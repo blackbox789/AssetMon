@@ -36,12 +36,22 @@ function srvSummaryKvRow(label, value) {
 }
 
 function srvSummaryMapLink(kind, label, s) {
-  const key = encodeURIComponent(s.hostname || s.id || "");
-  if (!key) return label;
+  const rawKey = s.hostname || s.id || "";
+  if (!rawKey) return label;
+  const key = String(rawKey).replace(/'/g, "");
   const isPower = kind === "power";
   const page = isPower ? "power-map.html" : "port-map.html";
-  const title = isPower ? "Buka Power Map (power-map.html) server ini" : "Buka Port Map (port-map.html) server ini";
-  return `<a class="srv-map-link" href="${page}?device=${key}" target="_blank" rel="noopener" title="${title}">${label} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>`;
+  const title = isPower ? "Buka Power Map server ini (popup)" : "Buka Port Map server ini (popup)";
+  const icon = `<i class="fa-solid fa-arrow-up-right-from-square"></i>`;
+  const psu = Math.max(1, parseInt(s.psuCount, 10) || 2);
+  if (isPower && typeof openPowerMap === "function") {
+    return `<button type="button" class="srv-map-link" title="${title}" onclick="openPowerMap('${key}', false, ${psu});return false;">${label} ${icon}</button>`;
+  }
+  if (!isPower && typeof openPortMap === "function") {
+    const form = String(s.formFactor || "").replace(/'/g, "");
+    return `<button type="button" class="srv-map-link" title="${title}" onclick="openPortMap('${key}', false, 0, { type: 'server', formFactor: '${form}' });return false;">${label} ${icon}</button>`;
+  }
+  return `<a class="srv-map-link" href="${page}?device=${encodeURIComponent(rawKey)}" target="_blank" rel="noopener" title="${title}">${label} ${icon}</a>`;
 }
 
 function srvSummaryChips(list, cls) {

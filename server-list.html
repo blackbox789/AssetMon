@@ -10,6 +10,8 @@
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/components.css">
 <link rel="stylesheet" href="css/server-list.css">
+<link rel="stylesheet" href="css/pdu-list.css">
+<link rel="stylesheet" href="css/map-pages.css">
 </head>
 <body>
 <div class="app-shell" id="app-shell">
@@ -684,5 +686,51 @@
 <script src="js/server-summary.js"></script>
 <script src="js/server-list.js"></script>
 <script src="js/server-form.js"></script>
+
+<div class="modal-overlay" id="portmap-overlay">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-head">
+      <div><div class="modal-title" id="portmap-title">Port Map</div><div class="modal-sub" id="portmap-sub"></div></div>
+      <div class="modal-close" id="portmap-close"><i class="fa-solid fa-xmark"></i></div>
+    </div>
+    <div id="portmap-body"></div>
+  </div>
+</div>
+
+<script src="js/port-data.js"></script>
+<script src="js/pdu-data.js"></script>
+
+<div class="modal-overlay" id="powermap-overlay">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-head">
+      <div><div class="modal-title" id="powermap-title">Power Map</div><div class="modal-sub" id="powermap-sub"></div></div>
+      <div style="display:flex;gap:8px;flex-shrink:0;">
+        <button class="btn ghost" id="powermap-portmap-btn" style="padding:7px 11px;font-size:12px;display:none;" title="Lihat port manajemen PDU"><i class="fa-solid fa-ethernet"></i> Port Map</button>
+        <button class="btn ghost" id="powermap-edit-btn" style="padding:7px 11px;font-size:12px;" title="Ubah jumlah outlet"><i class="fa-solid fa-pen"></i></button>
+        <div class="modal-close" id="powermap-close"><i class="fa-solid fa-xmark"></i></div>
+      </div>
+    </div>
+    <div id="powermap-edit-panel" style="display:none;background:var(--bg-surface-2);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
+      <label class="form-label" style="margin-bottom:8px;display:block;">Ubah Jumlah Power Outlet</label>
+      <div class="tag-picker" id="powermap-outlet-picker">
+        <div class="chip" data-outlet="8">8 outlet</div>
+        <div class="chip" data-outlet="12">12 outlet</div>
+        <div class="chip" data-outlet="16">16 outlet</div>
+        <div class="chip" data-outlet="24">24 outlet</div>
+        <div class="chip" data-outlet="36">36 outlet</div>
+        <div class="chip" data-outlet="custom">Custom…</div>
+      </div>
+      <input class="form-input mono" type="number" id="powermap-outlet-custom" min="1" max="36" style="display:none;margin-top:10px;" placeholder="Maks. 36 outlet">
+      <div class="form-hint" id="powermap-edit-warning" style="display:none;color:var(--warning);"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;">
+        <button class="btn ghost" id="powermap-edit-cancel" style="padding:7px 12px;font-size:12px;">Batal</button>
+        <button class="btn primary" id="powermap-edit-save" style="padding:7px 12px;font-size:12px;"><i class="fa-solid fa-check"></i> Simpan</button>
+      </div>
+    </div>
+    <div id="powermap-body"></div>
+  </div>
+</div>
+
+<script src="js/port-map.js"></script>
 </body>
 </html>

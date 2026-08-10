@@ -181,8 +181,13 @@ function renderRows() {
       e.stopPropagation();
       const s = servers.find(x => x.id === btn.closest("tr").dataset.id);
       if (!s) return;
-      const key = encodeURIComponent(s.hostname || s.id || "");
-      if (key) window.open("power-map.html?device=" + key, "_blank", "noopener");
+      const key = s.hostname || s.id || "";
+      if (!key) return;
+      if (typeof openPowerMap === "function") {
+        openPowerMap(key, false, parseInt(s.psuCount, 10) || 2);
+      } else {
+        window.open("power-map.html?device=" + encodeURIComponent(key), "_blank", "noopener");
+      }
     });
   });
   tbody.querySelectorAll("[data-srv-view]").forEach(btn => {
