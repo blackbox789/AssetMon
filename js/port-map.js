@@ -123,7 +123,9 @@ function openOutletEditor(outletNo) {
   document.getElementById("powermap-outlet-sub").textContent = row ? "Edit data perangkat yang terhubung ke outlet ini." : "Outlet kosong — isi data perangkat yang terhubung.";
   document.getElementById("powermap-outlet-label").value = row?.label || "";
   document.getElementById("powermap-outlet-device").value = row?.device || "";
-  document.getElementById("powermap-outlet-psu").value = row?.psu || "PSU-A";
+  const psuOpts = psuOptionsFor(psuCountOfDevice(row?.device || ""));
+  document.getElementById("powermap-outlet-psu").innerHTML = psuOpts.map(p => `<option value="${p}">${p}</option>`).join("");
+  document.getElementById("powermap-outlet-psu").value = row && psuOpts.includes(row.psu) ? row.psu : "PSU-A";
   document.getElementById("powermap-outlet-watt").value = row ? String(row.watt) : "";
   document.getElementById("powermap-outlet-delete").style.visibility = row ? "visible" : "hidden";
   document.getElementById("powermap-outlet-overlay").classList.add("open");
@@ -135,6 +137,13 @@ document.getElementById("powermap-outlet-overlay").addEventListener("click", e =
 });
 document.getElementById("powermap-outlet-close").addEventListener("click", () => document.getElementById("powermap-outlet-overlay").classList.remove("open"));
 document.getElementById("powermap-outlet-cancel").addEventListener("click", () => document.getElementById("powermap-outlet-overlay").classList.remove("open"));
+document.getElementById("powermap-outlet-device").addEventListener("input", () => {
+  const sel = document.getElementById("powermap-outlet-psu");
+  const prev = sel.value;
+  const opts = psuOptionsFor(psuCountOfDevice(document.getElementById("powermap-outlet-device").value.trim()));
+  sel.innerHTML = opts.map(p => `<option value="${p}">${p}</option>`).join("");
+  if (opts.includes(prev)) sel.value = prev;
+});
 document.getElementById("powermap-outlet-save").addEventListener("click", () => {
   if (!currentPduKey || editingOutlet == null) return;
   const data = POWER_DATA[currentPduKey];
@@ -293,9 +302,11 @@ function openDevicePsuEditor(deviceKey, ref) {
   pduSel.innerHTML = keys.map(k => `<option value="${k}">${k} (${pduPortsOf(k)} outlet)</option>`).join("");
   pduSel.value = current;
   const row = ref && POWER_DATA[ref.pdu] ? (POWER_DATA[ref.pdu].rows || []).find(r => r.outlet === ref.outlet && r.device === deviceKey) : null;
+  const psuOpts = psuOptionsFor(psuCountOfDevice(deviceKey));
+  document.getElementById("powermap-devpsu-psu").innerHTML = psuOpts.map(p => `<option value="${p}">${p}</option>`).join("");
   document.getElementById("powermap-devpsu-title").textContent = `PSU — ${deviceKey}`;
   document.getElementById("powermap-devpsu-sub").textContent = row ? "Edit koneksi PSU perangkat ini." : "Hubungkan perangkat ini ke outlet PDU yang tersedia.";
-  document.getElementById("powermap-devpsu-psu").value = row ? row.psu : "PSU-A";
+  document.getElementById("powermap-devpsu-psu").value = row && psuOpts.includes(row.psu) ? row.psu : "PSU-A";
   document.getElementById("powermap-devpsu-watt").value = row ? String(row.watt) : "";
   document.getElementById("powermap-devpsu-label").value = row?.label || "";
   document.getElementById("powermap-devpsu-delete").style.visibility = row ? "visible" : "hidden";

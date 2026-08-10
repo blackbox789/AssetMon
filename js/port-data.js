@@ -308,7 +308,27 @@ const DEFAULT_POWER_DATA = {
 function psuColor(psu) {
   if (psu === "PSU-A") return "var(--accent)";
   if (psu === "PSU-B") return "var(--info)";
+  if (psu === "Single PSU") return "var(--violet)";
+  const i = typeof psu === "string" && psu.startsWith("PSU-") ? psu.charCodeAt(4) - 65 : -1;
+  const palette = ["var(--warning)", "var(--danger)", "var(--violet)", "#0EA5E9", "#F97316", "#22C55E", "#E11D48", "#14B8A6"];
+  if (i >= 2 && i < 2 + palette.length) return palette[i - 2];
   return "var(--violet)";
+}
+
+function psuOptionsFor(count) {
+  const n = Math.min(10, Math.max(parseInt(count, 10) || 2, 1));
+  const opts = [];
+  for (let i = 0; i < n; i++) opts.push("PSU-" + String.fromCharCode(65 + i));
+  if (n === 1) opts.unshift("Single PSU"); else opts.push("Single PSU");
+  return opts;
+}
+
+function psuCountOfDevice(deviceKey) {
+  if (deviceKey && typeof getServers === "function") {
+    const s = getServers().find(x => x.id === deviceKey || x.hostname === deviceKey);
+    if (s) return parseInt(s.psuCount, 10) || 2;
+  }
+  return 2;
 }
 
 // ---- Persistensi Port Map & Power Map ke SQLite (via server.js /api/maps) ----
@@ -465,12 +485,11 @@ function openPowerMap(deviceKey, startInEdit, psuCount) {
         <td class="mono" style="color:var(--text-muted);">${r.label || "—"}</td>
         <td class="mono">${r.watt} W</td>
       </tr>`).join("");
+    const psuCountOptions = Array.from({ length: 10 }, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join("");
     const countSel = `
       <label class="form-hint" style="margin:0;flex-shrink:0;">Jumlah PSU</label>
       <select id="powermap-devpsu-count" title="Jumlah PSU perangkat" style="padding:7px 10px;font-size:12px;flex-shrink:0;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface-1);color:var(--text);">
-        <option value="1">1</option>
-        <option value="2">2</option>
-        <option value="4">4</option>
+        ${psuCountOptions}
       </select>`;
     document.getElementById("powermap-body").innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
