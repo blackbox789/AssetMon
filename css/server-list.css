@@ -104,3 +104,17 @@ tbody tr.row-selected .strong { color: var(--accent-text); }
   margin: 0 6px;
   white-space: nowrap;
 }
+.pg-size-select {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-2);
+  color: var(--text-secondary);
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-ui);
+  cursor: pointer;
+}
+.pg-size-select:hover { color: var(--accent-text); border-color: var(--accent); }
+.pg-size-select:focus { outline: none; border-color: var(--accent); }

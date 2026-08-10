@@ -14,7 +14,12 @@ const detailBody = document.getElementById("detail-body");
 
 let servers = [];
 let selectedId = null;
-const PAGE_SIZE = 50;
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
+const PAGE_SIZE_KEY = "rv_page_size";
+function getPageSize() {
+  const v = parseInt(localStorage.getItem(PAGE_SIZE_KEY) || "", 10);
+  return PAGE_SIZE_OPTIONS.includes(v) ? v : 50;
+}
 let currentPage = 1;
 
 const COND_CLASS = { "Active": "online", "Standby": "maintenance", "Decommissioned": "offline" };
@@ -79,10 +84,15 @@ function renderStats() {
 function renderPagination(total) {
   const wrap = document.getElementById("srv-pagination");
   if (!wrap) return;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const size = getPageSize();
+  const pages = Math.max(1, Math.ceil(total / size));
   const page = Math.min(Math.max(1, currentPage), pages);
   currentPage = page;
+  const sizeSel = `<select id="pg-size" class="pg-size-select" title="Jumlah server per halaman">${
+    PAGE_SIZE_OPTIONS.map(n => `<option value="${n}"${n === size ? " selected" : ""}>${n}/hlm</option>`).join("")
+  }</select>`;
   const btns = [];
+  btns.push(sizeSel);
   btns.push(`<button type="button" data-pg="prev" ${page === 1 ? "disabled" : ""}><i class="fa-solid fa-chevron-left"></i></button>`);
   const shown = new Set([1, pages, page, page - 1, page + 1].filter(p => p >= 1 && p <= pages));
   let last = 0;
@@ -92,8 +102,17 @@ function renderPagination(total) {
     last = p;
   });
   btns.push(`<button type="button" data-pg="next" ${page === pages ? "disabled" : ""}><i class="fa-solid fa-chevron-right"></i></button>`);
-  btns.push(`<span class="pg-info">${total} server · ${PAGE_SIZE}/hlm</span>`);
+  btns.push(`<span class="pg-info">${total} server</span>`);
   wrap.innerHTML = btns.join("");
+  const sizeSelEl = document.getElementById("pg-size");
+  if (sizeSelEl) {
+    sizeSelEl.addEventListener("change", () => {
+      const n = parseInt(sizeSelEl.value, 10);
+      localStorage.setItem(PAGE_SIZE_KEY, String(n));
+      currentPage = 1;
+      render();
+    });
+  }
   wrap.querySelectorAll("button").forEach(b => {
     b.addEventListener("click", () => {
       const v = b.dataset.pg;
@@ -105,19 +124,20 @@ function renderPagination(total) {
 
 function goToPage(page) {
   const total = servers.filter(matchFilters).length;
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pages = Math.max(1, Math.ceil(total / getPageSize()));
   currentPage = Math.min(Math.max(1, page), pages);
   renderRows();
 }
 
 function renderRows() {
   const list = servers.filter(matchFilters);
-  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const size = getPageSize();
+  const pages = Math.max(1, Math.ceil(list.length / size));
   currentPage = Math.min(Math.max(1, currentPage), pages);
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const pageList = list.slice(start, start + PAGE_SIZE);
+  const start = (currentPage - 1) * size;
+  const pageList = list.slice(start, start + size);
   const from = list.length ? start + 1 : 0;
-  const to = Math.min(start + PAGE_SIZE, list.length);
+  const to = Math.min(start + size, list.length);
   countText.textContent = list.length
     ? `Menampilkan ${from}–${to} dari ${list.length} server`
     : "Menampilkan 0 server";
