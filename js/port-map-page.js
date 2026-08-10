@@ -90,6 +90,15 @@ function pmCollectDevices() {
       const def = PM_DEFAULT_BY_TYPE[d.type] || PM_DEFAULT_BY_TYPE.server;
       d.ports = def.ports; d.sfp = def.sfp; d.qsfp = def.qsfp || 0; d.used = 0;
     }
+    if (d.type === "server" && typeof getServers === "function") {
+      try {
+        const srv = getServers().find(s => (s.hostname || "").toLowerCase() === String(d.name).toLowerCase());
+        if (srv) {
+          const l = portLayoutFromServer(srv, d.ports, d.sfp || 0, d.qsfp || 0);
+          d.ports = l.ports; d.sfp = l.sfp; d.qsfp = l.qsfp;
+        }
+      } catch (e) { /* abaikan */ }
+    }
     return d;
   });
 }

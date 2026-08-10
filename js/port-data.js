@@ -553,8 +553,15 @@ function openPowerMap(deviceKey, startInEdit, psuCount) {
     document.getElementById("powermap-sub").textContent = rows.length
       ? `${rows.length} PSU terhubung · Total beban ${totalWatt} W`
       : "Belum ada data power untuk perangkat ini.";
-    const slotCount = Math.min(10, Math.max(psuCount || 2, rows.length));
-    const curPsu = Math.min(10, Math.max(parseInt(psuCount, 10) || 2, 1));
+    let effPsu = parseInt(psuCount, 10) || 2;
+    if (typeof getServers === "function") {
+      try {
+        const s = getServers().find(x => (x.hostname || "").toLowerCase() === String(deviceKey).toLowerCase());
+        if (s) effPsu = parseInt(s.psuCount, 10) || 2;
+      } catch (err) { /* abaikan */ }
+    }
+    const slotCount = Math.min(10, Math.max(effPsu, rows.length));
+    const curPsu = Math.min(10, Math.max(effPsu, 1));
     let cells = "";
     for (let i = 1; i <= slotCount; i++) {
       const row = rows[i - 1];

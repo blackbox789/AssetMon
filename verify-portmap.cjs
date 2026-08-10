@@ -131,5 +131,28 @@ global.document.getElementById("portmap-count-save").click();
 check("peringatan muncul saat koneksi QSFP4 akan disembunyikan", global._alerts === before + 1);
 check("qsfp tidak diubah (tetap 2)", E(`PORT_DATA["SRV-QSFP-02"].qsfp`) === 2);
 
+// ---- 4) Power Map: psuCount dari record server walau dipanggil tanpa argumen ----
+console.log("[4] Power Map — psuCount tersinkron dari record server");
+E(`_servers.push({ hostname: "SRV-PSU-04", id: "SRV-PSU-04", psuCount: "4", psuWatt: "2200 W" })`);
+E(`openPowerMap("SRV-PSU-04", false, 0)`);
+const pmBody = elements["powermap-body"].innerHTML;
+check("dropdown Jumlah PSU = 4 (dari record, bukan default 2)", elements["powermap-devpsu-count"].value === "4");
+check("render 4 slot PSU (Slot PSU 4 ada)", pmBody.includes("Slot PSU 4") && !pmBody.includes("Slot PSU 5"));
+E(`openPowerMap("SRV-PSU-04", false, 8)`);
+check("count eksplisit tidak menimpa record server (tetap 4)", elements["powermap-devpsu-count"].value === "4");
+// non-server (tanpa record) tetap pakai argumen/default
+E(`openPowerMap("PDU-B", false, 0)`);
+check("PDU tetap pakai cabang PDU (judul PDU-B)", elements["powermap-title"].textContent === "PDU-B — Power Map");
+
+// ---- 5) Direktori Port Map: layout tersinkron dari record server ----
+console.log("[5] direktori port-map-page — sync dari record server");
+E(`PDU_DATA = []`);
+global.location = { search: "" };
+vm.runInThisContext(fs.readFileSync(path.join(__dirname, "js", "port-map-page.js"), "utf8"), { filename: "port-map-page.js" });
+const d1 = E(`pmCollectDevices().find(x => x.name === "SRV-QSFP-01")`);
+const d2 = E(`pmCollectDevices().find(x => x.name === "SRV-QSFP-02")`);
+check("SRV-QSFP-01 di direktori = record 4/2/2", d1.ports === 4 && d1.sfp === 2 && d1.qsfp === 2);
+check("SRV-QSFP-02 di direktori ikut record 6/4/2", d2.ports === 6 && d2.sfp === 4 && d2.qsfp === 2);
+
 console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
