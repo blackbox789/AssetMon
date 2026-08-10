@@ -222,6 +222,13 @@ function updateServer(id, server) {
   if (!id) return false;
   const entry = { ...server, id };
   if (entry.hostname) entry.hostname = canonKey(entry.hostname);
+  try {
+    const prev = getServers().find(s => s.id === id);
+    const oldHost = prev && prev.hostname ? canonKey(prev.hostname) : "";
+    if (oldHost && entry.hostname && oldHost !== entry.hostname) {
+      rekeyDeviceMaps(oldHost, entry.hostname);
+    }
+  } catch (e) { /* abaikan */ }
   const isDemo = String(id).startsWith("demo-");
   if (!isDemo && typeof apiSaveServer === "function" && apiSaveServer(entry)) {
     return true;

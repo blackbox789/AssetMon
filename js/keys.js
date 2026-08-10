@@ -43,3 +43,26 @@ function writeStorageVersion(v) {
     localStorage.setItem(SCHEMA_VERSION_KEY, String(v));
   } catch (e) { /* abaikan */ }
 }
+
+// ---- Rekey map & registri saat perangkat diganti nama ----
+// Memindahkan semua Port Map & Power Map (localStorage + DB via registri)
+// dari key lama ke key baru supaya indexing tetap konsisten. Dipanggil
+// saat hostname/nama perangkat berubah.
+function rekeyDeviceMaps(oldKey, newKey) {
+  const from = canonKey(oldKey);
+  const to = canonKey(newKey);
+  if (!from || !to || from === to) return;
+  [PORT_STORAGE_KEY, POWER_STORAGE_KEY].forEach(storageKey => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      const obj = JSON.parse(raw) || {};
+      if (obj[from]) {
+        obj[to] = obj[from];
+        delete obj[from];
+        localStorage.setItem(storageKey, JSON.stringify(obj));
+      }
+    } catch (e) { /* abaikan */ }
+  });
+  if (typeof apiRenameDevice === "function") apiRenameDevice(from, to);
+}

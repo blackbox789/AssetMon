@@ -236,10 +236,12 @@ document.getElementById("save-add-pdu").addEventListener("click", () => {
     if (old) {
       entry.used = old.used || 0;
       PDU_DATA[idx] = entry;
-      if (old.name !== name && POWER_DATA[old.name]) {
-        if (typeof apiRenameDevice === "function") apiRenameDevice(old.name, name);
-        POWER_DATA[name] = POWER_DATA[old.name];
-        delete POWER_DATA[old.name];
+      if (old.name !== name) {
+        if (POWER_DATA[old.name]) {
+          POWER_DATA[name] = POWER_DATA[old.name];
+          delete POWER_DATA[old.name];
+        }
+        rekeyDeviceMaps(old.name, name);
       }
       if (POWER_DATA[name]) POWER_DATA[name].ports = ports;
       else POWER_DATA[name] = { ports, rows: [] };
