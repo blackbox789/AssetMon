@@ -49,6 +49,8 @@ global._alerts = 0;
 global.alert = () => { global._alerts++; };
 global.window = global;
 
+const srcKeys = fs.readFileSync(path.join(__dirname, "js", "keys.js"), "utf8");
+vm.runInThisContext(srcKeys, { filename: "keys.js" });
 const src = fs.readFileSync(path.join(__dirname, "js", "port-data.js"), "utf8");
 vm.runInThisContext(src, { filename: "port-data.js" });
 
@@ -153,6 +155,20 @@ const d1 = E(`pmCollectDevices().find(x => x.name === "SRV-QSFP-01")`);
 const d2 = E(`pmCollectDevices().find(x => x.name === "SRV-QSFP-02")`);
 check("SRV-QSFP-01 di direktori = record 4/2/2", d1.ports === 4 && d1.sfp === 2 && d1.qsfp === 2);
 check("SRV-QSFP-02 di direktori ikut record 6/4/2", d2.ports === 6 && d2.sfp === 4 && d2.qsfp === 2);
+
+// ---- 6) canonKey & normalisasi key (R1/R2) ----
+console.log("[6] canonKey & normalisasi key runtime");
+eq("canonKey trim + uppercase", E(`canonKey("  srv-web-01 ")`), "SRV-WEB-01");
+eq("canonKey PDU dipertahankan", E(`canonKey("PDU-A")`), "PDU-A");
+eq("normalizeRuntimeKeys gabung duplikat case", E(`Object.keys(normalizeRuntimeKeys({ "srv-web-01": 1, "SRV-WEB-01": 2 })).join(",")`), "SRV-WEB-01");
+global._store = {};
+global.localStorage.getItem = k => global._store[k] || null;
+global.localStorage.setItem = (k, v) => { global._store[k] = v; };
+E(`_store["rv_port_maps"] = JSON.stringify({ "srv-low-01": { type: "server", ports: 2, rows: [] } })`);
+const pm6 = E(`buildRuntimeMaps("port", DEFAULT_PORT_DATA)`);
+check("key runtime kanonik (lower -> UPPER)", !!pm6["SRV-LOW-01"] && pm6["SRV-LOW-01"].ports === 2);
+E(`saveMap("port", " pdu-x ", { type: "pdu", ports: 8, rows: [] })`);
+check("saveMap menormalkan key sebelum disimpan", !!JSON.parse(E(`_store["rv_port_maps"]`))["PDU-X"]);
 
 console.log(`\nRESULT: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

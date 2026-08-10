@@ -5,7 +5,9 @@
   "description": "RackView — Datacenter Asset Mgmt (static UI + Express/SQLite backend)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "seed": "node data/seed.js",
+    "seed:example": "node data/seed.js --make-example"
   },
   "dependencies": {
     "express": "^4.21.2"

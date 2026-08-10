@@ -109,7 +109,6 @@ assetTypeSelect.addEventListener("change", populateModelList);
 populateModelList();
 
 // ---- Network Switch: template Port Map per Jenis Switch + simpan ke localStorage ----
-const SWITCH_STORAGE_KEY = "rv_switches";
 const SWITCH_TEMPLATES = {
   ethernet:   { ports: 24, sfp: 2 },
   san:        { ports: 24, sfp: 0 },
@@ -198,6 +197,7 @@ function saveSwitchAsset() {
     setTimeout(() => { nameField.closest(".m-field").style.outline = ""; }, 1600);
     return;
   }
+  sw.name = canonKey(sw.name);
   if (typeof PORT_DATA !== "undefined") {
     const tpl = SWITCH_TEMPLATES[sw.type] || SWITCH_TEMPLATES.ethernet;
     PORT_DATA[sw.name] = { type: "switch", switchType: sw.type, ports: tpl.ports, sfp: tpl.sfp, rows: [] };
@@ -216,7 +216,6 @@ function renderSavedSwitches() {
 
 // ---- Asset aksesori (KVM Switch, Patch Panel, Cable Management, Cooling Fan, dll) ----
 const ACCESSORY_TYPES = ["kvm-switch", "patch", "cable-management", "cooling-fan", "storage", "ups", "pdu", "firewall", "router", "blanking-panel", "monitoring-sensor", "custom"];
-const ACC_STORAGE_KEY = "rv_accessories";
 
 function readLocalAccessories() {
   try {
@@ -293,6 +292,7 @@ function saveAccessoryAsset() {
     setTimeout(() => { nameField.closest(".m-field").style.outline = ""; }, 1600);
     return;
   }
+  a.name = canonKey(a.name);
   if (["patch", "firewall", "router"].includes(a.type) && typeof PORT_DATA !== "undefined") {
     PORT_DATA[a.name] = { type: a.type, ports: 24, sfp: 0, rows: [] };
     if (typeof savePortMap === "function") savePortMap(a.name);

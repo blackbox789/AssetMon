@@ -15,7 +15,6 @@ const detailBody = document.getElementById("detail-body");
 let servers = [];
 let selectedId = null;
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
-const PAGE_SIZE_KEY = "rv_page_size";
 function getPageSize() {
   const v = parseInt(localStorage.getItem(PAGE_SIZE_KEY) || "", 10);
   return PAGE_SIZE_OPTIONS.includes(v) ? v : 50;

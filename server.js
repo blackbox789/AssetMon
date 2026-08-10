@@ -12,12 +12,26 @@ db.exec("PRAGMA journal_mode = WAL;");
 db.exec("PRAGMA foreign_keys = ON;");
 db.exec(`
   -- Skema & kunci utama:
-  --  racks    : rackId (PK, unik per rack fisik) + kolom ringkasan; diindeks site & createdAt.
+  --  devices  : registri master semua perangkat (deviceKey PK, dinormalisasi
+  --             uppercase). Semua tipe (server, switch, firewall, pdu, patch,
+  --             router, ups, dll) terdaftar di sini sehingga Port Map & Power Map
+  --             punya referensi yang konsisten (referential integrity).
+  --  racks    : rackId (PK, unik per rack fisik, uppercase) + kolom ringkasan;
+  --             diindeks site & createdAt.
   --  servers  : id (PK) = id server; detail tersimpan sebagai JSON di kolom data.
   --  maps     : satu tabel untuk Port Map & Power Map, dibedakan lewat kind
   --             ('port' => deviceKey = hostname perangkat; 'power' => deviceKey = nama PDU).
   --             PK (kind, deviceKey) menjamin satu data per (jenis, perangkat);
-  --             deviceKey diindeks agar pencarian lintas-kind (mis. semua kabel milik sebuah perangkat) cepat.
+  --             FK deviceKey -> devices.deviceKey (registri master);
+  --             deviceKey diindeks agar pencarian lintas-kind cepat.
+  CREATE TABLE IF NOT EXISTS devices (
+    deviceKey  TEXT PRIMARY KEY,
+    type       TEXT NOT NULL DEFAULT 'device',
+    name       TEXT NOT NULL DEFAULT '',
+    data       TEXT NOT NULL DEFAULT '{}',
+    createdAt  TEXT NOT NULL DEFAULT (datetime('now')),
+    updatedAt  TEXT NOT NULL DEFAULT (datetime('now'))
+  );
   CREATE TABLE IF NOT EXISTS racks (
     rackId       TEXT PRIMARY KEY,
     site         TEXT NOT NULL DEFAULT '',
@@ -46,8 +60,11 @@ db.exec(`
     data      TEXT NOT NULL,
     createdAt TEXT NOT NULL DEFAULT (datetime('now')),
     updatedAt TEXT NOT NULL DEFAULT (datetime('now')),
-    PRIMARY KEY (kind, deviceKey)
+    PRIMARY KEY (kind, deviceKey),
+    FOREIGN KEY (deviceKey) REFERENCES devices(deviceKey),
+    CHECK (kind IN ('port', 'power'))
   );
+  CREATE INDEX IF NOT EXISTS idx_devices_type ON devices(type);
   CREATE INDEX IF NOT EXISTS idx_maps_device_key ON maps(deviceKey);
   CREATE INDEX IF NOT EXISTS idx_maps_kind_created ON maps(kind, createdAt);
   CREATE INDEX IF NOT EXISTS idx_racks_site ON racks(site);
@@ -58,6 +75,64 @@ const mapCols = db.prepare("PRAGMA table_info(maps)").all();
 if (!mapCols.some(c => c.name === "updatedAt")) {
   db.exec("ALTER TABLE maps ADD COLUMN updatedAt TEXT NOT NULL DEFAULT (datetime('now'))");
 }
+
+// ---- Normalisasi master key perangkat (sama dengan js/keys.js canonKey) ----
+function canonKey(name) {
+  return String(name == null ? "" : name).trim().toUpperCase().replace(/\s+/g, " ");
+}
+
+function upsertDevice(deviceKey, type, name, data) {
+  const key = canonKey(deviceKey);
+  if (!key) return;
+  db.prepare(`
+    INSERT INTO devices (deviceKey, type, name, data) VALUES (?, ?, ?, ?)
+    ON CONFLICT(deviceKey) DO UPDATE SET
+      type=excluded.type, name=excluded.name,
+      data=CASE WHEN excluded.data != '{}' THEN excluded.data ELSE devices.data END,
+      updatedAt=datetime('now')
+  `).run(key, String(type || "device"), String(name || key), data ? JSON.stringify(data) : "{}");
+}
+
+// Normalisasi sekali-berjalan: deviceKey maps dibuat kanonik; duplikat yang
+// hanya beda case dikubur (entri dengan updatedAt terbaru yang menang).
+function normalizeMapKeys() {
+  const rows = db.prepare("SELECT kind, deviceKey, data, updatedAt FROM maps ORDER BY updatedAt").all();
+  const byKind = {};
+  const drop = [];
+  rows.forEach(r => {
+    const key = canonKey(r.deviceKey);
+    if (key === r.deviceKey) { (byKind[r.kind] = byKind[r.kind] || {})[key] = 1; return; }
+    const seen = (byKind[r.kind] = byKind[r.kind] || {});
+    if (seen[key]) {
+      drop.push([r.kind, r.deviceKey]);
+    } else {
+      seen[key] = 1;
+      db.prepare("UPDATE maps SET deviceKey = ? WHERE kind = ? AND deviceKey = ?").run(key, r.kind, r.deviceKey);
+    }
+  });
+  const del = db.prepare("DELETE FROM maps WHERE kind = ? AND deviceKey = ?");
+  drop.forEach(([kind, key]) => del.run(kind, key));
+  return { renamed: rows.length - drop.length, dropped: drop.length };
+}
+
+// Backfill registri devices dari servers + maps yang sudah ada (legacy data).
+function backfillDevices() {
+  db.prepare("SELECT id, data FROM servers").all().forEach(r => {
+    try {
+      const s = JSON.parse(r.data);
+      upsertDevice(s.hostname || s.id || r.id, "server", s.hostname || s.id || r.id, s);
+    } catch (e) { /* abaikan baris rusak */ }
+  });
+  db.prepare("SELECT kind, deviceKey, data FROM maps").all().forEach(r => {
+    try {
+      const d = JSON.parse(r.data);
+      upsertDevice(r.deviceKey, (d && d.type) || "device", r.deviceKey, d);
+    } catch (e) { /* abaikan baris rusak */ }
+  });
+}
+
+normalizeMapKeys();
+backfillDevices();
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -71,7 +146,16 @@ app.use((req, res, next) => {
 });
 
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, racks: db.prepare("SELECT COUNT(*) c FROM racks").get().c, servers: db.prepare("SELECT COUNT(*) c FROM servers").get().c, maps: db.prepare("SELECT COUNT(*) c FROM maps").get().c });
+  res.json({ ok: true, racks: db.prepare("SELECT COUNT(*) c FROM racks").get().c, servers: db.prepare("SELECT COUNT(*) c FROM servers").get().c, maps: db.prepare("SELECT COUNT(*) c FROM maps").get().c, devices: db.prepare("SELECT COUNT(*) c FROM devices").get().c });
+});
+
+// ---- Ekspor seluruh data (untuk backup/deploy: `node data/seed.js` bisa mengimpornya) ----
+app.get("/api/export", (req, res) => {
+  const racks = db.prepare("SELECT * FROM racks").all();
+  const servers = db.prepare("SELECT data FROM servers").all().map(r => JSON.parse(r.data));
+  const maps = db.prepare("SELECT kind, deviceKey, data FROM maps").all().map(r => ({ kind: r.kind, deviceKey: r.deviceKey, data: JSON.parse(r.data) }));
+  const devices = db.prepare("SELECT deviceKey, type, name FROM devices").all();
+  res.json({ exportedAt: new Date().toISOString(), racks, servers, maps, devices });
 });
 
 app.get("/api/racks", (req, res) => {
@@ -120,13 +204,80 @@ app.post("/api/servers", (req, res) => {
   const s = req.body || {};
   const id = s.id || "srv-" + Date.now().toString(36);
   const record = { ...s, id };
+  if (record.hostname) record.hostname = canonKey(record.hostname);
   db.prepare("INSERT INTO servers (id, data) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET data=excluded.data").run(id, JSON.stringify(record));
+  upsertDevice(record.hostname || id, "server", record.hostname || id, record);
   res.json({ ok: true, id });
 });
 
 app.delete("/api/servers/:id", (req, res) => {
-  db.prepare("DELETE FROM servers WHERE id = ?").run(String(req.params.id || ""));
+  const id = String(req.params.id || "");
+  db.prepare("DELETE FROM servers WHERE id = ?").run(id);
   res.json({ ok: true });
+});
+
+// ---- Registri master perangkat (devices) ----
+app.get("/api/devices", (req, res) => {
+  const rows = db.prepare("SELECT deviceKey, type, name FROM devices ORDER BY deviceKey").all();
+  res.json(rows);
+});
+
+app.post("/api/devices", (req, res) => {
+  const d = req.body || {};
+  const deviceKey = canonKey(d.deviceKey || d.name || "");
+  if (!deviceKey) return res.status(400).json({ error: "deviceKey wajib diisi" });
+  upsertDevice(deviceKey, d.type, d.name || deviceKey, d.data);
+  res.json({ ok: true, deviceKey });
+});
+
+// Hapus perangkat + semua Port/Power Map terkait (kaskade via aplikasi).
+app.delete("/api/devices/:deviceKey", (req, res) => {
+  const deviceKey = canonKey(req.params.deviceKey || "");
+  db.exec("BEGIN");
+  try {
+    db.prepare("DELETE FROM maps WHERE deviceKey = ?").run(deviceKey);
+    db.prepare("DELETE FROM devices WHERE deviceKey = ?").run(deviceKey);
+    db.exec("COMMIT");
+    res.json({ ok: true, deviceKey });
+  } catch (e) {
+    db.exec("ROLLBACK");
+    res.status(500).json({ error: String(e.message || e) });
+  }
+});
+
+// Ganti nama perangkat: update devices.deviceKey + semua maps.deviceKey.
+app.put("/api/devices/:deviceKey/rename", (req, res) => {
+  const from = canonKey(req.params.deviceKey || "");
+  const to = canonKey((req.body && (req.body.to || req.body.deviceKey)) || "");
+  if (!from || !to) return res.status(400).json({ error: "deviceKey asal & tujuan wajib diisi" });
+  if (from === to) return res.json({ ok: true, deviceKey: to });
+  const exists = db.prepare("SELECT deviceKey FROM devices WHERE deviceKey = ?").get(to);
+  db.exec("BEGIN");
+  try {
+    if (exists) {
+      // target sudah ada: gabungkan maps milik `from` ke `to` (konflik: yang baru saja diperbarui).
+      const rows = db.prepare("SELECT kind, data, updatedAt FROM maps WHERE deviceKey = ?").all(from);
+      const upd = db.prepare("UPDATE maps SET data = excluded.data, updatedAt = excluded.updatedAt WHERE kind = ? AND deviceKey = ?");
+      const ins = db.prepare("INSERT INTO maps (kind, deviceKey, data, updatedAt) VALUES (?, ?, ?, ?)");
+      rows.forEach(r => {
+        const cur = db.prepare("SELECT updatedAt FROM maps WHERE kind = ? AND deviceKey = ?").get(r.kind, to);
+        if (!cur || cur.updatedAt <= r.updatedAt) {
+          upd.run(r.data, r.kind, to);
+          if (!cur) ins.run(r.kind, to, r.data, r.updatedAt);
+        }
+      });
+      db.prepare("DELETE FROM maps WHERE deviceKey = ?").run(from);
+      db.prepare("DELETE FROM devices WHERE deviceKey = ?").run(from);
+    } else {
+      db.prepare("UPDATE maps SET deviceKey = ? WHERE deviceKey = ?").run(to, from);
+      db.prepare("UPDATE devices SET deviceKey = ?, updatedAt = datetime('now') WHERE deviceKey = ?").run(to, from);
+    }
+    db.exec("COMMIT");
+    res.json({ ok: true, deviceKey: to });
+  } catch (e) {
+    db.exec("ROLLBACK");
+    res.status(500).json({ error: String(e.message || e) });
+  }
 });
 
 app.get("/api/maps/:kind", (req, res) => {
@@ -137,7 +288,7 @@ app.get("/api/maps/:kind", (req, res) => {
 
 app.get("/api/maps/:kind/:deviceKey", (req, res) => {
   const kind = String(req.params.kind || "");
-  const deviceKey = String(req.params.deviceKey || "");
+  const deviceKey = canonKey(req.params.deviceKey || "");
   const row = db.prepare("SELECT deviceKey, data FROM maps WHERE kind = ? AND deviceKey = ?").get(kind, deviceKey);
   if (!row) return res.status(404).json({ error: "tidak ditemukan" });
   res.json({ deviceKey: row.deviceKey, data: JSON.parse(row.data) });
@@ -145,10 +296,11 @@ app.get("/api/maps/:kind/:deviceKey", (req, res) => {
 
 app.post("/api/maps/:kind/:deviceKey", (req, res) => {
   const kind = String(req.params.kind || "");
-  const deviceKey = String(req.params.deviceKey || "");
+  const deviceKey = canonKey(req.params.deviceKey || "");
   if (!["port", "power"].includes(kind)) return res.status(400).json({ error: "kind harus 'port' atau 'power'" });
   if (!deviceKey) return res.status(400).json({ error: "deviceKey wajib diisi" });
   const data = (req.body && req.body.data !== undefined) ? req.body.data : req.body;
+  upsertDevice(deviceKey, (data && data.type) || "device", deviceKey, data);
   db.prepare(`
     INSERT INTO maps (kind, deviceKey, data) VALUES (?, ?, ?)
     ON CONFLICT(kind, deviceKey) DO UPDATE SET data=excluded.data, updatedAt=datetime('now')
@@ -158,7 +310,7 @@ app.post("/api/maps/:kind/:deviceKey", (req, res) => {
 
 app.delete("/api/maps/:kind/:deviceKey", (req, res) => {
   const kind = String(req.params.kind || "");
-  const deviceKey = String(req.params.deviceKey || "");
+  const deviceKey = canonKey(req.params.deviceKey || "");
   db.prepare("DELETE FROM maps WHERE kind = ? AND deviceKey = ?").run(kind, deviceKey);
   res.json({ ok: true });
 });

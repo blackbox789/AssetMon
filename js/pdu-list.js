@@ -207,7 +207,7 @@ function resetForm() {
 
 // ---- Save (Add / Edit) ----
 document.getElementById("save-add-pdu").addEventListener("click", () => {
-  const name = document.getElementById("pdu-name").value.trim();
+  const name = canonKey(document.getElementById("pdu-name").value.trim());
   if (!name) {
     document.getElementById("pdu-name").focus();
     return;
@@ -237,6 +237,7 @@ document.getElementById("save-add-pdu").addEventListener("click", () => {
       entry.used = old.used || 0;
       PDU_DATA[idx] = entry;
       if (old.name !== name && POWER_DATA[old.name]) {
+        if (typeof apiRenameDevice === "function") apiRenameDevice(old.name, name);
         POWER_DATA[name] = POWER_DATA[old.name];
         delete POWER_DATA[old.name];
       }
@@ -248,6 +249,8 @@ document.getElementById("save-add-pdu").addEventListener("click", () => {
     PDU_DATA.unshift(entry);
     POWER_DATA[name] = { ports, rows: [] };
   }
+  if (typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: name, type: "pdu", name });
+  if (typeof savePowerMap === "function") savePowerMap(name);
   setAddTitle("add");
   renderTable();
   closeModal();

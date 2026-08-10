@@ -70,7 +70,7 @@ function pmCollectDevices() {
     add(p.name, { type: "pdu", model: [p.brand, p.model].filter(Boolean).join(" "), rack: p.rack, ip: p.ip, status: p.status });
   });
   try {
-    const swList = JSON.parse(localStorage.getItem("rv_switches") || "[]");
+    const swList = JSON.parse(localStorage.getItem(SWITCH_STORAGE_KEY) || "[]");
     if (Array.isArray(swList)) {
       swList.forEach(sw => {
         if (sw && sw.name) {
@@ -85,6 +85,16 @@ function pmCollectDevices() {
       });
     }
   } catch (e) { /* abaikan */ }
+  if (typeof apiGetDevices === "function") {
+    try {
+      const devs = apiGetDevices();
+      if (Array.isArray(devs)) {
+        devs.forEach(d => {
+          if (d && d.deviceKey) add(d.deviceKey, { type: d.type || "device", model: d.name || "" });
+        });
+      }
+    } catch (e) { /* abaikan */ }
+  }
   return [...map.values()].map(d => {
     if (!d.hasData) {
       const def = PM_DEFAULT_BY_TYPE[d.type] || PM_DEFAULT_BY_TYPE.server;

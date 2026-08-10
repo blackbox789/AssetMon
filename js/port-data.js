@@ -175,6 +175,7 @@ function specialPortColor(key) {
 }
 
 function openPortMap(deviceKey, startInEdit, psuCount, opts) {
+  deviceKey = canonKey(deviceKey);
   let data = PORT_DATA[deviceKey];
   const isFallback = !data;
   if (!data) {
@@ -425,9 +426,6 @@ function psuCountOfDevice(deviceKey) {
 // ---- Persistensi Port Map & Power Map ke SQLite (via server.js /api/maps) ----
 // Data tersimpan per perangkat (deviceKey). DEFAULT_* adalah seed demo yang
 // dipakai sebagai fallback; data hasil edit tersimpan ke DB dan menimpa default.
-const PORT_STORAGE_KEY = "rv_port_maps";
-const POWER_STORAGE_KEY = "rv_power_maps";
-
 function readLocalMaps(storageKey) {
   try {
     const obj = JSON.parse(localStorage.getItem(storageKey) || "{}");
@@ -471,8 +469,20 @@ function applySpecialsDefaults(kind, runtime, defaults) {
   });
 }
 
+// Normalisasi key runtime: semua deviceKey dibuat kanonik (uppercase).
+// Dua entri yang hanya beda case (mis. "srv-web-01" vs "SRV-WEB-01")
+// dianggap satu perangkat — entri terakhir yang menang.
+function normalizeRuntimeKeys(runtime) {
+  const out = {};
+  Object.keys(runtime).forEach(k => {
+    if (!runtime[k]) return;
+    out[canonKey(k)] = runtime[k];
+  });
+  return out;
+}
+
 function buildRuntimeMaps(kind, defaults) {
-  const runtime = JSON.parse(JSON.stringify(defaults));
+  let runtime = JSON.parse(JSON.stringify(defaults));
   const storageKey = kind === "port" ? PORT_STORAGE_KEY : POWER_STORAGE_KEY;
   const ls = readLocalMaps(storageKey);
   if (typeof apiGetMaps === "function") {
@@ -482,18 +492,21 @@ function buildRuntimeMaps(kind, defaults) {
         Object.keys(ls).forEach(k => apiSaveMap(kind, k, ls[k]));
       }
       db.forEach(e => { runtime[e.deviceKey] = e.data; });
+      runtime = normalizeRuntimeKeys(runtime);
       applyMediaDefaults(kind, runtime, defaults);
       applySpecialsDefaults(kind, runtime, defaults);
       return runtime;
     }
   }
   Object.keys(ls).forEach(k => { runtime[k] = ls[k]; });
+  runtime = normalizeRuntimeKeys(runtime);
   applyMediaDefaults(kind, runtime, defaults);
   applySpecialsDefaults(kind, runtime, defaults);
   return runtime;
 }
 
 function saveMap(kind, deviceKey, data) {
+  deviceKey = canonKey(deviceKey);
   if (typeof apiSaveMap === "function" && apiSaveMap(kind, deviceKey, data)) return true;
   try {
     const storageKey = kind === "port" ? PORT_STORAGE_KEY : POWER_STORAGE_KEY;
@@ -532,6 +545,7 @@ function buildOutletRows(totalPorts) {
 }
 
 function openPowerMap(deviceKey, startInEdit, psuCount) {
+  deviceKey = canonKey(deviceKey);
   const data = POWER_DATA[deviceKey];
   currentPduKey = deviceKey || null;
   document.getElementById("powermap-title").textContent = deviceKey ? deviceKey + " — Power Map" : "Power Map";

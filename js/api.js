@@ -58,3 +58,21 @@ function apiSaveMap(kind, deviceKey, data) {
 function apiDeleteMap(kind, deviceKey) {
   return apiRequest("DELETE", "/maps/" + encodeURIComponent(kind) + "/" + encodeURIComponent(deviceKey));
 }
+
+// ---- Registri master perangkat (devices) ----
+function apiGetDevices() {
+  const r = apiRequest("GET", "/devices");
+  return Array.isArray(r) ? r : null;
+}
+
+function apiSaveDevice(device) {
+  return apiRequest("POST", "/devices", device);
+}
+
+function apiDeleteDevice(deviceKey) {
+  return apiRequest("DELETE", "/devices/" + encodeURIComponent(deviceKey));
+}
+
+function apiRenameDevice(oldKey, newKey) {
+  return apiRequest("PUT", "/devices/" + encodeURIComponent(oldKey) + "/rename", { to: newKey });
+}

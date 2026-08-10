@@ -6,8 +6,6 @@
    dan tampil paling atas di Daftar Server.
    ============================================ */
 
-const SERVER_STORAGE_KEY = "rv_servers";
-
 const DEFAULT_SERVERS = [
   {
     id: "demo-1", hostname: "SRV-DB-01", tipeServer: "rack", formFactor: "2U",
@@ -206,6 +204,7 @@ function getServers() {
 
 function saveServer(server) {
   const entry = { ...server, id: "srv-" + Date.now().toString(36) };
+  if (entry.hostname) entry.hostname = canonKey(entry.hostname);
   if (typeof apiSaveServer === "function" && apiSaveServer(entry)) {
     return true;
   }
@@ -222,6 +221,7 @@ function saveServer(server) {
 function updateServer(id, server) {
   if (!id) return false;
   const entry = { ...server, id };
+  if (entry.hostname) entry.hostname = canonKey(entry.hostname);
   const isDemo = String(id).startsWith("demo-");
   if (!isDemo && typeof apiSaveServer === "function" && apiSaveServer(entry)) {
     return true;

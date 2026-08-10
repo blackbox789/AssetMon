@@ -66,7 +66,6 @@ const RACK_LAYOUTS = {
 
 // ---- tinggi rack server (ukuran U) yang bisa dipilih saat tambah rack ----
 const RACK_HEIGHTS = [24, 27, 32, 36, 42, 45, 47, 48, 52, 54];
-const RACK_STORAGE_KEY = "rv_custom_racks";
 
 function readLocalRacks() {
   try {
