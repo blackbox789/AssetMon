@@ -69,6 +69,23 @@ Sinkronisasi: simpan/edit selalu menulis record + mendaftarkan `devices` (regist
 DB) + menyimpan Port Map. Rename otomatis me-rekey map & registri
 (`rekeyDeviceMaps`).
 
+### Demo data & kolom Spesifikasi
+
+- **Seed demo (klien)** — `js/asset-list.js` (`DEMO_NETWORK_DEVICES`) mengisi
+  contoh lengkap saat pertama kali halaman dibuka di browser: `SW-CORE-01`,
+  `SW-ACC-03` (switch), `FW-EDGE-02` (firewall), `RT-EDGE-01` (router), lengkap
+  dengan interface, power, dan warranty. Idempoten (merge by name, tidak
+  menimpa data user), hanya berjalan sekali (flag `rv_demo_network_seeded`),
+  dan tersinkron ke Port Map + registri `devices`. Baris statis HTML dengan
+  nama sama otomatis diganti baris data (`removeStaticNetworkDuplicates`).
+- **Kolom Spesifikasi** di tabel asset (`networkSpecSummary`) meringkas
+  interface/speed/throughput/protokol/HA/stacking/PSU. Baris statis lama dinormalisasi
+  `normalizeSpecCells`.
+- **Hapus tersinkron** — tombol 🗑 di baris asset menghapus record lokal, Port/Power
+  Map (localStorage + DB), dan untuk switch/firewall/router juga registri `devices`
+  (kaskade via `DELETE /api/devices/:deviceKey`); aksesori non-network via
+  `DELETE /api/maps/:kind/:deviceKey`.
+
 ## API
 
 | Method | Endpoint                         | Keterangan                                  |

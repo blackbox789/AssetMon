@@ -124,6 +124,26 @@ function hasNetworkPorts(f) {
   return Boolean(f && (f.lanRj45 || f.lanSfp || f.lanQsfp));
 }
 
+function networkSpecSummary(rec) {
+  if (!rec) return "—";
+  const n = x => parseInt(x, 10) || 0;
+  const ports = [];
+  if (n(rec.lanRj45)) ports.push(n(rec.lanRj45) + " RJ45");
+  if (n(rec.lanSfp)) ports.push(n(rec.lanSfp) + " SFP");
+  if (n(rec.lanQsfp)) ports.push(n(rec.lanQsfp) + " QSFP");
+  const parts = [];
+  if (ports.length) parts.push(ports.join(" · "));
+  if (rec.speed) parts.push(rec.speed);
+  if (rec.throughput) parts.push(rec.throughput);
+  if (rec.routingProtocol) parts.push(rec.routingProtocol);
+  if (rec.role) parts.push(rec.role);
+  if (rec.stacking === "Ya") parts.push("Stack");
+  if (rec.haMode && rec.haMode !== "Standalone") parts.push(rec.haMode);
+  if (n(rec.wanPorts)) parts.push(n(rec.wanPorts) + " WAN");
+  if (n(rec.psuCount)) parts.push(n(rec.psuCount) + " PSU");
+  return parts.join(" · ") || "—";
+}
+
 // ---- Model: combobox (datalist) per Brand untuk Server/Storage, manual utk tipe lain ----
 const MODEL_CATALOG = {
   Dell: ["PowerEdge R750", "PowerEdge R750xd", "PowerEdge R650", "PowerEdge R740"],
@@ -217,12 +237,14 @@ function switchRowHTML(sw) {
     <td>${escA(sw.rack || "—")}${sw.posisiU ? " · " + escA(sw.posisiU) : ""}</td>
     <td class="mono">${escA(sw.ip || "—")}</td>
     <td>${escA(brandModel)}</td>
+    <td class="mono" style="font-size:11px;color:var(--text-secondary);">${escA(networkSpecSummary(sw))}</td>
     <td><span class="badge online"><span class="bdot"></span>Online</span></td>
     <td>Manual</td>
     <td><div class="row-actions">
       <button title="Edit"><i class="fa-solid fa-pen"></i></button>
       <button title="View"><i class="fa-solid fa-eye"></i></button>
       <button title="Port Map" data-open-pm="${escA(sw.name)}"><i class="fa-solid fa-ethernet"></i></button>
+      <button title="Hapus"><i class="fa-solid fa-trash"></i></button>
     </div></td>`;
 }
 
@@ -317,12 +339,14 @@ function accessoryRowHTML(a) {
     <td>${escA(a.rack || "—")}${a.posisiU ? " · " + escA(a.posisiU) : ""}</td>
     <td class="mono">${escA(a.ip || "—")}</td>
     <td>${escA(brandModel)}</td>
+    <td class="mono" style="font-size:11px;color:var(--text-secondary);">${escA(networkSpecSummary(a))}</td>
     <td><span class="badge online"><span class="bdot"></span>Online</span></td>
     <td>Manual</td>
     <td><div class="row-actions">
       <button title="Edit"><i class="fa-solid fa-pen"></i></button>
       <button title="View"><i class="fa-solid fa-eye"></i></button>
       ${hasMap ? `<button title="${isPdu ? "Power Map" : "Port Map"}" data-open-pm="${escA(a.name)}"><i class="fa-solid ${isPdu ? "fa-plug" : "fa-ethernet"}"></i></button>` : ""}
+      <button title="Hapus"><i class="fa-solid fa-trash"></i></button>
     </div></td>`;
 }
 
@@ -415,9 +439,42 @@ function readAssetRow(tr) {
   const [rack = "", posisiU = ""] = rackText.split("·").map(s => s.trim());
   const ip = (cells[3]?.textContent || "").trim();
   const brandModel = (cells[4]?.textContent || "").trim();
-  const status = (cells[5]?.textContent || "").trim();
-  const source = (cells[6]?.textContent || "").trim();
+  const status = (cells[6]?.textContent || "").trim();
+  const source = (cells[7]?.textContent || "").trim();
   return { name, serial, tags, type, rack, posisiU, ip, brandModel, status, source };
+}
+
+function deleteAssetRow(tr) {
+  const a = readAssetRow(tr);
+  const type = a.type || "custom";
+  try {
+    if (type === "switch") {
+      localStorage.setItem(SWITCH_STORAGE_KEY, JSON.stringify(readLocalSwitches().filter(s => s.name !== a.name)));
+    } else {
+      localStorage.setItem(ACC_STORAGE_KEY, JSON.stringify(readLocalAccessories().filter(x => !(x.name === a.name && x.type === type))));
+    }
+  } catch (e) { /* abaikan */ }
+  [PORT_STORAGE_KEY, POWER_STORAGE_KEY].forEach(storageKey => {
+    try {
+      const obj = JSON.parse(localStorage.getItem(storageKey) || "{}") || {};
+      if (Object.prototype.hasOwnProperty.call(obj, a.name)) {
+        delete obj[a.name];
+        localStorage.setItem(storageKey, JSON.stringify(obj));
+      }
+    } catch (e) { /* abaikan */ }
+  });
+  if (typeof PORT_DATA !== "undefined") delete PORT_DATA[a.name];
+  if (typeof POWER_DATA !== "undefined") delete POWER_DATA[a.name];
+  if (NETWORK_TYPES.includes(type)) {
+    if (typeof apiDeleteDevice === "function") apiDeleteDevice(a.name);
+  } else {
+    if (typeof apiDeleteMap === "function") apiDeleteMap("port", a.name);
+    if (typeof apiDeleteMap === "function") apiDeleteMap("power", a.name);
+  }
+  tr.remove();
+  const i = allRows.indexOf(tr);
+  if (i >= 0) allRows.splice(i, 1);
+  applyFilters();
 }
 
 function openViewAsset(tr) {
@@ -633,7 +690,8 @@ function saveEditAsset() {
     if (cells[2]) cells[2].textContent = `${rack}${posisiU ? " · " + posisiU : ""}`;
     if (cells[3]) cells[3].textContent = ip || "—";
     if (cells[4]) cells[4].textContent = brandModel || "—";
-    if (cells[7]) cells[7].innerHTML = cells[7].innerHTML.replaceAll(ed.name, nameCanon);
+    if (cells[5]) cells[5].textContent = networkSpecSummary(updated);
+    if (cells[8]) cells[8].innerHTML = cells[8].innerHTML.replaceAll(ed.name, nameCanon);
     ed.tr.setAttribute("data-type", type);
     ed.tr.setAttribute("data-tags", tags.join(","));
   }
@@ -762,6 +820,14 @@ document.querySelector("tbody").addEventListener("click", e => {
     if (tr) openViewAsset(tr);
     return;
   }
+  if (btn.title === "Hapus") {
+    if (!tr) return;
+    const nm = (tr.querySelector(".strong")?.textContent || "").trim();
+    if (confirm(`Hapus ${nm}? Record asset, Port/Power Map, dan registri perangkat ikut dihapus.`)) {
+      deleteAssetRow(tr);
+    }
+    return;
+  }
   const pm = btn.hasAttribute("data-open-pm") ? btn : e.target.closest("[data-open-pm]");
   if (!pm) return;
   const name = pm.dataset.openPm;
@@ -773,8 +839,83 @@ document.querySelector("tbody").addEventListener("click", e => {
   if (typeof openPortMap === "function") openPortMap(name, false, 0, { type: pmType, formFactor: "" });
 });
 
-renderSavedSwitches();
-renderSavedAccessories();
-applyFilters();
+// ---- Kolom Spesifikasi: baris statis (HTML lama) diberi sel spesifikasi ----
+function normalizeSpecCells() {
+  document.querySelectorAll("tbody tr[data-site]").forEach(tr => {
+    const cells = tr.querySelectorAll("td");
+    if (cells.length !== 8) return;
+    const td = document.createElement("td");
+    td.className = "mono";
+    td.style.cssText = "font-size:11px;color:var(--text-secondary);";
+    td.textContent = "—";
+    cells[4].insertAdjacentElement("afterend", td);
+  });
+}
+
+// ---- Demo data network device (Switch/Firewall/Router) ----
+const DEMO_NETWORK_DEVICES = [
+  { type: "switch", name: "SW-CORE-01", brand: "Cisco", model: "Catalyst 9300", rack: "R1-A12", posisiU: "U4", ip: "10.10.0.1", serial: "SW-CAT-9300-118", tags: ["production", "network-core"], site: "DC1", subType: "ethernet", lanRj45: "48", lanSfp: "4", speed: "10G", os: "IOS-XE 17.9", role: "Core", vlan: "1,10-99", stacking: "Ya", stackRole: "Master", psuCount: "2", psuWatt: "715", powerRedundancy: "Redundant", tahunPembelian: "2021", warranty: "2026", monitoring: "SNMP v3" },
+  { type: "switch", name: "SW-ACC-03", brand: "Cisco", model: "Catalyst 2960-X", rack: "R2-B14", posisiU: "U21", ip: "10.10.0.23", serial: "SW-CAT-2960-077", tags: ["production", "network-access"], site: "DC2", subType: "ethernet", lanRj45: "24", lanSfp: "2", speed: "1G", os: "IOS 15.2", role: "Access", vlan: "10-40", stacking: "Tidak", psuCount: "1", psuWatt: "300", powerRedundancy: "Single", tahunPembelian: "2019", warranty: "2024", monitoring: "SNMP v2c" },
+  { type: "firewall", name: "FW-EDGE-02", brand: "Fortinet", model: "FortiGate 200F", rack: "R1-A12", posisiU: "U14", ip: "10.10.0.254", serial: "FGT-200F-9931", tags: ["production", "security"], site: "DC1", lanRj45: "18", lanSfp: "4", speed: "10G", os: "FortiOS 7.4", role: "Edge", throughput: "20 Gbps", maxConnections: "2M", vpnTunnels: "500", haMode: "Active-Passive", psuCount: "2", psuWatt: "150", powerRedundancy: "Redundant", tahunPembelian: "2022", warranty: "2027", monitoring: "SNMP v3" },
+  { type: "router", name: "RT-EDGE-01", brand: "Cisco", model: "ISR 4451", rack: "R2-B14", posisiU: "U8", ip: "10.10.0.2", serial: "CSCO-ASR-2210", tags: ["production", "network-core"], site: "DC2", lanRj45: "6", lanSfp: "4", speed: "10G", os: "IOS-XE 17.6", role: "WAN", routingProtocol: "BGP", wanPorts: "2", psuCount: "2", psuWatt: "250", powerRedundancy: "Redundant", tahunPembelian: "2020", warranty: "2025", monitoring: "SNMP v3" },
+];
+
+// Seed data demo network device bila belum ada (merge by name), sinkron ke
+// registri + Port Map, lalu ganti baris statis agar dirender dari data.
+// Hanya sekali: setelah flag DEMO_SEED_KEY diset, hapus demo tidak akan
+// memunculkannya lagi saat load berikutnya.
+const DEMO_SEED_KEY = "rv_demo_network_seeded";
+function seedNetworkDemoData() {
+  let seeded = false;
+  try { seeded = localStorage.getItem(DEMO_SEED_KEY) === "1"; } catch (e) { /* abaikan */ }
+  if (seeded) return;
+  DEMO_NETWORK_DEVICES.forEach(d => {
+    const key = canonKey(d.name);
+    const isSwitch = d.type === "switch";
+    const exists = isSwitch
+      ? readLocalSwitches().some(s => canonKey(s.name) === key)
+      : readLocalAccessories().some(x => x.type === d.type && canonKey(x.name) === key);
+    if (exists) return;
+    if (typeof PORT_DATA !== "undefined") {
+      PORT_DATA[key] = {
+        type: d.type,
+        switchType: isSwitch ? (d.subType || "ethernet") : undefined,
+        ports: networkPortCount(d),
+        sfp: networkSfpCount(d),
+        rows: [],
+      };
+      if (typeof savePortMap === "function") savePortMap(key);
+    }
+    if (typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: key, type: d.type, name: key, data: d });
+    if (isSwitch) saveLocalSwitch({ ...d, name: key, type: d.subType || "ethernet" }); else saveLocalAccessory({ ...d, name: key });
+  });
+  try { localStorage.setItem(DEMO_SEED_KEY, "1"); } catch (e) { /* abaikan */ }
+}
+
+// Baris statis network device yang sudah punya record data (demo/user) dibuang
+// agar tidak dobel: baris datanya dirender dari localStorage dengan spesifikasi.
+function removeStaticNetworkDuplicates() {
+  const names = new Set();
+  readLocalSwitches().forEach(s => names.add(canonKey(s.name)));
+  readLocalAccessories().forEach(a => { if (NETWORK_TYPES.includes(a.type)) names.add(canonKey(a.name)); });
+  for (let i = allRows.length - 1; i >= 0; i--) {
+    const tr = allRows[i];
+    if (!NETWORK_TYPES.includes(tr.dataset.type)) continue;
+    const nm = (tr.querySelector(".strong")?.textContent || "").trim();
+    if (names.has(canonKey(nm))) {
+      tr.remove();
+      allRows.splice(i, 1);
+    }
+  }
+}
+
+window.addEventListener("load", () => {
+  normalizeSpecCells();
+  seedNetworkDemoData();
+  removeStaticNetworkDuplicates();
+  renderSavedSwitches();
+  renderSavedAccessories();
+  applyFilters();
+});
     
 
