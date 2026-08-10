@@ -445,6 +445,7 @@ function openPowerMap(deviceKey, startInEdit, psuCount) {
       ? `${rows.length} PSU terhubung · Total beban ${totalWatt} W`
       : "Belum ada data power untuk perangkat ini.";
     const slotCount = Math.min(10, Math.max(psuCount || 2, rows.length));
+    const curPsu = Math.min(10, Math.max(parseInt(psuCount, 10) || 2, 1));
     let cells = "";
     for (let i = 1; i <= slotCount; i++) {
       const row = rows[i - 1];
@@ -464,10 +465,20 @@ function openPowerMap(deviceKey, startInEdit, psuCount) {
         <td class="mono" style="color:var(--text-muted);">${r.label || "—"}</td>
         <td class="mono">${r.watt} W</td>
       </tr>`).join("");
+    const countSel = `
+      <label class="form-hint" style="margin:0;flex-shrink:0;">Jumlah PSU</label>
+      <select id="powermap-devpsu-count" title="Jumlah PSU perangkat" style="padding:7px 10px;font-size:12px;flex-shrink:0;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface-1);color:var(--text);">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="4">4</option>
+      </select>`;
     document.getElementById("powermap-body").innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
         <div class="form-hint" style="margin:0;">${rows.length ? "Klik PSU / baris tabel untuk mengedit, atau tambah PSU baru di bawah." : "Perangkat ini belum terhubung ke PDU — tambahkan PSU untuk mencatat koneksi daya."}</div>
-        <button type="button" class="btn primary" id="powermap-add-psu" style="padding:7px 12px;font-size:12px;flex-shrink:0;"><i class="fa-solid fa-plug-circle-plus"></i> Tambah PSU</button>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          ${countSel}
+          <button type="button" class="btn primary" id="powermap-add-psu" style="padding:7px 12px;font-size:12px;flex-shrink:0;"><i class="fa-solid fa-plug-circle-plus"></i> Tambah PSU</button>
+        </div>
       </div>
       ${legendHtml}
       <div class="portmap-visual"><div class="portmap-grid-row">${cells}</div></div>
@@ -476,6 +487,11 @@ function openPowerMap(deviceKey, startInEdit, psuCount) {
         <tbody>${tableRows}</tbody>
       </table>` : ""}
     `;
+    const countEl = document.getElementById("powermap-devpsu-count");
+    if (countEl) {
+      countEl.value = String(curPsu);
+      countEl.addEventListener("change", () => setDevicePsuCount(deviceKey, parseInt(countEl.value, 10) || 2));
+    }
     const addBtn = document.getElementById("powermap-add-psu");
     if (addBtn) addBtn.addEventListener("click", () => openDevicePsuEditor(deviceKey, null));
     document.getElementById("powermap-body").querySelectorAll("[data-devpsu-edit]").forEach(el => {
@@ -540,5 +556,26 @@ document.addEventListener("click", (e) => {
     openPortMap(currentPduKey, false, 0, { type: "pdu" });
   }
 });
+
+function setDevicePsuCount(deviceKey, count) {
+  const v = Math.min(10, Math.max(parseInt(count, 10) || 2, 1));
+  const srv = typeof getServers === "function"
+    ? getServers().find(s => s.id === deviceKey || s.hostname === deviceKey)
+    : null;
+  if (srv && typeof updateServer === "function") {
+    updateServer(srv.id, { ...srv, psuCount: String(v) });
+  }
+  if (typeof window.reloadServerList === "function") window.reloadServerList();
+  if (srv) {
+    const svo = document.getElementById("srv-view-overlay");
+    const svb = document.getElementById("srv-view-body");
+    if (svo && svb && svo.classList && svo.classList.contains && svo.classList.contains("open")) {
+      const fresh = typeof getServers === "function" ? getServers().find(s => s.id === srv.id) : null;
+      if (fresh && typeof buildServerSummaryHTML === "function") svb.innerHTML = buildServerSummaryHTML(fresh);
+    }
+  }
+  openPowerMap(deviceKey, false, v);
+}
+
     
 

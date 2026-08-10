@@ -735,6 +735,16 @@ function prefillServerForm(s) {
     if (!k || s[k] == null) return;
     el.value = s[k];
   });
+  document.querySelectorAll('select[data-sf="psuCount"]').forEach(sel => {
+    const v = s.psuCount == null ? "" : String(s.psuCount);
+    if (v && ![...sel.options].some(o => o.value === v)) {
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v + " PSU";
+      sel.appendChild(opt);
+    }
+    if (v) sel.value = v;
+  });
   if (s.coreThread) {
     const parts = String(s.coreThread).split("/").map(x => x.trim());
     document.querySelectorAll('[data-sf="core"]').forEach(el => el.value = parts[0] || "");
