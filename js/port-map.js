@@ -383,7 +383,7 @@ function openPortEditor(portNo) {
   if (!currentPortKey) return;
   const key = currentPortKey;
   let data = PORT_DATA[key];
-  if (!data) data = { type: lastPortMeta.type, ports: lastPortMeta.ports, sfp: lastPortMeta.sfp, rows: [] };
+  if (!data) data = { type: lastPortMeta.type, ports: lastPortMeta.ports, sfp: lastPortMeta.sfp, qsfp: lastPortMeta.qsfp || 0, rows: [] };
   editingPort = portNo;
   let row = data.rows.find(r => String(r.port) === String(portNo));
   if (!row && data.ports === 1 && data.rows.length) row = data.rows[0];
@@ -426,7 +426,7 @@ document.getElementById("portmap-port-media").addEventListener("change", e => {
 document.getElementById("portmap-port-save").addEventListener("click", () => {
   if (!currentPortKey || editingPort == null) return;
   const key = currentPortKey;
-  if (!PORT_DATA[key]) PORT_DATA[key] = { type: lastPortMeta.type, ports: lastPortMeta.ports, sfp: lastPortMeta.sfp, rows: [] };
+  if (!PORT_DATA[key]) PORT_DATA[key] = { type: lastPortMeta.type, ports: lastPortMeta.ports, sfp: lastPortMeta.sfp, qsfp: lastPortMeta.qsfp || 0, rows: [] };
   const data = PORT_DATA[key];
   const portNo = document.getElementById("portmap-port-no").value.trim() || String(editingPort);
   let media = document.getElementById("portmap-port-media").value;

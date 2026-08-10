@@ -108,6 +108,17 @@ function escPM(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
+// Layout port (RJ-45 / SFP+ / QSFP) dari record server — sumber kebenaran
+// sama dengan yang dipakai Ringkasan Identitas (lanRj45 / lanSfp / lanQsfp).
+// Kalau record tidak diisi (semua 0 / kosong), pakai nilai fallback.
+function portLayoutFromServer(srv, fallbackPorts, fallbackSfp, fallbackQsfp) {
+  const rj45 = parseInt(srv && srv.lanRj45, 10) || 0;
+  const sfp = parseInt(srv && srv.lanSfp, 10) || 0;
+  const qsfp = parseInt(srv && srv.lanQsfp, 10) || 0;
+  if (rj45 > 0 || sfp > 0 || qsfp > 0) return { ports: rj45, sfp, qsfp };
+  return { ports: fallbackPorts, sfp: fallbackSfp, qsfp: fallbackQsfp };
+}
+
 // ---- Port Spesial per tipe perangkat (Manajemen, Console, Uplink, WAN, HA) ----
 // Port di luar switchport bernomor (1..N) & slot SFP: mis. port manajemen,
 // console/serial, WAN/HA khusus. Disimpan sebagai baris koneksi dengan nama
@@ -173,13 +184,14 @@ function openPortMap(deviceKey, startInEdit, psuCount, opts) {
     const u = m ? parseInt(m[1], 10) : 1;
     let ports = type === "switch" ? 24 : type === "firewall" ? 6 : type === "patch" ? 24 : type === "pdu" ? 1 : 4;
     let sfp = type === "switch" ? 2 : 0;
+    let qsfp = 0;
     if (type === "server") {
       try {
         if (typeof getServers === "function") {
           const srv = getServers().find(s => (s.hostname || "").toLowerCase() === String(deviceKey).toLowerCase());
           if (srv) {
-            sfp = parseInt(srv.lanSfp, 10) || 0;
-            ports = (parseInt(srv.lanRj45, 10) || 0) + sfp;
+            const l = portLayoutFromServer(srv, u * 2, 0, 0);
+            ports = l.ports; sfp = l.sfp; qsfp = l.qsfp;
             if (ports < 1) ports = u * 2;
           } else {
             ports = u * 2;
@@ -187,14 +199,25 @@ function openPortMap(deviceKey, startInEdit, psuCount, opts) {
         }
       } catch (err) { /* abaikan */ }
     }
-    data = { type, ports, sfp, rows: [], specials: JSON.parse(JSON.stringify(SPECIAL_PORT_DEFS[type] || [])) };
+    data = { type, ports, sfp, qsfp, rows: [], specials: JSON.parse(JSON.stringify(SPECIAL_PORT_DEFS[type] || [])) };
   }
   if (!Array.isArray(data.rows)) data.rows = [];
   if (!Array.isArray(data.specials)) data.specials = [];
+  if (data.sfp == null) data.sfp = 0;
+  if (data.qsfp == null) data.qsfp = 0;
+  if (data.type === "server" && typeof getServers === "function") {
+    try {
+      const srv = getServers().find(s => (s.hostname || "").toLowerCase() === String(deviceKey).toLowerCase());
+      if (srv) {
+        const l = portLayoutFromServer(srv, data.ports, data.sfp, data.qsfp);
+        data.ports = l.ports; data.sfp = l.sfp; data.qsfp = l.qsfp;
+      }
+    } catch (err) { /* abaikan */ }
+  }
   currentPortKey = deviceKey || null;
-  lastPortMeta = { type: data.type, ports: data.ports, sfp: data.sfp };
+  lastPortMeta = { type: data.type, ports: data.ports, sfp: data.sfp, qsfp: data.qsfp };
   document.getElementById("portmap-title").textContent = deviceKey + " — Port Map";
-  document.getElementById("portmap-sub").textContent = `${data.rows.length} port terpakai dari ${data.ports} port` + (data.sfp ? ` + ${data.sfp} SFP` : "");
+  document.getElementById("portmap-sub").textContent = `${data.rows.length} port terpakai dari ${data.ports} port` + (data.sfp ? ` + ${data.sfp} SFP` : "") + (data.qsfp ? ` + ${data.qsfp} QSFP` : "");
 
   let visualHtml = "";
   const sfpCells = data.sfp ? Array.from({ length: data.sfp }, (_, i) => {
@@ -203,6 +226,12 @@ function openPortMap(deviceKey, startInEdit, psuCount, opts) {
     return `<div class="portmap-sfp-box ${sfpRow ? "used" : ""}" data-port-edit="SFP${idx}" style="cursor:pointer;" title="${sfpRow ? "Klik untuk edit: SFP" + idx + " → " + sfpRow.dest : "SFP" + idx + " kosong — klik untuk isi data"}">SFP${idx}</div>`;
   }).join("") : "";
   const sfpHtml = sfpCells ? `<div class="portmap-sfp-row">${sfpCells}</div>` : "";
+  const qsfpCells = data.qsfp ? Array.from({ length: data.qsfp }, (_, i) => {
+    const idx = i + 1;
+    const qsfpRow = data.rows.find(r => r.port === "QSFP" + idx);
+    return `<div class="portmap-sfp-box ${qsfpRow ? "used" : ""}" data-port-edit="QSFP${idx}" style="cursor:pointer;" title="${qsfpRow ? "Klik untuk edit: QSFP" + idx + " → " + qsfpRow.dest : "QSFP" + idx + " kosong — klik untuk isi data"}">QSFP${idx}</div>`;
+  }).join("") : "";
+  const qsfpHtml = qsfpCells ? `<div class="portmap-sfp-row">${qsfpCells}</div>` : "";
 
   // Strip Port Spesial (Manajemen / Console / Uplink / WAN / HA / dsb.) — di atas grid.
   const specials = Array.isArray(data.specials) ? data.specials : [];
@@ -235,7 +264,7 @@ function openPortMap(deviceKey, startInEdit, psuCount, opts) {
       for (let p = from; p <= to; p++) cells += cellHtml(p);
       return `<div class="portmap-grid-row">${cells}</div>`;
     }).join("");
-    visualHtml = `<div class="portmap-visual">${gridRows}${sfpHtml}${specialHtml}</div>`;
+    visualHtml = `<div class="portmap-visual">${gridRows}${sfpHtml}${qsfpHtml}${specialHtml}</div>`;
   } else {
     const perRow = Math.max(2, Math.min(8, data.ports));
     const gridRows = [];
@@ -244,7 +273,7 @@ function openPortMap(deviceKey, startInEdit, psuCount, opts) {
       for (let p = start; p <= Math.min(start + perRow - 1, data.ports); p++) cells += cellHtml(p);
       gridRows.push(`<div class="portmap-grid-row">${cells}</div>`);
     }
-    visualHtml = `<div class="portmap-visual">${gridRows}${sfpHtml}${specialHtml}</div>`;
+    visualHtml = `<div class="portmap-visual">${gridRows}${sfpHtml}${qsfpHtml}${specialHtml}</div>`;
   }
 
   const specialLegend = specials.map(s => `<span><span class="sw" style="background:${specialPortColor(s.key)}"></span>${escPM(s.label)} (${escPM(s.key)})</span>`).join("");
@@ -275,12 +304,72 @@ function openPortMap(deviceKey, startInEdit, psuCount, opts) {
         : "");
 
   document.getElementById("portmap-body").innerHTML = `
-    <div class="form-hint" style="margin-bottom:12px;">Klik kotak port atau nomor port di tabel untuk mengisi / mengedit koneksi.</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+      <div class="form-hint" style="margin:0;">Klik kotak port atau nomor port di tabel untuk mengisi / mengedit koneksi.</div>
+      <button type="button" class="btn ghost" id="portmap-count-btn" style="padding:7px 11px;font-size:12px;flex-shrink:0;" title="Ubah jumlah port RJ-45 / SFP+ / QSFP"><i class="fa-solid fa-sliders"></i> Ubah Jumlah Port</button>
+    </div>
+    <div id="portmap-count-panel" style="display:none;margin-bottom:12px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg-surface-2);">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;flex-wrap:wrap;">
+        <div><label class="form-label">RJ-45</label><input class="form-input mono" type="number" id="portmap-count-rj45" min="0" max="72" value="${data.ports}"></div>
+        <div><label class="form-label">SFP+</label><input class="form-input mono" type="number" id="portmap-count-sfp" min="0" max="24" value="${data.sfp}"></div>
+        <div><label class="form-label">QSFP</label><input class="form-input mono" type="number" id="portmap-count-qsfp" min="0" max="24" value="${data.qsfp}"></div>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn primary" id="portmap-count-save" style="padding:7px 11px;font-size:12px;"><i class="fa-solid fa-check"></i> Simpan</button>
+          <button type="button" class="btn ghost" id="portmap-count-cancel" style="padding:7px 11px;font-size:12px;">Batal</button>
+        </div>
+      </div>
+      <div class="form-hint" style="margin:8px 0 0;">Untuk server, jumlah ini ikut menulis lanRj45 / lanSfp / lanQsfp agar sinkron dengan Ringkasan Identitas.</div>
+    </div>
     ${legendHtml}
     ${mediaLegendHtml}
     ${visualHtml}
     ${tableHtml}
   `;
+  const cntBtn = document.getElementById("portmap-count-btn");
+  const cntPanel = document.getElementById("portmap-count-panel");
+  if (cntBtn && cntPanel) {
+    cntBtn.addEventListener("click", () => { cntPanel.style.display = cntPanel.style.display === "none" ? "" : "none"; });
+    document.getElementById("portmap-count-cancel").addEventListener("click", () => { cntPanel.style.display = "none"; });
+    document.getElementById("portmap-count-save").addEventListener("click", () => {
+      const ports = Math.max(0, parseInt(document.getElementById("portmap-count-rj45").value, 10) || 0);
+      const sfp = Math.max(0, parseInt(document.getElementById("portmap-count-sfp").value, 10) || 0);
+      const qsfp = Math.max(0, parseInt(document.getElementById("portmap-count-qsfp").value, 10) || 0);
+      const wouldHide = data.rows.filter(r => {
+        const p = String(r.port);
+        if (/^\d+$/.test(p) && parseInt(p, 10) > ports) return true;
+        if (p.startsWith("SFP") && parseInt(p.replace("SFP", ""), 10) > sfp) return true;
+        if (p.startsWith("QSFP") && parseInt(p.replace("QSFP", ""), 10) > qsfp) return true;
+        return false;
+      }).length;
+      if (wouldHide) {
+        alert(`Tidak bisa: ${wouldHide} koneksi aktif akan disembunyikan. Perbesar jumlah port atau hapus koneksinya dulu.`);
+        return;
+      }
+      if (!PORT_DATA[deviceKey]) PORT_DATA[deviceKey] = data;
+      data.ports = ports;
+      data.sfp = sfp;
+      data.qsfp = qsfp;
+      if (data.type === "server" && typeof getServers === "function") {
+        try {
+          const srv = getServers().find(s => (s.hostname || "").toLowerCase() === String(deviceKey).toLowerCase());
+          if (srv && typeof updateServer === "function") {
+            updateServer(srv.id, { ...srv, lanRj45: String(ports), lanSfp: String(sfp), lanQsfp: String(qsfp) });
+          }
+        } catch (err) { /* abaikan */ }
+      }
+      savePortMap(deviceKey);
+      openPortMap(deviceKey, false, psuCount, opts);
+      if (typeof window.reloadServerList === "function") window.reloadServerList();
+      const svo = document.getElementById("srv-view-overlay");
+      const svb = document.getElementById("srv-view-body");
+      if (svo && svb && svo.classList && svo.classList.contains && svo.classList.contains("open") && typeof buildServerSummaryHTML === "function") {
+        try {
+          const fresh = getServers().find(s => (s.hostname || "").toLowerCase() === String(deviceKey).toLowerCase());
+          if (fresh) svb.innerHTML = buildServerSummaryHTML(fresh);
+        } catch (err) { /* abaikan */ }
+      }
+    });
+  }
   document.getElementById("portmap-overlay").classList.add("open");
 }
 

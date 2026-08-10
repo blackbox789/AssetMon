@@ -48,7 +48,7 @@ function pmCollectDevices() {
   };
   Object.keys(PORT_DATA).forEach(k => {
     const d = PORT_DATA[k];
-    add(k, { type: d.type, model: d.model || "", ports: d.ports, sfp: d.sfp, used: Array.isArray(d.rows) ? d.rows.length : 0, hasData: true });
+    add(k, { type: d.type, model: d.model || "", ports: d.ports, sfp: d.sfp, qsfp: d.qsfp, used: Array.isArray(d.rows) ? d.rows.length : 0, hasData: true });
   });
   PM_R1_DEVICES.forEach(d => add(d.name, { type: d.type, model: d.model, ip: d.ip, rack: d.rack }));
   if (typeof getServers === "function") {
@@ -88,7 +88,7 @@ function pmCollectDevices() {
   return [...map.values()].map(d => {
     if (!d.hasData) {
       const def = PM_DEFAULT_BY_TYPE[d.type] || PM_DEFAULT_BY_TYPE.server;
-      d.ports = def.ports; d.sfp = def.sfp; d.used = 0;
+      d.ports = def.ports; d.sfp = def.sfp; d.qsfp = def.qsfp || 0; d.used = 0;
     }
     return d;
   });
@@ -118,8 +118,8 @@ function pmRenderTable() {
     return `<tr data-pm-name="${escPM(d.name)}" data-type="${d.type}">
       <td><div class="strong">${escPM(d.name)}</div><div class="mono" style="font-size:11px;">${escPM(d.model) || "&nbsp;"}</div></td>
       <td>${pmTypeBadge(d.type)}</td>
-      <td><div class="outlet-cell"><span class="outlet-nums">${d.used}/${d.ports} terpakai${d.sfp ? ` + ${d.sfp} SFP` : ""}</span><div class="outlet-bar"><div class="outlet-fill ${cls}" style="width:${Math.min(100, pct)}%"></div></div></div></td>
-      <td class="mono">${d.sfp || "—"}</td>
+      <td><div class="outlet-cell"><span class="outlet-nums">${d.used}/${d.ports} terpakai${d.sfp ? ` + ${d.sfp} SFP` : ""}${d.qsfp ? ` + ${d.qsfp} QSFP` : ""}</span><div class="outlet-bar"><div class="outlet-fill ${cls}" style="width:${Math.min(100, pct)}%"></div></div></div></td>
+      <td class="mono">${d.sfp || "—"}${d.qsfp ? ` · Q ${d.qsfp}` : ""}</td>
       <td class="mono">${escPM(d.rack || "—")}</td>
       <td class="mono">${escPM(d.ip || "—")}</td>
       <td><button class="btn primary pm-open-btn" style="padding:7px 12px;font-size:12px;" data-name="${escPM(d.name)}" data-type="${d.type}"><i class="fa-solid fa-ethernet"></i> Buka Port Map</button></td>
