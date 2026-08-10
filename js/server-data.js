@@ -193,7 +193,15 @@ function getServers() {
       }
     });
   }
-  return list;
+  return list.map(s => {
+    const norm = x => ({
+      ...x,
+      psuCount: x.psuCount == null || String(x.psuCount).trim() === "" ? "2" : x.psuCount,
+    });
+    const base = norm(s);
+    if (Array.isArray(base.nodes)) base.nodes = base.nodes.map(norm);
+    return base;
+  });
 }
 
 function saveServer(server) {

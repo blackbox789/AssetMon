@@ -160,6 +160,7 @@ function renderRows() {
       <td><span class="badge ${condClass(s.kondisi)}"><span class="bdot"></span>${esc(s.kondisi)}</span></td>
       <td>
         <div class="row-actions">
+          <button type="button" class="row-action" title="Buka Power Map" data-srv-power><i class="fa-solid fa-plug"></i></button>
           <button type="button" class="row-action" title="Lihat ringkasan" data-srv-view><i class="fa-solid fa-eye"></i></button>
           <button type="button" class="row-action" title="Edit server" data-srv-edit><i class="fa-solid fa-pen"></i></button>
         </div>
@@ -168,10 +169,20 @@ function renderRows() {
   }).join("");
   tbody.querySelectorAll("tr").forEach(tr => {
     tr.addEventListener("click", (e) => {
-      if (e.target.closest("[data-srv-view]") || e.target.closest("[data-srv-edit]")) return;
+      if (e.target.closest("[data-srv-view]") || e.target.closest("[data-srv-edit]") || e.target.closest("[data-srv-power]")) return;
       selectedId = tr.dataset.id;
       tbody.querySelectorAll("tr").forEach(r => r.classList.toggle("row-selected", r === tr));
       renderDetail(servers.find(s => s.id === selectedId));
+    });
+  });
+  tbody.querySelectorAll("[data-srv-power]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const s = servers.find(x => x.id === btn.closest("tr").dataset.id);
+      if (!s) return;
+      const key = encodeURIComponent(s.hostname || s.id || "");
+      if (key) window.open("power-map.html?device=" + key, "_blank", "noopener");
     });
   });
   tbody.querySelectorAll("[data-srv-view]").forEach(btn => {

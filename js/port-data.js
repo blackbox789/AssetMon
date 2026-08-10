@@ -431,6 +431,7 @@ function openPowerMap(deviceKey, startInEdit, psuCount) {
   if (pmBtn) pmBtn.style.display = data ? "" : "none";
   if (!data) {
     // device (bukan PDU): tampilkan outlet PSU yang ada di perangkat tsb
+    // dan izinkan edit / tambah / hapus koneksi PSU (data tersimpan di PDU).
     const rows = [];
     if (deviceKey) {
       Object.keys(POWER_DATA).forEach(k => {
@@ -443,17 +444,12 @@ function openPowerMap(deviceKey, startInEdit, psuCount) {
     document.getElementById("powermap-sub").textContent = rows.length
       ? `${rows.length} PSU terhubung · Total beban ${totalWatt} W`
       : "Belum ada data power untuk perangkat ini.";
-    if (!rows.length) {
-      document.getElementById("powermap-body").innerHTML = `<div class="form-hint" style="padding:26px;text-align:center;">Perangkat ini belum terhubung ke PDU manapun — data outlet/PSU tidak tersedia.</div>`;
-      document.getElementById("powermap-overlay").classList.add("open");
-      return;
-    }
-    const slotCount = Math.min(10, Math.max(psuCount || 0, rows.length));
+    const slotCount = Math.min(10, Math.max(psuCount || 2, rows.length));
     let cells = "";
     for (let i = 1; i <= slotCount; i++) {
       const row = rows[i - 1];
       if (row) {
-        cells += `<div class="portmap-cell" style="background:${psuColor(row.psu)}" title="PSU ${row.psu} → ${row.pdu} Outlet ${row.outlet} [${row.label || '—'}] · ${row.watt}W"><div class="pnum">${row.psu}</div><div>${row.pdu} · Out ${row.outlet}</div></div>`;
+        cells += `<div class="portmap-cell" data-devpsu-edit="${escPM(row.pdu)}|${row.outlet}" style="background:${psuColor(row.psu)};cursor:pointer;" title="Klik untuk edit: ${row.psu} → ${row.pdu} Outlet ${row.outlet} [${row.label || '—'}] · ${row.watt}W"><div class="pnum">${row.psu}</div><div>${row.pdu} · Out ${row.outlet}</div></div>`;
       } else {
         cells += `<div class="portmap-cell free" title="Slot PSU ${i} — kosong"><div class="pnum">PSU ${i}</div>Kosong</div>`;
       }
@@ -461,7 +457,7 @@ function openPowerMap(deviceKey, startInEdit, psuCount) {
     const legendPsus = [...new Set(rows.map(r => r.psu))];
     const legendHtml = `<div class="portmap-legend">${legendPsus.map(p => `<span><span class="sw" style="background:${psuColor(p)}"></span>${p}</span>`).join("")}${slotCount > rows.length ? `<span><span class="sw" style="background:var(--bg-surface-3);border:1px solid var(--border)"></span>Kosong</span>` : ""}</div>`;
     const tableRows = rows.map(r => `
-      <tr>
+      <tr data-devpsu-edit="${escPM(r.pdu)}|${r.outlet}" style="cursor:pointer;" title="Klik untuk edit koneksi PSU ini">
         <td class="strong mono">${r.psu}</td>
         <td class="strong">${r.pdu}</td>
         <td class="mono">Outlet ${r.outlet}</td>
@@ -469,13 +465,25 @@ function openPowerMap(deviceKey, startInEdit, psuCount) {
         <td class="mono">${r.watt} W</td>
       </tr>`).join("");
     document.getElementById("powermap-body").innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;">
+        <div class="form-hint" style="margin:0;">${rows.length ? "Klik PSU / baris tabel untuk mengedit, atau tambah PSU baru di bawah." : "Perangkat ini belum terhubung ke PDU — tambahkan PSU untuk mencatat koneksi daya."}</div>
+        <button type="button" class="btn primary" id="powermap-add-psu" style="padding:7px 12px;font-size:12px;flex-shrink:0;"><i class="fa-solid fa-plug-circle-plus"></i> Tambah PSU</button>
+      </div>
       ${legendHtml}
       <div class="portmap-visual"><div class="portmap-grid-row">${cells}</div></div>
-      <table>
+      ${rows.length ? `<table>
         <thead><tr><th>PSU</th><th>PDU Sumber</th><th>Outlet</th><th>Label ID</th><th>Beban</th></tr></thead>
         <tbody>${tableRows}</tbody>
-      </table>
+      </table>` : ""}
     `;
+    const addBtn = document.getElementById("powermap-add-psu");
+    if (addBtn) addBtn.addEventListener("click", () => openDevicePsuEditor(deviceKey, null));
+    document.getElementById("powermap-body").querySelectorAll("[data-devpsu-edit]").forEach(el => {
+      el.addEventListener("click", () => {
+        const [pdu, outlet] = String(el.dataset.devpsuEdit).split("|");
+        openDevicePsuEditor(deviceKey, { pdu, outlet: parseInt(outlet, 10) });
+      });
+    });
     document.getElementById("powermap-overlay").classList.add("open");
     return;
   }

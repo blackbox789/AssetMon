@@ -165,6 +165,145 @@ document.getElementById("powermap-body").addEventListener("click", e => {
   if (el) openOutletEditor(parseInt(el.dataset.outletEdit, 10));
 });
 
+// ---- Editor PSU perangkat (tambah / edit / hapus koneksi PSU di tampilan perangkat) ----
+let editingDeviceKey = null;
+let editingDevicePsu = null; // { pdu, outlet } — referensi koneksi yang sedang diedit
+
+function pduOptionKeys() {
+  const set = new Set();
+  PDU_DATA.forEach(p => set.add(p.name));
+  Object.keys(POWER_DATA).forEach(k => set.add(k));
+  return [...set];
+}
+
+function pduPortsOf(pdu) {
+  if (POWER_DATA[pdu] && POWER_DATA[pdu].ports) return POWER_DATA[pdu].ports;
+  const p = PDU_DATA.find(x => x.name === pdu);
+  return p ? p.ports : 24;
+}
+
+function pduFreeOutlets(pdu) {
+  const used = new Set(
+    (POWER_DATA[pdu] && Array.isArray(POWER_DATA[pdu].rows) ? POWER_DATA[pdu].rows : [])
+      .map(r => r.outlet)
+  );
+  const free = [];
+  for (let o = 1; o <= pduPortsOf(pdu); o++) if (!used.has(o)) free.push(o);
+  return free;
+}
+
+function ensureDevicePsuEditor() {
+  if (document.getElementById("powermap-devpsu-overlay")) return;
+  document.body.insertAdjacentHTML("beforeend", `
+  <div class="modal-overlay" id="powermap-devpsu-overlay" style="z-index:65;">
+    <div class="modal" style="max-width:480px;">
+      <div class="modal-head">
+        <div><div class="modal-title" id="powermap-devpsu-title">PSU — Power Map</div><div class="modal-sub" id="powermap-devpsu-sub"></div></div>
+        <div class="modal-close" id="powermap-devpsu-close"><i class="fa-solid fa-xmark"></i></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 18px;">
+        <div style="margin-bottom:14px;"><label class="form-label">PDU Sumber</label><select class="form-input" id="powermap-devpsu-pdu"></select></div>
+        <div style="margin-bottom:14px;"><label class="form-label">Outlet (kosong)</label><select class="form-input" id="powermap-devpsu-outlet"></select></div>
+        <div style="margin-bottom:14px;"><label class="form-label">PSU Tujuan</label><select class="form-input" id="powermap-devpsu-psu"><option value="PSU-A">PSU-A</option><option value="PSU-B">PSU-B</option><option value="Single PSU">Single PSU</option></select></div>
+        <div style="margin-bottom:14px;"><label class="form-label">Beban (W)</label><input class="form-input mono" type="number" id="powermap-devpsu-watt" min="0" placeholder="mis. 240"></div>
+        <div style="margin-bottom:14px;grid-column:1 / -1;"><label class="form-label">Label ID</label><input class="form-input mono" type="text" id="powermap-devpsu-label" placeholder="mis. CBL-2007"></div>
+      </div>
+      <div class="form-hint" id="powermap-devpsu-hint">Koneksi PSU disimpan di data PDU sumber dan tampil di Power Map perangkat ini.</div>
+      <div class="modal-foot" style="justify-content:space-between;">
+        <button class="btn ghost" id="powermap-devpsu-delete" style="color:var(--danger);"><i class="fa-solid fa-trash"></i> Hapus PSU</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn ghost" id="powermap-devpsu-cancel">Batal</button>
+          <button class="btn primary" id="powermap-devpsu-save"><i class="fa-solid fa-check"></i> Simpan</button>
+        </div>
+      </div>
+    </div>
+  </div>`);
+  const close = () => document.getElementById("powermap-devpsu-overlay").classList.remove("open");
+  document.getElementById("powermap-devpsu-close").addEventListener("click", close);
+  document.getElementById("powermap-devpsu-cancel").addEventListener("click", close);
+  document.getElementById("powermap-devpsu-overlay").addEventListener("click", e => {
+    if (e.target.id === "powermap-devpsu-overlay") close();
+  });
+  document.getElementById("powermap-devpsu-pdu").addEventListener("change", () => refreshDevicePsuOutlets());
+  document.getElementById("powermap-devpsu-save").addEventListener("click", () => {
+    const device = editingDeviceKey;
+    if (!device) return close();
+    const pdu = document.getElementById("powermap-devpsu-pdu").value;
+    const outlet = parseInt(document.getElementById("powermap-devpsu-outlet").value, 10);
+    if (!pdu || !outlet) return;
+    if (!POWER_DATA[pdu]) POWER_DATA[pdu] = { ports: pduPortsOf(pdu), rows: [] };
+    const isSame = editingDevicePsu && editingDevicePsu.pdu === pdu && editingDevicePsu.outlet === outlet;
+    if (!isSame && (POWER_DATA[pdu].rows || []).some(r => r.outlet === outlet)) return;
+    const row = {
+      outlet,
+      device,
+      psu: document.getElementById("powermap-devpsu-psu").value,
+      watt: Math.max(0, parseInt(document.getElementById("powermap-devpsu-watt").value, 10) || 0),
+      label: document.getElementById("powermap-devpsu-label").value.trim(),
+    };
+    const oldPdu = editingDevicePsu ? editingDevicePsu.pdu : null;
+    if (editingDevicePsu && !isSame) {
+      const oldRows = POWER_DATA[oldPdu].rows || [];
+      POWER_DATA[oldPdu].rows = oldRows.filter(r => !(r.outlet === editingDevicePsu.outlet && r.device === device));
+    }
+    const rows = POWER_DATA[pdu].rows || (POWER_DATA[pdu].rows = []);
+    if (isSame) {
+      const idx = rows.findIndex(r => r.outlet === outlet && r.device === device);
+      if (idx >= 0) rows[idx] = row; else rows.push(row);
+    } else {
+      rows.push(row);
+    }
+    close();
+    savePowerMap(pdu);
+    if (oldPdu && oldPdu !== pdu) savePowerMap(oldPdu);
+    openPowerMap(device, false, 2);
+    if (typeof pwRefresh === "function") pwRefresh();
+  });
+  document.getElementById("powermap-devpsu-delete").addEventListener("click", () => {
+    const device = editingDeviceKey;
+    const ref = editingDevicePsu;
+    if (!device || !ref) return close();
+    if (POWER_DATA[ref.pdu]) {
+      POWER_DATA[ref.pdu].rows = (POWER_DATA[ref.pdu].rows || []).filter(r => !(r.outlet === ref.outlet && r.device === device));
+    }
+    close();
+    savePowerMap(ref.pdu);
+    openPowerMap(device, false, 2);
+    if (typeof pwRefresh === "function") pwRefresh();
+  });
+}
+
+function refreshDevicePsuOutlets() {
+  const pdu = document.getElementById("powermap-devpsu-pdu").value;
+  const sel = document.getElementById("powermap-devpsu-outlet");
+  const opts = pduFreeOutlets(pdu);
+  if (editingDevicePsu && editingDevicePsu.pdu === pdu) opts.push(editingDevicePsu.outlet);
+  opts.sort((a, b) => a - b);
+  sel.innerHTML = opts.map(o => `<option value="${o}">Outlet ${o}</option>`).join("");
+  if (editingDevicePsu && editingDevicePsu.pdu === pdu) sel.value = String(editingDevicePsu.outlet);
+}
+
+function openDevicePsuEditor(deviceKey, ref) {
+  ensureDevicePsuEditor();
+  editingDeviceKey = deviceKey;
+  editingDevicePsu = ref ? { pdu: ref.pdu, outlet: ref.outlet } : null;
+  const keys = pduOptionKeys();
+  const pduSel = document.getElementById("powermap-devpsu-pdu");
+  const current = ref ? ref.pdu : (keys.find(k => pduFreeOutlets(k).length) || keys[0]);
+  pduSel.innerHTML = keys.map(k => `<option value="${k}">${k} (${pduPortsOf(k)} outlet)</option>`).join("");
+  pduSel.value = current;
+  const row = ref && POWER_DATA[ref.pdu] ? (POWER_DATA[ref.pdu].rows || []).find(r => r.outlet === ref.outlet && r.device === deviceKey) : null;
+  document.getElementById("powermap-devpsu-title").textContent = `PSU — ${deviceKey}`;
+  document.getElementById("powermap-devpsu-sub").textContent = row ? "Edit koneksi PSU perangkat ini." : "Hubungkan perangkat ini ke outlet PDU yang tersedia.";
+  document.getElementById("powermap-devpsu-psu").value = row ? row.psu : "PSU-A";
+  document.getElementById("powermap-devpsu-watt").value = row ? String(row.watt) : "";
+  document.getElementById("powermap-devpsu-label").value = row?.label || "";
+  document.getElementById("powermap-devpsu-delete").style.visibility = row ? "visible" : "hidden";
+  refreshDevicePsuOutlets();
+  document.getElementById("powermap-devpsu-overlay").classList.add("open");
+}
+
+
 // ---- Editor data port (klik nomor port / sel visual / SFP di Port Map) ----
 function ensurePortEditor() {
   if (document.getElementById("portmap-port-overlay")) return;

@@ -827,6 +827,9 @@ function prefillServerForm(s) {
 if (EDIT_ID && typeof getServers === "function") {
   const s = getServers().find(x => x.id === EDIT_ID);
   if (s) prefillServerForm(s);
+} else if (!IN_EDIT_MODAL) {
+  document.querySelectorAll('[data-sf="psuCount"]').forEach(el => { if (!el.value) el.value = "2"; });
+  document.querySelectorAll('[data-sf="psuWatt"]').forEach(el => { if (!el.value) el.value = "750 W"; });
 }
 
 // ---- Popup Edit Server (server-list.html): modal berisi form penuh ----
@@ -848,6 +851,10 @@ if (IN_EDIT_MODAL) {
     if (stEd && typeof stEd._setStorageSlots === "function") stEd._setStorageSlots(0, []);
     const dmEd = editFormBox.querySelector("[data-dimm-editor]");
     if (dmEd && typeof dmEd._setDimmSlots === "function") dmEd._setDimmSlots(0, []);
+    const pc = editFormBox.querySelector('[data-sf="psuCount"]');
+    if (pc) pc.value = "2";
+    const pw = editFormBox.querySelector('[data-sf="psuWatt"]');
+    if (pw) pw.value = "750 W";
   }
 
   function setEditSaveLabel() {
@@ -1642,8 +1649,8 @@ function collectServerForm(root) {
     mgmtPort: pick("mgmtPort", false),
     pcieCount: sf("pcieCount"),
     pcieGen: sf("pcieGen"),
-    psuCount: sf("psuCount"),
-    psuWatt: sf("psuWatt"),
+    psuCount: sf("psuCount") || "2",
+    psuWatt: sf("psuWatt") || "750 W",
     powerRedundancy: pick("powerRedundancy", false),
     site: siteCode,
     siteName,

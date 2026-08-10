@@ -112,6 +112,12 @@ function pwUpdateStats() {
   document.getElementById("stat-devices").textContent = PW_DEVICES.length;
 }
 
+function pwRefresh() {
+  PW_PDUS = pwPduRows();
+  PW_DEVICES = pwDeviceRows();
+  pwRender();
+}
+
 ["top-search", "filter-type"].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener("input", pwRender);
