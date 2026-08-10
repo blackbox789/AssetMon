@@ -6,6 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "verify": "node verify-portmap.cjs",
     "seed": "node data/seed.js",
     "seed:example": "node data/seed.js --make-example"
   },
