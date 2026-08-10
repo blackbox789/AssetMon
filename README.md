@@ -49,6 +49,26 @@ node data/seed.js --api http://10.0.0.5:3000/api data/backup.json
 - Normalisasi master key: `js/keys.js` (`canonKey`) di sisi klien,
   `server.js` (`canonKey`, `normalizeMapKeys`) di sisi server.
 
+### Record Network Device (Switch / Firewall / Router)
+
+Di `rv_switches` (switch) dan `rv_accessories` (firewall/router), nama perangkat
+selalu `canonKey` (uppercase). Field record:
+
+| Grup | Field |
+| ---- | ----- |
+| Identitas | `name`, `brand`, `model`, `serial`, `rack`, `posisiU`, `ip`, `tags`, `site` |
+| Interface | `lanRj45`, `lanSfp`, `lanQsfp` → Port Map dibuat otomatis (`ports = RJ-45 + SFP + QSFP×4`, `sfp = SFP + QSFP×4`) |
+| Umum | `speed` (1G–400G), `os` (firmware), `role`, `vlan`, `monitoring` |
+| Power | `psuCount`, `psuWatt`, `powerRedundancy` |
+| Pembelian | `tahunPembelian`, `warranty` |
+| Switch | `switchType` (ethernet/san/fc/iscsi/infiniband/nvmeof), `stacking`, `stackRole` |
+| Firewall | `throughput`, `maxConnections`, `vpnTunnels`, `haMode` |
+| Router | `routingProtocol`, `wanPorts` |
+
+Sinkronisasi: simpan/edit selalu menulis record + mendaftarkan `devices` (registri
+DB) + menyimpan Port Map. Rename otomatis me-rekey map & registri
+(`rekeyDeviceMaps`).
+
 ## API
 
 | Method | Endpoint                         | Keterangan                                  |

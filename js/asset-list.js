@@ -37,6 +37,21 @@ assetTypeSelect.addEventListener("change", toggleServerSection);
 toggleServerSection();
 
 // ---- Network Switch: brand/model manual + Jenis Switch saat Tipe Asset = Switch ----
+const TYPE_TO_OPTION = {
+  server: "Server", switch: "Switch", pdu: "PDU", firewall: "Firewall",
+  router: "Router", patch: "Patch Panel", ups: "UPS", storage: "Storage",
+  "kvm-switch": "KVM Switch", "cable-management": "Cable Management",
+  "cooling-fan": "Cooling Fan", "blanking-panel": "Blanking Panel",
+  "monitoring-sensor": "Monitoring Sensor", custom: "Custom"
+};
+const OPTION_TO_TYPE = Object.fromEntries(Object.entries(TYPE_TO_OPTION).map(([k, v]) => [v, k]));
+const TYPE_LABELS = {
+  server: "Server", switch: "Network Switch", pdu: "Rack PDU", firewall: "Firewall",
+  router: "Router", patch: "Patch Panel", ups: "UPS", storage: "Storage",
+  "kvm-switch": "KVM Switch", "cable-management": "Cable Management",
+  "cooling-fan": "Cooling Fan", "blanking-panel": "Blanking Panel",
+  "monitoring-sensor": "Monitoring Sensor", custom: "Custom"
+};
 const switchTypeField = document.getElementById("switch-type-field");
 const switchTypeSel = document.getElementById("switch-type");
 const brandManual = document.getElementById("brand-manual");
@@ -57,6 +72,57 @@ function toggleSwitchFields() {
 }
 assetTypeSelect.addEventListener("change", toggleSwitchFields);
 toggleSwitchFields();
+
+// ---- Network Device (Switch/Firewall/Router): field record + bagian form ----
+const NETWORK_TYPES = ["switch", "firewall", "router"];
+const NF_SELECT_DEFAULTS = { speed: "10G", stacking: "Tidak", powerRedundancy: "Redundant", haMode: "Standalone", stackRole: "" };
+const NF_LABELS = {
+  lanRj45: "Port RJ-45", lanSfp: "Port SFP", lanQsfp: "Port QSFP",
+  speed: "Kecepatan Port", os: "Firmware / OS", role: "Peran / Segmentasi",
+  vlan: "VLAN / Segment", throughput: "Throughput", maxConnections: "Max Sessions",
+  vpnTunnels: "VPN Tunnels", haMode: "High Availability", routingProtocol: "Routing Protocol",
+  wanPorts: "WAN Port", stacking: "Stacking", stackRole: "Stack Role",
+  psuCount: "PSU", psuWatt: "Watt", powerRedundancy: "Power Redundancy",
+  tahunPembelian: "Tahun Pembelian", warranty: "Warranty", monitoring: "Monitoring",
+};
+const networkSection = document.getElementById("network-section");
+
+function toggleNetworkSection() {
+  const typeKey = OPTION_TO_TYPE[assetTypeSelect.value] || "";
+  const isNet = NETWORK_TYPES.includes(typeKey);
+  if (networkSection) networkSection.style.display = isNet ? "" : "none";
+  document.querySelectorAll("[data-nf-switch-only]").forEach(el => { el.style.display = typeKey === "switch" ? "" : "none"; });
+  document.querySelectorAll("[data-nf-fw-only]").forEach(el => { el.style.display = typeKey === "firewall" ? "" : "none"; });
+  document.querySelectorAll("[data-nf-router-only]").forEach(el => { el.style.display = typeKey === "router" ? "" : "none"; });
+  if (isNet && networkSection) networkSection.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+assetTypeSelect.addEventListener("change", toggleNetworkSection);
+toggleNetworkSection();
+
+function collectNetworkFields() {
+  const typeKey = OPTION_TO_TYPE[assetTypeSelect.value] || "";
+  if (!NETWORK_TYPES.includes(typeKey)) return {};
+  const out = {};
+  if (networkSection) {
+    networkSection.querySelectorAll("[data-nf]").forEach(el => {
+      const v = (el.value || "").trim();
+      if (v) out[el.dataset.nf] = v;
+    });
+  }
+  return out;
+}
+
+function networkPortCount(f) {
+  const n = x => parseInt(x, 10) || 0;
+  return n(f.lanRj45) + n(f.lanSfp) + n(f.lanQsfp) * 4;
+}
+function networkSfpCount(f) {
+  const n = x => parseInt(x, 10) || 0;
+  return n(f.lanSfp) + n(f.lanQsfp) * 4;
+}
+function hasNetworkPorts(f) {
+  return Boolean(f && (f.lanRj45 || f.lanSfp || f.lanQsfp));
+}
 
 // ---- Model: combobox (datalist) per Brand untuk Server/Storage, manual utk tipe lain ----
 const MODEL_CATALOG = {
@@ -185,7 +251,7 @@ function collectSwitchAsset() {
   const ip = document.getElementById("asset-ip").value.trim();
   const serial = (document.querySelector('[data-sf="serial"]') || {}).value || "";
   const tags = [...document.querySelectorAll("#tag-picker .chip.active")].map(c => c.textContent.trim());
-  return { name, type, brand, model, rack, posisiU, ip, serial, tags, site: "DC1" };
+  return { name, type, brand, model, rack, posisiU, ip, serial, tags, site: "DC1", ...collectNetworkFields() };
 }
 
 function saveSwitchAsset() {
@@ -200,9 +266,16 @@ function saveSwitchAsset() {
   sw.name = canonKey(sw.name);
   if (typeof PORT_DATA !== "undefined") {
     const tpl = SWITCH_TEMPLATES[sw.type] || SWITCH_TEMPLATES.ethernet;
-    PORT_DATA[sw.name] = { type: "switch", switchType: sw.type, ports: tpl.ports, sfp: tpl.sfp, rows: [] };
+    PORT_DATA[sw.name] = {
+      type: "switch",
+      switchType: sw.type,
+      ports: hasNetworkPorts(sw) ? networkPortCount(sw) : tpl.ports,
+      sfp: hasNetworkPorts(sw) ? networkSfpCount(sw) : tpl.sfp,
+      rows: [],
+    };
     if (typeof savePortMap === "function") savePortMap(sw.name);
   }
+  if (typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: sw.name, type: "switch", name: sw.name, data: sw });
   saveLocalSwitch(sw);
   addSwitchRow(sw);
   overlay.classList.remove("open");
@@ -280,7 +353,7 @@ function collectAccessoryAsset() {
   const ip = document.getElementById("asset-ip").value.trim();
   const serial = (document.querySelector('[data-sf="serial"]') || {}).value || "";
   const tags = [...document.querySelectorAll("#tag-picker .chip.active")].map(c => c.textContent.trim());
-  return { name, type, brand, model, rack, posisiU, ip, serial, tags, site: "DC1" };
+  return { name, type, brand, model, rack, posisiU, ip, serial, tags, site: "DC1", ...collectNetworkFields() };
 }
 
 function saveAccessoryAsset() {
@@ -294,7 +367,12 @@ function saveAccessoryAsset() {
   }
   a.name = canonKey(a.name);
   if (["patch", "firewall", "router"].includes(a.type) && typeof PORT_DATA !== "undefined") {
-    PORT_DATA[a.name] = { type: a.type, ports: 24, sfp: 0, rows: [] };
+    PORT_DATA[a.name] = {
+      type: a.type,
+      ports: hasNetworkPorts(a) ? networkPortCount(a) : 24,
+      sfp: hasNetworkPorts(a) ? networkSfpCount(a) : 0,
+      rows: [],
+    };
     if (typeof savePortMap === "function") savePortMap(a.name);
   }
   if (a.type === "pdu" && typeof POWER_DATA !== "undefined") {
@@ -305,6 +383,9 @@ function saveAccessoryAsset() {
     if (typeof savePowerMap === "function") savePowerMap(a.name);
   }
   saveLocalAccessory(a);
+  if (["switch", "firewall", "router"].includes(a.type) && typeof apiSaveDevice === "function") {
+    apiSaveDevice({ deviceKey: a.name, type: a.type, name: a.name, data: a });
+  }
   addAccessoryRow(a);
   overlay.classList.remove("open");
   resetAddModal();
@@ -323,21 +404,6 @@ const viewPmBtn = document.getElementById("view-pm-btn");
 let viewPmName = null;
 let viewPmType = null;
 
-const TYPE_TO_OPTION = {
-  server: "Server", switch: "Switch", pdu: "PDU", firewall: "Firewall",
-  router: "Router", patch: "Patch Panel", ups: "UPS", storage: "Storage",
-  "kvm-switch": "KVM Switch", "cable-management": "Cable Management",
-  "cooling-fan": "Cooling Fan", "blanking-panel": "Blanking Panel",
-  "monitoring-sensor": "Monitoring Sensor", custom: "Custom"
-};
-const OPTION_TO_TYPE = Object.fromEntries(Object.entries(TYPE_TO_OPTION).map(([k, v]) => [v, k]));
-const TYPE_LABELS = {
-  server: "Server", switch: "Network Switch", pdu: "Rack PDU", firewall: "Firewall",
-  router: "Router", patch: "Patch Panel", ups: "UPS", storage: "Storage",
-  "kvm-switch": "KVM Switch", "cable-management": "Cable Management",
-  "cooling-fan": "Cooling Fan", "blanking-panel": "Blanking Panel",
-  "monitoring-sensor": "Monitoring Sensor", custom: "Custom"
-};
 
 function readAssetRow(tr) {
   const cells = tr.querySelectorAll("td");
@@ -356,6 +422,12 @@ function readAssetRow(tr) {
 
 function openViewAsset(tr) {
   const a = readAssetRow(tr);
+  let rec = null;
+  try {
+    rec = a.type === "switch"
+      ? readLocalSwitches().find(s => s.name === a.name) || null
+      : readLocalAccessories().find(x => x.name === a.name) || null;
+  } catch (e) { /* abaikan */ }
   viewPmName = a.name;
   viewPmType = a.type;
   document.getElementById("view-title").textContent = a.name;
@@ -365,6 +437,14 @@ function openViewAsset(tr) {
   viewPmBtn.innerHTML = a.type === "pdu"
     ? '<i class="fa-solid fa-plug"></i> Power Map'
     : '<i class="fa-solid fa-ethernet"></i> Port Map';
+  const netItems = Object.keys(NF_LABELS)
+    .map(f => ({ f, v: rec ? rec[f] : null }))
+    .filter(x => x.v != null && String(x.v) !== "");
+  const netHtml = netItems.length
+    ? '<div style="border-top:1px solid var(--border-soft);margin-top:14px;padding-top:14px;"><div style="font-size:11.5px;font-weight:600;color:var(--accent-text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;"><i class="fa-solid fa-diagram-project"></i> Spesifikasi Network Device</div><div class="field-grid">' +
+      netItems.map(x => '<div class="field-item"><div class="k">' + escA(NF_LABELS[x.f]) + '</div><div class="v">' + escA(x.v) + '</div></div>').join("") +
+      '</div></div>'
+    : "";
   document.getElementById("view-body").innerHTML = `
     <div class="field-grid">
       <div class="field-item"><div class="k">Tipe</div><div class="v">${escA(TYPE_LABELS[a.type] || a.type || "—")}</div></div>
@@ -375,7 +455,7 @@ function openViewAsset(tr) {
       <div class="field-item"><div class="k">Status</div><div class="v">${escA(a.status || "—")}</div></div>
       <div class="field-item"><div class="k">Discovery Source</div><div class="v">${escA(a.source || "—")}</div></div>
       <div class="field-item"><div class="k">Tags</div><div class="v">${a.tags.length ? a.tags.map(t => `<span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>${escA(t)}</span>`).join(" ") : "—"}</div></div>
-    </div>`;
+    </div>${netHtml}`;
   viewOverlay.classList.add("open");
 }
 
@@ -414,11 +494,20 @@ function resetAddModal() {
   if (t) t.textContent = "Add Asset";
   if (s) s.textContent = "Tambahkan asset baru ke inventory";
   if (modalSaveBtn) modalSaveBtn.innerHTML = "Simpan Asset";
+  if (networkSection) {
+    networkSection.querySelectorAll("[data-nf]").forEach(el => {
+      el.value = el.tagName === "SELECT"
+        ? (NF_SELECT_DEFAULTS[el.dataset.nf] !== undefined ? NF_SELECT_DEFAULTS[el.dataset.nf] : (el.options[0] && el.options[0].value))
+        : "";
+    });
+  }
 }
 
 function openEditAsset(tr) {
   const a = readAssetRow(tr);
   const sw = a.type === "switch" ? readLocalSwitches().find(s => s.name === a.name) : null;
+  const acc = !sw ? readLocalAccessories().find(x => x.name === a.name) : null;
+  const rec = sw || acc;
   editingAsset = { tr, name: a.name, type: a.type, source: sw ? "switch" : "row" };
 
   document.querySelector("#modal-overlay .modal-title").textContent = "Edit Asset";
@@ -445,6 +534,14 @@ function openEditAsset(tr) {
   document.querySelector('[data-sf="posisiU"]').value = a.posisiU;
   document.getElementById("asset-ip").value = a.ip === "—" ? "" : a.ip;
   document.querySelector('[data-sf="serial"]').value = a.serial === "—" ? "" : a.serial;
+  if (networkSection) {
+    networkSection.querySelectorAll("[data-nf]").forEach(el => {
+      const v = rec && rec[el.dataset.nf] != null ? String(rec[el.dataset.nf]) : "";
+      el.value = el.tagName === "SELECT"
+        ? (v || (NF_SELECT_DEFAULTS[el.dataset.nf] !== undefined ? NF_SELECT_DEFAULTS[el.dataset.nf] : (el.options[0] && el.options[0].value)))
+        : v;
+    });
+  }
   document.querySelectorAll("#tag-picker .chip").forEach(c => c.classList.remove("active"));
   a.tags.forEach(t => {
     const chip = [...document.querySelectorAll("#tag-picker .chip")].find(c => c.textContent.trim() === t);
@@ -482,25 +579,52 @@ function saveEditAsset() {
 
   if (ed.source === "switch") {
     const sw = collectSwitchAsset();
+    sw.name = canonKey(sw.name);
     const list = readLocalSwitches();
     const idx = list.findIndex(s => s.name === ed.name);
     if (idx >= 0) list[idx] = sw; else list.unshift(sw);
     localStorage.setItem(SWITCH_STORAGE_KEY, JSON.stringify(list));
+    const hasPorts = hasNetworkPorts(sw);
+    if (ed.name !== sw.name) rekeyDeviceMaps(ed.name, sw.name);
     if (typeof PORT_DATA !== "undefined") {
-      if (ed.name !== name && PORT_DATA[ed.name]) {
-        PORT_DATA[name] = PORT_DATA[ed.name];
+      if (ed.name !== sw.name && PORT_DATA[ed.name]) {
+        PORT_DATA[sw.name] = PORT_DATA[ed.name];
         delete PORT_DATA[ed.name];
       }
       const tpl = SWITCH_TEMPLATES[sw.type] || SWITCH_TEMPLATES.ethernet;
-      PORT_DATA[name] = { type: "switch", switchType: sw.type, ports: tpl.ports, sfp: tpl.sfp, rows: (PORT_DATA[name] && PORT_DATA[name].rows) || [] };
-      if (typeof savePortMap === "function") savePortMap(name);
+      const rows = (PORT_DATA[sw.name] && PORT_DATA[sw.name].rows) || [];
+      PORT_DATA[sw.name] = { type: "switch", switchType: sw.type, ports: hasPorts ? networkPortCount(sw) : tpl.ports, sfp: hasPorts ? networkSfpCount(sw) : tpl.sfp, rows };
+      if (typeof savePortMap === "function") savePortMap(sw.name);
     }
+    if (typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: sw.name, type: "switch", name: sw.name, data: sw });
     ed.tr.remove();
     addSwitchRow(sw);
   } else {
+    const nameCanon = canonKey(name);
+    const prev = readLocalAccessories().find(x => x.name === ed.name) || {};
+    const isNet = NETWORK_TYPES.includes(type);
+    const updated = { ...prev, name: nameCanon, type, rack, posisiU, ip, serial, tags, ...collectNetworkFields() };
+    if (!updated.site) updated.site = "DC1";
+    if (ed.name !== nameCanon) rekeyDeviceMaps(ed.name, nameCanon);
+    if (["patch", "firewall", "router"].includes(type) && typeof PORT_DATA !== "undefined") {
+      if (ed.name !== nameCanon && PORT_DATA[ed.name]) {
+        PORT_DATA[nameCanon] = PORT_DATA[ed.name];
+        delete PORT_DATA[ed.name];
+      }
+      const rows = (PORT_DATA[nameCanon] && PORT_DATA[nameCanon].rows) || [];
+      PORT_DATA[nameCanon] = {
+        type,
+        ports: hasNetworkPorts(updated) ? networkPortCount(updated) : (PORT_DATA[nameCanon] && PORT_DATA[nameCanon].ports) || 24,
+        sfp: hasNetworkPorts(updated) ? networkSfpCount(updated) : (PORT_DATA[nameCanon] && PORT_DATA[nameCanon].sfp) || 0,
+        rows,
+      };
+      if (typeof savePortMap === "function") savePortMap(nameCanon);
+    }
+    if (isNet && typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: nameCanon, type, name: nameCanon, data: updated });
+    saveLocalAccessory(updated);
     const cells = ed.tr.querySelectorAll("td");
     if (cells[0]) {
-      cells[0].innerHTML = `<div class="strong">${escA(name)}</div><div class="mono" style="font-size:11px;">${escA(serial || "—")}</div><div style="margin-top:4px;">${switchTagChips(tags)}</div>`;
+      cells[0].innerHTML = `<div class="strong">${escA(nameCanon)}</div><div class="mono" style="font-size:11px;">${escA(serial || "—")}</div><div style="margin-top:4px;">${switchTagChips(tags)}</div>`;
     }
     if (cells[1]) {
       const chipClass = ["server", "switch", "pdu", "firewall", "router", "patch", "storage", "ups", "kvm-switch", "cable-management", "cooling-fan", "blanking-panel", "monitoring-sensor", "custom"].includes(type) ? type : "custom";
@@ -509,7 +633,7 @@ function saveEditAsset() {
     if (cells[2]) cells[2].textContent = `${rack}${posisiU ? " · " + posisiU : ""}`;
     if (cells[3]) cells[3].textContent = ip || "—";
     if (cells[4]) cells[4].textContent = brandModel || "—";
-    if (cells[7]) cells[7].innerHTML = cells[7].innerHTML.replaceAll(ed.name, name);
+    if (cells[7]) cells[7].innerHTML = cells[7].innerHTML.replaceAll(ed.name, nameCanon);
     ed.tr.setAttribute("data-type", type);
     ed.tr.setAttribute("data-tags", tags.join(","));
   }
