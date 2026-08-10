@@ -93,7 +93,7 @@
         <div class="card stat-card">
           <div class="stat-top"><span class="stat-label">Total Assets</span>
             <div class="stat-icon" style="background:var(--accent-dim);color:var(--accent-text);"><i class="fa-solid fa-server"></i></div></div>
-          <div class="stat-value">1,284</div>
+          <div class="stat-value" id="stat-total-assets">1,284</div>
           <div class="stat-delta up">+18 minggu ini</div>
         </div>
         <div class="card stat-card">
@@ -114,6 +114,19 @@
           <div class="stat-value">7</div>
           <div class="stat-delta down">3 high priority</div>
         </div>
+      </div>
+
+      <div class="card" id="device-registry-card" style="margin-bottom:16px;">
+        <div class="card-head">
+          <div><div class="card-title">Device Registry</div><div class="card-title-sub">Jumlah perangkat terindeks di registri master (per tipe)</div></div>
+          <span class="link-btn" onclick="location.href='port-map.html'">Buka Port Map</span>
+        </div>
+        <table>
+          <thead><tr><th>Tipe</th><th>Jumlah</th></tr></thead>
+          <tbody id="device-registry-body">
+            <tr><td colspan="2" style="color:var(--text-muted);padding:16px;">Memuat…</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <div class="card" style="margin-bottom:16px;">
@@ -194,6 +207,8 @@
 <script src="js/app.js"></script>
     
 <script src="js/keys.js"></script>
+<script src="js/api.js"></script>
+<script src="js/dashboard.js"></script>
 </body>
 </html>
 

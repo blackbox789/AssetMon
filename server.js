@@ -131,8 +131,35 @@ function backfillDevices() {
   });
 }
 
+// Bersihkan device yatim (stale): terdaftar di registri tetapi tidak punya
+// Port/Power Map dan tidak merujuk ke record server mana pun. Dijalankan
+// sekali saat startup supaya index perangkat tetap bersih & konsisten.
+function pruneOrphanDevices() {
+  const withMap = new Set(db.prepare("SELECT DISTINCT deviceKey FROM maps").all().map(r => r.deviceKey));
+  const withServer = new Set();
+  db.prepare("SELECT id, data FROM servers").all().forEach(r => {
+    try {
+      const s = JSON.parse(r.data);
+      if (s && s.hostname) withServer.add(canonKey(s.hostname));
+      if (s && s.id) withServer.add(canonKey(s.id));
+      withServer.add(canonKey(r.id));
+    } catch (e) { /* abaikan baris rusak */ }
+  });
+  const rows = db.prepare("SELECT deviceKey FROM devices").all();
+  const del = db.prepare("DELETE FROM devices WHERE deviceKey = ?");
+  let removed = 0;
+  rows.forEach(r => {
+    if (!withMap.has(r.deviceKey) && !withServer.has(canonKey(r.deviceKey))) {
+      del.run(r.deviceKey);
+      removed++;
+    }
+  });
+  return removed;
+}
+
 normalizeMapKeys();
 backfillDevices();
+const prunedDevices = pruneOrphanDevices();
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -321,4 +348,5 @@ app.get("/", (req, res) => res.redirect("/dashboard.html"));
 
 app.listen(PORT, () => {
   console.log("RackView server jalan di http://localhost:" + PORT);
+  if (prunedDevices > 0) console.log("[maintenance] " + prunedDevices + " device yatim dibersihkan dari registri");
 });
