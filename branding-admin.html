@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings — Branding</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/branding-admin.css">
+</head>
+<body>
+<div class="app-shell" id="app-shell">
+<aside class="sidebar" id="sidebar">
+  <div class="brand" id="brand-header">
+    <div class="brand-mark" data-brand-logo-small>RV</div>
+    <div class="brand-text" style="flex:1;min-width:0;">
+      <div class="brand-name" data-brand-name>RackView</div>
+      <div class="brand-sub" data-brand-tagline>Datacenter Asset Mgmt</div>
+    </div>
+    <button class="sidebar-collapse-btn" id="collapse-btn" aria-label="Collapse sidebar"><i class="fa-solid fa-angles-left"></i></button>
+  </div>
+  <nav class="nav">
+    <div class="nav-group">
+      <div class="nav-label">Overview</div>
+      <a href="dashboard.html" class="nav-item"><i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Inventory</div>
+      <a href="sites.html" class="nav-item"><i class="fa-solid fa-map-location-dot"></i><span>Sites</span></a>
+      <a href="rack-elevation.html" class="nav-item"><i class="fa-solid fa-server"></i><span>Rack Elevation</span></a>
+      <a href="capacity-matrix.html" class="nav-item"><i class="fa-solid fa-th-large"></i><span>Capacity Matrix</span></a>
+      <a href="network-topology.html" class="nav-item"><i class="fa-solid fa-diagram-project"></i><span>Network Topology</span></a>
+      <a href="port-map.html" class="nav-item"><i class="fa-solid fa-ethernet"></i><span>Port Map</span></a>
+      <a href="power-map.html" class="nav-item"><i class="fa-solid fa-plug"></i><span>Power Map</span></a>
+            <a href="asset-list.html" class="nav-item nav-parent open" data-submenu="submenu-asset"><i class="fa-solid fa-list-ul"></i><span>Asset List</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+      <div class="nav-submenu open" id="submenu-asset">
+        <a href="server-list.html" class="nav-subitem" data-type="server"><i class="fa-solid fa-database"></i><span>Server</span></a>
+        <a href="storage-list.html" class="nav-subitem" data-type="storage"><i class="fa-solid fa-hard-drive"></i><span>Storage</span></a>
+        <a href="asset-list.html" class="nav-subitem nav-parent2 open" data-submenu2="submenu-asset-net"><i class="fa-solid fa-network-wired"></i><span>Network Device</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+        <div class="nav-submenu2 open" id="submenu-asset-net">
+          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Network Device</span></a>
+          <a href="firewall-list.html" class="nav-subitem2" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
+          <a href="router-list.html" class="nav-subitem2" data-type="router"><i class="fa-solid fa-tower-broadcast"></i><span>Router</span></a>
+        </div>
+        <a href="ups-list.html" class="nav-subitem" data-type="ups"><i class="fa-solid fa-plug-circle-bolt"></i><span>UPS</span></a>
+        <a href="accessories-list.html" class="nav-subitem" data-type="accessories"><i class="fa-solid fa-sliders"></i><span>Accessories</span></a>
+        <a href="asset-list.html" class="nav-subitem" data-type="other"><i class="fa-solid fa-ellipsis"></i><span>Lainnya</span></a>
+        <a href="pdu-list.html" class="nav-subitem"><i class="fa-solid fa-bolt"></i><span>PDU</span></a>
+        <a href="cable-registry.html" class="nav-subitem"><i class="fa-solid fa-tag"></i><span>Cable Registry</span></a>
+      </div>
+      <a href="#" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Discovery Center</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Admin</div>
+      <a href="#" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>User Management</span></a>
+      <a href="#" class="nav-item"><i class="fa-solid fa-file-lines"></i><span>Audit Log</span></a>
+      <a href="reports.html" class="nav-item"><i class="fa-solid fa-chart-column"></i><span>Reports</span></a>
+      <a href="branding-admin.html" class="nav-item active"><i class="fa-solid fa-palette"></i><span>Settings → Branding</span></a>
+    </div>
+  </nav>
+  <div class="sidebar-foot">
+    <span class="agent-dot"></span>
+    <span class="sidebar-foot-text">Semua sistem <b>online</b></span>
+  </div>
+</aside>
+<div class="main">
+  <div class="topbar">
+    <div>
+      <h1>Settings → Branding</h1>
+      <div class="topbar-sub">Super Admin only — perubahan berlaku untuk seluruh tenant/organisasi</div>
+    </div>
+    <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Cari asset, rack, atau IP…"></div>
+    <div class="topbar-actions">
+      <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle theme">
+        <i class="fa-solid fa-sun icon-sun-only"></i><i class="fa-solid fa-moon icon-moon-only"></i>
+      </button>
+      <div class="icon-btn"><i class="fa-solid fa-bell"></i><span class="dot"></span></div>
+      <div class="user-chip">
+        <div class="avatar">JS</div>
+        <div class="user-meta"><div style="font-weight:600;color:var(--text-primary);">Joko S.</div><div class="role">NOC Supervisor</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="content">
+
+      <div class="branding-layout">
+        <div class="card">
+          <div class="tabs-row">
+            <button class="tab-btn active" data-tab="identity">Identity</button>
+            <button class="tab-btn" data-tab="colors">Colors</button>
+            <button class="tab-btn" data-tab="login">Login Page</button>
+            <button class="tab-btn" data-tab="content">Content</button>
+            <button class="tab-btn" data-tab="export">Export &amp; Email</button>
+          </div>
+
+          <div class="tab-panel active" data-panel="identity">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Company Logo</label>
+                <div class="upload-box"><i class="fa-solid fa-cloud-arrow-up"></i>Drag & drop atau klik untuk upload<br><span style="opacity:.7">SVG/PNG, max 500KB, 400×100px</span></div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Company Logo Small</label>
+                <div class="upload-box"><i class="fa-solid fa-cloud-arrow-up"></i>Upload icon<br><span style="opacity:.7">40×40px, max 200KB</span></div>
+              </div>
+            </div>
+            <div class="form-group"><label class="form-label">Company Name</label><input class="form-input" id="in-company-name" value="RackView" maxlength="50"></div>
+            <div class="form-group"><label class="form-label">Tagline</label><input class="form-input" id="in-tagline" value="Datacenter Asset Management" maxlength="100"></div>
+            <div class="form-group"><label class="form-label">Favicon</label><div class="upload-box"><i class="fa-solid fa-cloud-arrow-up"></i>Upload favicon (32×32, 180×180 apple-touch)</div></div>
+          </div>
+
+          <div class="tab-panel" data-panel="colors">
+            <div class="form-group">
+              <label class="form-label">Primary Brand Color</label>
+              <div class="color-row"><input type="color" id="in-primary" value="#31D8A4"><input class="form-input" type="text" id="in-primary-hex" value="#31D8A4"></div>
+              <div class="swatch-presets" id="primary-presets">
+                <span class="swatch" style="background:#31D8A4" data-hex="#31D8A4"></span>
+                <span class="swatch" style="background:#F97316" data-hex="#F97316"></span>
+                <span class="swatch" style="background:#EC4899" data-hex="#EC4899"></span>
+                <span class="swatch" style="background:#4C8DFF" data-hex="#4C8DFF"></span>
+                <span class="swatch" style="background:#EF4444" data-hex="#EF4444"></span>
+              </div>
+              <div class="contrast-warning" id="contrast-warning"><i class="fa-solid fa-triangle-exclamation"></i>Warna ini cukup gelap — teks putih di atas tombol mungkin kurang kontras.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Secondary Brand Color</label>
+              <div class="color-row"><input type="color" id="in-secondary" value="#4C8DFF"><input class="form-input" type="text" id="in-secondary-hex" value="#4C8DFF"></div>
+            </div>
+          </div>
+
+          <div class="tab-panel" data-panel="login">
+            <div class="form-group">
+              <label class="form-label">Login Background</label>
+              <div class="radio-group" id="bg-type-group">
+                <div class="radio-pill active" data-bgtype="gradient">Gradient</div>
+                <div class="radio-pill" data-bgtype="solid">Solid Color</div>
+                <div class="radio-pill" data-bgtype="image">Image Upload</div>
+              </div>
+              <div class="form-hint">Gradient dipilih — gunakan 2 warna + sudut di bawah ini.</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Login Card Style</label>
+              <div class="radio-group" id="card-style-group">
+                <div class="radio-pill active" data-cardstyle="glass">Glassmorphism</div>
+                <div class="radio-pill" data-cardstyle="solid">Solid</div>
+                <div class="radio-pill" data-cardstyle="minimal">Minimal</div>
+              </div>
+            </div>
+            <div class="switch-row">
+              <div><div class="switch-label">Tampilkan "Powered by RackView"</div></div>
+              <button class="toggle-switch on" id="in-poweredby"></button>
+            </div>
+          </div>
+
+          <div class="tab-panel" data-panel="content">
+            <div class="form-group"><label class="form-label">Footer Text</label><input class="form-input" id="in-footer" value="© 2026 RackView. All rights reserved." maxlength="200"></div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label">Support URL</label><input class="form-input" type="url" placeholder="https://support.rackview.io"></div>
+              <div class="form-group"><label class="form-label">Privacy Policy URL</label><input class="form-input" type="url" placeholder="https://..."></div>
+            </div>
+            <div class="form-group"><label class="form-label">Terms of Service URL</label><input class="form-input" type="url" placeholder="https://..."></div>
+            <div class="form-group"><label class="form-label">Email Sender Name</label><input class="form-input" type="text" placeholder="RackView System"></div>
+          </div>
+
+          <div class="tab-panel" data-panel="export">
+            <div class="form-group"><label class="form-label">Email Header Image</label><div class="upload-box"><i class="fa-solid fa-cloud-arrow-up"></i>Upload gambar header email (600×120px)</div></div>
+            <div class="form-group"><label class="form-label">Report Header Style</label><select class="form-input"><option>Logo Left</option><option>Logo Center</option><option>Logo + Name Inline</option></select></div>
+            <div class="switch-row"><div><div class="switch-label">Watermark pada Export PDF</div></div><button class="toggle-switch on" id="in-watermark"></button></div>
+            <div class="form-group" style="margin-top:14px;"><label class="form-label">Teks Watermark</label><input class="form-input" type="text" value="Confidential - RackView"></div>
+          </div>
+
+          <div class="modal-foot" style="margin-top:8px;">
+            <button class="btn ghost" id="reset-btn">Reset to Default</button>
+            <button class="btn primary" id="apply-btn"><i class="fa-solid fa-check"></i>Apply Changes</button>
+          </div>
+        </div>
+
+        <div class="preview-panel">
+          <div class="card">
+            <div class="card-title">Live Preview</div>
+            <div class="card-title-sub" style="margin-bottom:16px;">Update otomatis saat kamu ubah setting</div>
+            <div class="browser-mock">
+              <div class="browser-bar"><span></span><span></span><span></span></div>
+              <div class="preview-login" id="pv-login">
+                <div class="preview-login-card">
+                  <div class="preview-logo-mark"></div>
+                  <div class="preview-cname" id="pv-cname">RackView</div>
+                  <div class="preview-tag" id="pv-tag">Datacenter Asset Management</div>
+                  <div class="preview-input"></div><div class="preview-input"></div><div class="preview-btn"></div>
+                </div>
+              </div>
+              <div class="preview-sidebar-mock">
+                <div class="pv-sb">
+                  <div class="pv-sb-logo"></div>
+                  <div class="pv-sb-name" id="pv-sb-name">RackView</div>
+                  <div class="pv-nav-item active"></div><div class="pv-nav-item"></div><div class="pv-nav-item"></div>
+                </div>
+                <div class="pv-main"><div class="pv-card"></div><div class="pv-card"></div></div>
+              </div>
+            </div>
+            <div class="preview-btn-demo" id="pv-button-demo">Sign In</div>
+          </div>
+        </div>
+      </div>
+  </div>
+</div>
+</div>
+
+    <script src="js/brand.js"></script>
+<script src="js/app.js"></script>
+    
+
+    <script src="js/branding-admin.js"></script>
+</body>
+</html>
+

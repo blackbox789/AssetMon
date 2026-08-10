@@ -1,0 +1,536 @@
+
+const DEFAULT_PORT_DATA = {
+  "SW-CORE-01": { type: "switch", ports: 24, sfp: 2, rows: [
+    { port: 1, vlan: "UPLINK", dest: "FW-EDGE-02", destPort: "WAN", ip: "10.10.0.254", label: "CBL-1001", media: "Cat6" },
+    { port: 2, vlan: "TRUNK", dest: "SW-ACC-03", destPort: "Uplink", ip: "10.10.0.23", label: "CBL-1002", media: "SFP+ DAC" },
+    { port: 3, vlan: "TRUNK", dest: "SW-ACC-04", destPort: "Uplink", ip: "10.10.0.24", label: "CBL-1003", media: "LC MM" },
+    { port: "MGMT", vlan: "v99", dest: "SW-MGMT-02", destPort: "1", ip: "10.10.99.1", label: "CBL-1004", media: "Cat6" },
+  ]},
+  "SW-ACC-03": { type: "switch", ports: 24, sfp: 2, rows: [
+    { port: 1, vlan: "TRUNK", dest: "SW-CORE-01", destPort: "2", ip: "10.10.0.1", label: "CBL-1010", media: "SFP+ DAC" },
+    { port: 2, vlan: "v10", dest: "SRV-APP-04", destPort: "eth0", ip: "10.10.4.14", label: "CBL-1011", media: "Cat6A" },
+    { port: 3, vlan: "v99", dest: "SRV-APP-04", destPort: "eth1 (mgmt)", ip: "10.10.99.14", label: "CBL-1012", media: "Cat6" },
+    { port: 4, vlan: "v20", dest: "SRV-DB-17", destPort: "eth0", ip: "10.10.4.17", label: "CBL-1013", media: "Cat6A" },
+    { port: 5, vlan: "v99", dest: "SRV-DB-17", destPort: "eth1 (mgmt)", ip: "10.10.99.17", label: "CBL-1014", media: "Cat6" },
+    { port: 6, vlan: "v10", dest: "SRV-WEB-02", destPort: "eth0", ip: "10.10.4.22", label: "CBL-1015", media: "Cat6" },
+    { port: 7, vlan: "v99", dest: "SRV-WEB-02", destPort: "eth1 (mgmt)", ip: "10.10.99.22", label: "CBL-1016", media: "Cat6" },
+    { port: "MGMT", vlan: "v99", dest: "SW-MGMT-02", destPort: "2", ip: "10.10.99.23", label: "CBL-1017", media: "Cat6" },
+  ]},
+  "FW-EDGE-02": { type: "firewall", ports: 6, sfp: 0, rows: [
+    { port: 1, vlan: "WAN", dest: "ISP Upstream", destPort: "—", ip: "203.0.113.1", label: "CBL-1020", media: "LC SM" },
+    { port: 2, vlan: "TRUNK", dest: "SW-CORE-01", destPort: "1", ip: "10.10.0.1", label: "CBL-1021", media: "Cat6" },
+    { port: 3, vlan: "DMZ", dest: "DMZ Segment", destPort: "—", ip: "10.10.50.1", label: "CBL-1022", media: "LC MM" },
+    { port: "MGMT", vlan: "v99", dest: "SW-MGMT-02", destPort: "3", ip: "10.10.99.254", label: "CBL-1023", media: "Cat6" },
+  ]},
+  "SRV-APP-04": { type: "server", ports: 2, sfp: 0, rows: [
+    { port: "eth0", vlan: "v10", dest: "SW-ACC-03", destPort: "2", ip: "10.10.4.14", label: "CBL-1030", media: "Cat6A" },
+    { port: "eth1 (mgmt)", vlan: "v99", dest: "SW-ACC-03", destPort: "3", ip: "10.10.99.14", label: "CBL-1031", media: "Cat6" },
+  ]},
+  "SRV-DB-17": { type: "server", ports: 2, sfp: 0, rows: [
+    { port: "eth0", vlan: "v20", dest: "SW-ACC-03", destPort: "4", ip: "10.10.4.17", label: "CBL-1040", media: "Cat6A" },
+    { port: "eth1 (mgmt)", vlan: "v99", dest: "SW-ACC-03", destPort: "5", ip: "10.10.99.17", label: "CBL-1041", media: "Cat6" },
+    { port: "SAS-HBA", vlan: "—", dest: "JBOD-ENCL-01", destPort: "Exp", ip: "—", label: "CBL-1042", media: "SAS" },
+  ]},
+  "SRV-WEB-02": { type: "server", ports: 2, sfp: 0, rows: [
+    { port: "eth0", vlan: "v10", dest: "SW-ACC-03", destPort: "6", ip: "10.10.4.22", label: "CBL-1050", media: "Cat6A" },
+    { port: "eth1 (mgmt)", vlan: "v99", dest: "SW-ACC-03", destPort: "7", ip: "10.10.99.22", label: "CBL-1051", media: "Cat6" },
+  ]},
+  "PDU-A": { type: "pdu", ports: 1, sfp: 0, rows: [
+    { port: "MGMT", vlan: "v99", dest: "SW-ACC-03", destPort: "15", ip: "10.10.9.1", label: "CBL-2015", media: "Cat6" },
+  ]},
+  "PDU-B": { type: "pdu", ports: 1, sfp: 0, rows: [
+    { port: "MGMT", vlan: "v99", dest: "SW-ACC-03", destPort: "16", ip: "10.10.9.2", label: "CBL-2016", media: "Cat6" },
+  ]},
+};
+
+const TAG_COLORS = {
+  "production": "var(--danger)",
+  "staging": "var(--warning)",
+  "development": "var(--info)",
+  "database": "var(--violet)",
+  "security": "var(--warning)",
+  "network-core": "var(--accent)",
+  "network-access": "var(--accent)",
+  "application": "var(--info)",
+  "web": "var(--accent)",
+  "backup": "var(--text-muted)",
+  "power": "var(--violet)",
+};
+function tagColor(tag) {
+  if (TAG_COLORS[tag]) return TAG_COLORS[tag];
+  const palette = ["var(--accent)", "var(--info)", "var(--violet)", "var(--warning)", "#F97316", "#EC4899"];
+  let h = 0;
+  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
+function vlanColor(vlan) {
+  const palette = ["var(--accent)", "var(--info)", "var(--violet)", "var(--warning)", "#F97316", "#EC4899"];
+  let h = 0;
+  for (let i = 0; i < vlan.length; i++) h = (h * 31 + vlan.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
+
+// ---- Tipe media koneksi (copper / fiber / direct attach / storage / mgmt) ----
+const MEDIA_TYPES = [
+  "Cat5e", "Cat6", "Cat6A", "Cat7", "Cat8",
+  "LC MM", "LC SM", "SC SM", "MPO",
+  "SFP+ DAC", "QSFP",
+  "SAS", "SATA", "FC",
+  "Console", "USB",
+];
+const MEDIA_COLORS = {
+  "Cat5e": "#E5A13D", "Cat6": "#2FB5C8", "Cat6A": "#C8569E", "Cat7": "#7C6FF0", "Cat8": "#F97316",
+  "LC MM": "#22C55E", "LC SM": "#3B82F6", "SC SM": "#0EA5E9", "MPO": "#A3E635",
+  "SFP+ DAC": "#14B8A6", "QSFP": "#06B6D4",
+  "SAS": "#EF4444", "SATA": "#F59E0B", "FC": "#8B5CF6",
+  "Console": "#6E7681", "USB": "#94A3B8",
+};
+const MEDIA_SHORT = {
+  "Cat5e": "5E", "Cat6": "6", "Cat6A": "6A", "Cat7": "7", "Cat8": "8",
+  "LC MM": "LC", "LC SM": "LC·SM", "SC SM": "SC", "MPO": "MPO",
+  "SFP+ DAC": "DAC", "QSFP": "QSFP",
+  "SAS": "SAS", "SATA": "SATA", "FC": "FC",
+  "Console": "CON", "USB": "USB",
+};
+function mediaColor(media) {
+  if (MEDIA_COLORS[media]) return MEDIA_COLORS[media];
+  const palette = ["#22C55E", "#3B82F6", "#14B8A6", "#A3E635", "#8B5CF6", "#F97316"];
+  let h = 0;
+  for (let i = 0; i < media.length; i++) h = (h * 31 + media.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
+function mediaShort(media) {
+  if (MEDIA_SHORT[media]) return MEDIA_SHORT[media];
+  return String(media || "").slice(0, 4).toUpperCase() || "—";
+}
+
+function escPM(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ---- Port Spesial per tipe perangkat (Manajemen, Console, Uplink, WAN, HA) ----
+// Port di luar switchport bernomor (1..N) & slot SFP: mis. port manajemen,
+// console/serial, WAN/HA khusus. Disimpan sebagai baris koneksi dengan nama
+// port string ("MGMT", "CON", "WAN", dst.) sehingga ikut tercatat di tabel
+// detail, Cable Registry, dan tab Koneksi Kabel. Uplink fiber/DAC sudah
+// diwakili slot SFP; uplink copper tetap port bernomor di grid.
+const SPECIAL_PORT_DEFS = {
+  switch: [
+    { key: "MGMT", label: "Manajemen", media: "Cat6", hint: "Port manajemen switch (biasanya di panel samping)" },
+    { key: "CON",  label: "Console",   media: "Console", hint: "Port console / serial — akses CLI out-of-band" },
+  ],
+  firewall: [
+    { key: "MGMT", label: "Manajemen", media: "Cat6", hint: "Port manajemen firewall" },
+    { key: "CON",  label: "Console",   media: "Console", hint: "Port console / serial" },
+    { key: "WAN",  label: "WAN",       media: "LC SM", hint: "Koneksi WAN / ISP — boleh juga memakai port bernomor" },
+    { key: "HA",   label: "HA",        media: "Cat6", hint: "Link high-availability antar firewall" },
+  ],
+  router: [
+    { key: "MGMT", label: "Manajemen", media: "Cat6", hint: "Port manajemen router" },
+    { key: "CON",  label: "Console",   media: "Console", hint: "Port console / serial" },
+    { key: "WAN",  label: "WAN",       media: "LC SM", hint: "Koneksi WAN / ISP" },
+  ],
+  server: [
+    { key: "MGMT", label: "Manajemen", media: "Cat6", hint: "BMC — iDRAC / iLO / IPMI (bukan port data)" },
+  ],
+  pdu: [
+    { key: "MGMT", label: "Manajemen", media: "Cat6", hint: "Port manajemen PDU" },
+  ],
+  ups: [
+    { key: "MGMT", label: "Manajemen", media: "Cat6", hint: "Port manajemen UPS" },
+  ],
+  patch: [],
+  storage: [],
+  "kvm-switch": [],
+  "cable-management": [],
+  "cooling-fan": [],
+  "blanking-panel": [],
+  "monitoring-sensor": [],
+};
+
+const SPECIAL_PORT_COLORS = {
+  MGMT: "#3B82F6", CON: "#F97316", CONSOLE: "#F97316",
+  WAN: "#0EA5E9", HA: "#A855F7", UPLINK: "#22C55E",
+  AUX: "#94A3B8", PSU: "#8B5CF6", DATA: "#2FB5C8",
+};
+
+function specialPortColor(key) {
+  const k = String(key || "").toUpperCase();
+  if (SPECIAL_PORT_COLORS[k]) return SPECIAL_PORT_COLORS[k];
+  const palette = ["#3B82F6", "#F97316", "#22C55E", "#A855F7", "#0EA5E9", "#EC4899"];
+  let h = 0;
+  for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length];
+}
+
+function openPortMap(deviceKey, startInEdit, psuCount, opts) {
+  let data = PORT_DATA[deviceKey];
+  const isFallback = !data;
+  if (!data) {
+    const type = (opts && opts.type) || "server";
+    const form = (opts && opts.formFactor) || "";
+    const m = String(form).match(/^(\d+)U/);
+    const u = m ? parseInt(m[1], 10) : 1;
+    let ports = type === "switch" ? 24 : type === "firewall" ? 6 : type === "patch" ? 24 : type === "pdu" ? 1 : 4;
+    let sfp = type === "switch" ? 2 : 0;
+    if (type === "server") {
+      try {
+        if (typeof getServers === "function") {
+          const srv = getServers().find(s => (s.hostname || "").toLowerCase() === String(deviceKey).toLowerCase());
+          if (srv) {
+            sfp = parseInt(srv.lanSfp, 10) || 0;
+            ports = (parseInt(srv.lanRj45, 10) || 0) + sfp;
+            if (ports < 1) ports = u * 2;
+          } else {
+            ports = u * 2;
+          }
+        }
+      } catch (err) { /* abaikan */ }
+    }
+    data = { type, ports, sfp, rows: [], specials: JSON.parse(JSON.stringify(SPECIAL_PORT_DEFS[type] || [])) };
+  }
+  if (!Array.isArray(data.rows)) data.rows = [];
+  if (!Array.isArray(data.specials)) data.specials = [];
+  currentPortKey = deviceKey || null;
+  lastPortMeta = { type: data.type, ports: data.ports, sfp: data.sfp };
+  document.getElementById("portmap-title").textContent = deviceKey + " — Port Map";
+  document.getElementById("portmap-sub").textContent = `${data.rows.length} port terpakai dari ${data.ports} port` + (data.sfp ? ` + ${data.sfp} SFP` : "");
+
+  let visualHtml = "";
+  const sfpCells = data.sfp ? Array.from({ length: data.sfp }, (_, i) => {
+    const idx = i + 1;
+    const sfpRow = data.rows.find(r => r.port === "SFP" + idx);
+    return `<div class="portmap-sfp-box ${sfpRow ? "used" : ""}" data-port-edit="SFP${idx}" style="cursor:pointer;" title="${sfpRow ? "Klik untuk edit: SFP" + idx + " → " + sfpRow.dest : "SFP" + idx + " kosong — klik untuk isi data"}">SFP${idx}</div>`;
+  }).join("") : "";
+  const sfpHtml = sfpCells ? `<div class="portmap-sfp-row">${sfpCells}</div>` : "";
+
+  // Strip Port Spesial (Manajemen / Console / Uplink / WAN / HA / dsb.) — di atas grid.
+  const specials = Array.isArray(data.specials) ? data.specials : [];
+  const specialCells = specials.map(s => {
+    const row = data.rows.find(r => String(r.port) === String(s.key));
+    const col = specialPortColor(s.key);
+    const rmBtn = `<button class="portmap-special-x" data-remove-special="${escPM(s.key)}" title="Hapus port spesial ${escPM(s.label)} (${escPM(s.key)})" style="position:absolute;top:0;right:0;width:16px;height:14px;line-height:12px;padding:0;border:none;border-radius:4px;background:rgba(0,0,0,.32);color:#fff;font-size:9px;cursor:pointer;font-family:var(--font-ui);opacity:.9;">&times;</button>`;
+    const body = row
+      ? `<div class="pnum">${escPM(s.label)}</div><div>${escPM(row.dest)}</div>`
+      : `<div class="pnum">${escPM(s.label)}</div>&ndash;`;
+    return row
+      ? `<div class="portmap-special-box used" data-port-edit="${escPM(s.key)}" style="position:relative;background:${col};border-color:${col};cursor:pointer;" title="Klik untuk edit: ${escPM(s.label)} (${escPM(s.key)}) → ${escPM(row.dest)} · ${escPM(row.vlan)}">${rmBtn}${body}</div>`
+      : `<div class="portmap-special-box" data-port-edit="${escPM(s.key)}" style="position:relative;cursor:pointer;" title="${escPM(s.label)} (${escPM(s.key)}) kosong — klik untuk isi koneksi">${rmBtn}${body}</div>`;
+  }).join("");
+  const addSpecialBtn = `<button class="portmap-special-add" data-add-special style="width:32px;height:32px;border-radius:5px;border:1px dashed var(--border);background:transparent;color:var(--text-muted);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;" title="Tambah port spesial (mis. Uplink, AUX, Out-of-Band)">+</button>`;
+  const specialHtml = `<div class="portmap-special-row"><span class="portmap-special-label">Port Spesial</span><div class="portmap-sfp-row">${specialCells}${addSpecialBtn}</div></div>`;
+
+  const cellHtml = p => {
+    let row = data.rows.find(r => String(r.port) === String(p));
+    if (!row && data.ports === 1 && data.rows.length) row = data.rows[0];
+    if (row) {
+      return `<div class="portmap-cell" data-port-edit="${p}" style="background:${vlanColor(row.vlan)};cursor:pointer;" title="Klik untuk edit: Port ${p} [${row.label || '—'}] → ${row.dest} (${row.destPort}) · ${row.media || 'media: —'}"><div class="pnum">${p}</div><div>${row.vlan}</div>${row.media ? `<div class="mmedia">${mediaShort(row.media)}</div>` : ""}</div>`;
+    }
+    return `<div class="portmap-cell free" data-port-edit="${p}" style="cursor:pointer;" title="Klik untuk isi data: Port ${p} — kosong"><div class="pnum">${p}</div>–</div>`;
+  };
+  if (data.ports >= 24) {
+    const rowRanges = [[1, 12], [13, 24]];
+    const gridRows = rowRanges.map(([from, to]) => {
+      let cells = "";
+      for (let p = from; p <= to; p++) cells += cellHtml(p);
+      return `<div class="portmap-grid-row">${cells}</div>`;
+    }).join("");
+    visualHtml = `<div class="portmap-visual">${gridRows}${sfpHtml}${specialHtml}</div>`;
+  } else {
+    const perRow = Math.max(2, Math.min(8, data.ports));
+    const gridRows = [];
+    for (let start = 1; start <= data.ports; start += perRow) {
+      let cells = "";
+      for (let p = start; p <= Math.min(start + perRow - 1, data.ports); p++) cells += cellHtml(p);
+      gridRows.push(`<div class="portmap-grid-row">${cells}</div>`);
+    }
+    visualHtml = `<div class="portmap-visual">${gridRows}${sfpHtml}${specialHtml}</div>`;
+  }
+
+  const specialLegend = specials.map(s => `<span><span class="sw" style="background:${specialPortColor(s.key)}"></span>${escPM(s.label)} (${escPM(s.key)})</span>`).join("");
+  const legendVlans = [...new Set(data.rows.map(r => r.vlan))];
+  const legendHtml = `<div class="portmap-legend">${specialLegend}${legendVlans.map(v => `<span><span class="sw" style="background:${vlanColor(v)}"></span>${v}</span>`).join("")}<span><span class="sw" style="background:var(--bg-surface-3);border:1px solid var(--border)"></span>Kosong</span></div>`;
+  const mediaSet = [...new Set(data.rows.map(r => r.media).filter(Boolean))];
+  const mediaLegendHtml = mediaSet.length
+    ? `<div class="portmap-legend" style="margin-top:8px;">${mediaSet.map(m => `<span><span class="sw" style="background:${mediaColor(m)}"></span>${escPM(m)}</span>`).join("")}</div>`
+    : "";
+
+  const tableRows = data.rows.map(r => `
+    <tr data-port-edit="${escPM(r.port)}" style="cursor:pointer;" title="Klik untuk edit port ${r.port}">
+      <td class="strong mono">${r.port}</td>
+      <td class="mono" style="color:var(--text-muted);">${r.label || "—"}</td>
+      <td>${r.media ? `<span class="vlan-tag" style="background:${mediaColor(r.media)}">${escPM(r.media)}</span>` : `<span class="mono" style="color:var(--text-muted);">—</span>`}</td>
+      <td><span class="vlan-tag" style="background:${vlanColor(r.vlan)}">${r.vlan}</span></td>
+      <td class="mono">${r.destPort}</td>
+      <td class="strong">${r.dest}</td>
+      <td class="mono">${r.ip}</td>
+    </tr>`).join("");
+  const tableHtml = data.rows.length
+    ? `<table>
+        <thead><tr><th>Port</th><th>Label ID</th><th>Media</th><th>VLAN</th><th>Port Tujuan</th><th>Perangkat Tujuan</th><th>IP Address</th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>`
+    : (isFallback
+        ? `<div class="form-hint" style="padding:18px;text-align:center;border:1px dashed var(--border);border-radius:8px;">Belum ada kabel terdaftar untuk <b>${escPM(deviceKey)}</b> — semua port kosong. Klik nomor port untuk mencatat koneksi, atau lewat menu Cable Registry.</div>`
+        : "");
+
+  document.getElementById("portmap-body").innerHTML = `
+    <div class="form-hint" style="margin-bottom:12px;">Klik kotak port atau nomor port di tabel untuk mengisi / mengedit koneksi.</div>
+    ${legendHtml}
+    ${mediaLegendHtml}
+    ${visualHtml}
+    ${tableHtml}
+  `;
+  document.getElementById("portmap-overlay").classList.add("open");
+}
+
+const portmapCloseBtn = document.getElementById("portmap-close");
+const portmapOverlayEl = document.getElementById("portmap-overlay");
+if (portmapCloseBtn) portmapCloseBtn.addEventListener("click", () => portmapOverlayEl.classList.remove("open"));
+if (portmapOverlayEl) portmapOverlayEl.addEventListener("click", e => { if (e.target.id === "portmap-overlay") e.currentTarget.classList.remove("open"); });
+
+const DEFAULT_POWER_DATA = {
+  "PDU-A": { ports: 24, rows: [
+    { outlet: 1, device: "SRV-APP-04", psu: "PSU-A", watt: 240, label: "CBL-2001" },
+    { outlet: 2, device: "SRV-DB-17", psu: "PSU-A", watt: 260, label: "CBL-2002" },
+    { outlet: 3, device: "SW-CORE-01", psu: "Single PSU", watt: 150, label: "CBL-2003" },
+    { outlet: 4, device: "FW-EDGE-02", psu: "Single PSU", watt: 65, label: "CBL-2004" },
+    { outlet: 5, device: "SRV-WEB-02", psu: "PSU-A", watt: 205, label: "CBL-2005" },
+    { outlet: 6, device: "SW-ACC-03", psu: "Single PSU", watt: 80, label: "CBL-2006" },
+  ]},
+  "PDU-B": { ports: 24, rows: [
+    { outlet: 1, device: "SRV-APP-04", psu: "PSU-B", watt: 240, label: "CBL-2010" },
+    { outlet: 2, device: "SRV-DB-17", psu: "PSU-B", watt: 260, label: "CBL-2011" },
+    { outlet: 3, device: "SRV-WEB-02", psu: "PSU-B", watt: 205, label: "CBL-2012" },
+  ]},
+};
+
+function psuColor(psu) {
+  if (psu === "PSU-A") return "var(--accent)";
+  if (psu === "PSU-B") return "var(--info)";
+  return "var(--violet)";
+}
+
+// ---- Persistensi Port Map & Power Map ke SQLite (via server.js /api/maps) ----
+// Data tersimpan per perangkat (deviceKey). DEFAULT_* adalah seed demo yang
+// dipakai sebagai fallback; data hasil edit tersimpan ke DB dan menimpa default.
+const PORT_STORAGE_KEY = "rv_port_maps";
+const POWER_STORAGE_KEY = "rv_power_maps";
+
+function readLocalMaps(storageKey) {
+  try {
+    const obj = JSON.parse(localStorage.getItem(storageKey) || "{}");
+    return obj && typeof obj === "object" && !Array.isArray(obj) ? obj : {};
+  } catch {
+    return {};
+  }
+}
+
+// Upgrade data lama: baris port yang belum punya "media" diisi dari seed
+// default (cocokkan per nomor port), fallback "Cat6". Ini agar contoh tipe
+// media tetap tampil untuk data yang tersimpan sebelum fitur media ada.
+function applyMediaDefaults(kind, runtime, defaults) {
+  if (kind !== "port") return;
+  Object.keys(runtime).forEach(k => {
+    const dev = runtime[k];
+    if (!dev || !Array.isArray(dev.rows)) return;
+    const seed = defaults[k];
+    dev.rows.forEach(row => {
+      if (row && !row.media) {
+        let media = "Cat6";
+        if (seed && Array.isArray(seed.rows)) {
+          const s = seed.rows.find(sr => String(sr.port) === String(row.port));
+          if (s && s.media) media = s.media;
+        }
+        row.media = media;
+      }
+    });
+  });
+}
+
+// Port Spesial: kalau data perangkat belum punya daftar specials (mis. data lama
+// di DB/localStorage), isi dari template default sesuai tipe perangkat.
+function applySpecialsDefaults(kind, runtime, defaults) {
+  if (kind !== "port") return;
+  Object.keys(runtime).forEach(k => {
+    const dev = runtime[k];
+    if (!dev || Array.isArray(dev.specials)) return;
+    const defs = SPECIAL_PORT_DEFS[dev.type] || [];
+    dev.specials = JSON.parse(JSON.stringify(defs));
+  });
+}
+
+function buildRuntimeMaps(kind, defaults) {
+  const runtime = JSON.parse(JSON.stringify(defaults));
+  const storageKey = kind === "port" ? PORT_STORAGE_KEY : POWER_STORAGE_KEY;
+  const ls = readLocalMaps(storageKey);
+  if (typeof apiGetMaps === "function") {
+    const db = apiGetMaps(kind);
+    if (db) {
+      if (!db.length && Object.keys(ls).length && typeof apiSaveMap === "function") {
+        Object.keys(ls).forEach(k => apiSaveMap(kind, k, ls[k]));
+      }
+      db.forEach(e => { runtime[e.deviceKey] = e.data; });
+      applyMediaDefaults(kind, runtime, defaults);
+      applySpecialsDefaults(kind, runtime, defaults);
+      return runtime;
+    }
+  }
+  Object.keys(ls).forEach(k => { runtime[k] = ls[k]; });
+  applyMediaDefaults(kind, runtime, defaults);
+  applySpecialsDefaults(kind, runtime, defaults);
+  return runtime;
+}
+
+function saveMap(kind, deviceKey, data) {
+  if (typeof apiSaveMap === "function" && apiSaveMap(kind, deviceKey, data)) return true;
+  try {
+    const storageKey = kind === "port" ? PORT_STORAGE_KEY : POWER_STORAGE_KEY;
+    const ls = readLocalMaps(storageKey);
+    ls[deviceKey] = data;
+    localStorage.setItem(storageKey, JSON.stringify(ls));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function savePortMap(deviceKey) {
+  if (PORT_DATA[deviceKey]) return saveMap("port", deviceKey, PORT_DATA[deviceKey]);
+  return false;
+}
+
+function savePowerMap(deviceKey) {
+  if (POWER_DATA[deviceKey]) return saveMap("power", deviceKey, POWER_DATA[deviceKey]);
+  return false;
+}
+
+let PORT_DATA = buildRuntimeMaps("port", DEFAULT_PORT_DATA);
+let POWER_DATA = buildRuntimeMaps("power", DEFAULT_POWER_DATA);
+
+let currentPduKey = null;
+let currentPortKey = null;
+let lastPortMeta = { type: "server", ports: 4, sfp: 0 };
+
+function buildOutletRows(totalPorts) {
+  const rows = [];
+  for (let start = 1; start <= totalPorts; start += 12) {
+    rows.push([start, Math.min(start + 11, totalPorts)]);
+  }
+  return rows;
+}
+
+function openPowerMap(deviceKey, startInEdit, psuCount) {
+  const data = POWER_DATA[deviceKey];
+  currentPduKey = deviceKey || null;
+  document.getElementById("powermap-title").textContent = deviceKey ? deviceKey + " — Power Map" : "Power Map";
+  document.getElementById("powermap-edit-panel").style.display = "none";
+  const editBtn = document.getElementById("powermap-edit-btn");
+  if (editBtn) editBtn.style.display = data ? "" : "none";
+  const pmBtn = document.getElementById("powermap-portmap-btn");
+  if (pmBtn) pmBtn.style.display = data ? "" : "none";
+  if (!data) {
+    // device (bukan PDU): tampilkan outlet PSU yang ada di perangkat tsb
+    const rows = [];
+    if (deviceKey) {
+      Object.keys(POWER_DATA).forEach(k => {
+        (POWER_DATA[k].rows || []).forEach(r => {
+          if (r.device === deviceKey) rows.push({ ...r, pdu: k });
+        });
+      });
+    }
+    const totalWatt = rows.reduce((s, r) => s + r.watt, 0);
+    document.getElementById("powermap-sub").textContent = rows.length
+      ? `${rows.length} PSU terhubung · Total beban ${totalWatt} W`
+      : "Belum ada data power untuk perangkat ini.";
+    if (!rows.length) {
+      document.getElementById("powermap-body").innerHTML = `<div class="form-hint" style="padding:26px;text-align:center;">Perangkat ini belum terhubung ke PDU manapun — data outlet/PSU tidak tersedia.</div>`;
+      document.getElementById("powermap-overlay").classList.add("open");
+      return;
+    }
+    const slotCount = Math.min(10, Math.max(psuCount || 0, rows.length));
+    let cells = "";
+    for (let i = 1; i <= slotCount; i++) {
+      const row = rows[i - 1];
+      if (row) {
+        cells += `<div class="portmap-cell" style="background:${psuColor(row.psu)}" title="PSU ${row.psu} → ${row.pdu} Outlet ${row.outlet} [${row.label || '—'}] · ${row.watt}W"><div class="pnum">${row.psu}</div><div>${row.pdu} · Out ${row.outlet}</div></div>`;
+      } else {
+        cells += `<div class="portmap-cell free" title="Slot PSU ${i} — kosong"><div class="pnum">PSU ${i}</div>Kosong</div>`;
+      }
+    }
+    const legendPsus = [...new Set(rows.map(r => r.psu))];
+    const legendHtml = `<div class="portmap-legend">${legendPsus.map(p => `<span><span class="sw" style="background:${psuColor(p)}"></span>${p}</span>`).join("")}${slotCount > rows.length ? `<span><span class="sw" style="background:var(--bg-surface-3);border:1px solid var(--border)"></span>Kosong</span>` : ""}</div>`;
+    const tableRows = rows.map(r => `
+      <tr>
+        <td class="strong mono">${r.psu}</td>
+        <td class="strong">${r.pdu}</td>
+        <td class="mono">Outlet ${r.outlet}</td>
+        <td class="mono" style="color:var(--text-muted);">${r.label || "—"}</td>
+        <td class="mono">${r.watt} W</td>
+      </tr>`).join("");
+    document.getElementById("powermap-body").innerHTML = `
+      ${legendHtml}
+      <div class="portmap-visual"><div class="portmap-grid-row">${cells}</div></div>
+      <table>
+        <thead><tr><th>PSU</th><th>PDU Sumber</th><th>Outlet</th><th>Label ID</th><th>Beban</th></tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    `;
+    document.getElementById("powermap-overlay").classList.add("open");
+    return;
+  }
+  const totalWatt = data.rows.reduce((s, r) => s + r.watt, 0);
+  document.getElementById("powermap-title").textContent = deviceKey + " — Power Map";
+  document.getElementById("powermap-sub").textContent = `${data.rows.length} outlet terpakai dari ${data.ports} · Total beban ${totalWatt} W`;
+
+  const rowRanges = buildOutletRows(data.ports);
+  const gridRows = rowRanges.map(([from, to]) => {
+    let cells = "";
+    for (let p = from; p <= to; p++) {
+      const row = data.rows.find(r => r.outlet === p);
+      if (row) {
+        cells += `<div class="portmap-cell" data-outlet-edit="${p}" style="background:${psuColor(row.psu)};cursor:pointer;" title="Klik untuk edit: Outlet ${p} [${row.label || '—'}] → ${row.device} (${row.psu}, ${row.watt}W)"><div class="pnum">${p}</div><div>${row.psu === "Single PSU" ? "SGL" : row.psu.replace("PSU-", "")}</div></div>`;
+      } else {
+        cells += `<div class="portmap-cell free" data-outlet-edit="${p}" style="cursor:pointer;" title="Klik untuk isi data: Outlet ${p} — kosong"><div class="pnum">${p}</div>–</div>`;
+      }
+    }
+    return `<div class="portmap-grid-row">${cells}</div>`;
+  }).join("");
+  const visualHtml = `<div class="portmap-visual">${gridRows}</div>`;
+
+  const legendPsus = [...new Set(data.rows.map(r => r.psu))];
+  const legendHtml = `<div class="portmap-legend">${legendPsus.map(p => `<span><span class="sw" style="background:${psuColor(p)}"></span>${p}</span>`).join("")}<span><span class="sw" style="background:var(--bg-surface-3);border:1px solid var(--border)"></span>Kosong</span></div>`;
+
+  const tableRows = data.rows.map(r => `
+    <tr data-outlet-edit="${r.outlet}" style="cursor:pointer;" title="Klik untuk edit outlet ${r.outlet}">
+      <td class="strong mono">${r.outlet}</td>
+      <td class="mono" style="color:var(--text-muted);">${r.label || "—"}</td>
+      <td class="strong">${r.device}</td>
+      <td><span class="vlan-tag" style="background:${psuColor(r.psu)}">${r.psu}</span></td>
+      <td class="mono">${r.watt} W</td>
+    </tr>`).join("");
+
+  document.getElementById("powermap-body").innerHTML = `
+    ${legendHtml}
+    <div class="form-hint" style="margin-bottom:12px;">Klik kotak outlet atau nomor outlet di tabel untuk mengisi / mengedit data perangkat.</div>
+    ${visualHtml}
+    <table>
+      <thead><tr><th>Outlet</th><th>Label ID</th><th>Perangkat</th><th>PSU Tujuan</th><th>Beban</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  `;
+  document.getElementById("powermap-overlay").classList.add("open");
+  if (startInEdit) {
+    openPowerMapEditPanel();
+  } else {
+    document.getElementById("powermap-edit-panel").style.display = "none";
+  }
+}
+
+document.addEventListener("click", (e) => {
+  if (e.target.closest("#powermap-portmap-btn") && currentPduKey) {
+    openPortMap(currentPduKey, false, 0, { type: "pdu" });
+  }
+});
+    
+

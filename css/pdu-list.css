@@ -1,0 +1,67 @@
+
+/* ---- shared list/table/form styles (mirrors asset-list) ---- */
+.filter-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.filter-count { margin-left: auto; font-size: 12.5px; color: var(--text-muted); }
+.row-actions { display: flex; gap: 6px; }
+.row-actions button { width: 28px; height: 28px; border: 1px solid var(--border); background: var(--bg-surface-2); color: var(--text-muted); border-radius: 7px; cursor: pointer; }
+.row-actions button:hover { color: var(--accent-text); border-color: var(--accent); }
+.table-footer { display: flex; align-items: center; justify-content: space-between; padding: 12px 4px 0; font-size: 12.5px; color: var(--text-muted); }
+.m-field { margin-bottom: 14px; }
+.tag-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.form-hint { font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+
+/* ---- PDU type chip ---- */
+.pdu-type-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+.pdu-type-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pdu-type-chip.vertical { color: var(--violet); background: var(--violet-dim); }
+.pdu-type-chip.horizontal { color: var(--info); background: var(--info-dim); }
+
+/* ---- Outlet usage cell ---- */
+.outlet-cell { display: flex; flex-direction: column; gap: 4px; }
+.outlet-nums { font-size: 12px; font-family: var(--font-mono); color: var(--text-secondary); }
+.outlet-bar { width: 130px; height: 6px; border-radius: 3px; background: var(--bg-surface-3); overflow: hidden; }
+.outlet-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+.outlet-fill.warn { background: var(--warning); }
+.outlet-fill.crit { background: var(--danger); }
+
+/* ---- Add PDU form: type selector ---- */
+.type-options { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.type-option { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; cursor: pointer; background: var(--bg-surface-2); transition: border-color .12s, background .12s; }
+.type-option:hover { border-color: var(--border); }
+.type-option.active { border-color: var(--accent); background: var(--accent-dim); }
+.type-option .to-head { display: flex; align-items: center; gap: 9px; }
+.type-option .to-head i { width: 18px; text-align: center; color: var(--accent-text); font-size: 13px; }
+.type-option .to-name { font-size: 13.5px; font-weight: 600; color: var(--text-primary); }
+.type-option .to-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; line-height: 1.45; }
+
+.port-fixed-hint { display: inline-flex; align-items: center; gap: 8px; background: var(--bg-surface-2); border: 1px dashed var(--border); border-radius: 8px; padding: 10px 14px; font-size: 12.5px; color: var(--text-secondary); }
+.port-fixed-hint i { color: var(--info); }
+
+/* ---- Detail PDU (modal View) ---- */
+.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; }
+.field-item .k { font-size: 10.5px; color: var(--text-muted); margin-bottom: 2px; }
+.field-item .v { font-size: 13px; font-family: var(--font-mono); color: var(--text-primary); }
+
+/* ---- Port map / power map modal (shared with other inventory pages) ---- */
+.portmap-visual { background: var(--bg-surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 18px; }
+.portmap-grid-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.portmap-grid-row:last-child { margin-bottom: 0; }
+.portmap-cell { flex: 1; height: 40px; border-radius: 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8.5px; font-family: var(--font-mono); font-weight: 700; cursor: default; color: #fff; }
+.portmap-cell.free { background: var(--bg-surface-3); color: var(--text-muted); font-weight: 500; }
+.portmap-cell .pnum { font-size: 8px; opacity: .85; margin-bottom: 1px; }
+.portmap-cell .mmedia { font-size: 7px; line-height: 1; opacity: .9; margin-top: 2px; }
+.vlan-tag { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 5px; color: #fff; display: inline-block; }
+.portmap-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; font-size: 11px; color: var(--text-muted); }
+.portmap-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.portmap-legend .sw { width: 9px; height: 9px; border-radius: 3px; }
+
+/* ---- Port Map: slot SFP & Port Spesial ---- */
+.portmap-sfp-row { display: flex; gap: 10px; margin-top: 10px; justify-content: flex-end; }
+.portmap-sfp-box { width: 44px; height: 28px; border-radius: 4px; background: var(--bg-surface-3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 8px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700; }
+.portmap-sfp-box.used { background: var(--violet); color: #fff; border-color: var(--violet); }
+.portmap-special-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.portmap-special-label { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--text-muted); flex-shrink: 0; }
+.portmap-special-row .portmap-sfp-row { margin-top: 0; flex-wrap: wrap; justify-content: flex-start; }
+.portmap-special-box { min-width: 66px; height: 32px; border-radius: 5px; background: var(--bg-surface-3); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700; padding: 2px 8px; }
+.portmap-special-box .pnum { font-size: 8px; opacity: .9; margin-bottom: 1px; }
+.portmap-special-box.used { color: #fff; }

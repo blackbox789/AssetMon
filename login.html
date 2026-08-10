@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign In</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/login.css">
+</head>
+<body class="login-body">
+  <div class="top-right">
+    <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle theme">
+      <i class="fa-solid fa-sun icon-sun-only"></i><i class="fa-solid fa-moon icon-moon-only"></i>
+    </button>
+  </div>
+
+  <main class="login-card">
+    <div class="login-brand">
+      <div class="brand-mark" data-brand-logo-small>RV</div>
+      <div>
+        <div class="login-brand-name" data-brand-name style="text-align:center;">RackView</div>
+        <div class="login-brand-sub" data-brand-tagline style="text-align:center;">Datacenter Asset Management</div>
+      </div>
+    </div>
+
+    <form id="login-form" novalidate>
+      <div class="login-field">
+        <label class="login-label">Username</label>
+        <div class="login-input-wrap">
+          <i class="fa-solid fa-user"></i>
+          <input class="login-input" id="username" type="text" placeholder="ops.engineer" autocomplete="username" required>
+        </div>
+      </div>
+      <div class="login-field">
+        <label class="login-label">Password</label>
+        <div class="login-input-wrap">
+          <i class="fa-solid fa-lock"></i>
+          <input class="login-input" id="password" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" autocomplete="current-password" required>
+          <i class="fa-solid fa-eye login-toggle-pass"></i>
+        </div>
+      </div>
+      <div class="login-row-between">
+        <label class="login-remember"><input type="checkbox"> Remember me</label>
+        <span class="login-forgot">Forgot password?</span>
+      </div>
+      <button type="submit" class="btn primary login-btn"><i class="fa-solid fa-right-to-bracket"></i>Sign In</button>
+      <p class="status-line" id="status-line"></p>
+    </form>
+
+    <div class="card-footer">
+      <a href="#" data-brand-support>Support</a>
+      <a href="#" data-brand-privacy>Privacy Policy</a>
+      <a href="#" data-brand-terms>Terms of Service</a>
+    </div>
+    <p class="copyright" data-brand-footer>© 2026 RackView. All rights reserved.</p>
+  </main>
+
+  <p class="powered-by" data-powered-by>Powered by RackView</p>
+
+  <script src="js/brand.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>
+

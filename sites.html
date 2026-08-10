@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sites</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/sites.css">
+</head>
+<body>
+<div class="app-shell" id="app-shell">
+<aside class="sidebar" id="sidebar">
+  <div class="brand" id="brand-header">
+    <div class="brand-mark" data-brand-logo-small>RV</div>
+    <div class="brand-text" style="flex:1;min-width:0;">
+      <div class="brand-name" data-brand-name>RackView</div>
+      <div class="brand-sub" data-brand-tagline>Datacenter Asset Mgmt</div>
+    </div>
+    <button class="sidebar-collapse-btn" id="collapse-btn" aria-label="Collapse sidebar"><i class="fa-solid fa-angles-left"></i></button>
+  </div>
+  <nav class="nav">
+    <div class="nav-group">
+      <div class="nav-label">Overview</div>
+      <a href="dashboard.html" class="nav-item"><i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Inventory</div>
+      <a href="sites.html" class="nav-item active"><i class="fa-solid fa-map-location-dot"></i><span>Sites</span></a>
+      <a href="rack-elevation.html" class="nav-item"><i class="fa-solid fa-server"></i><span>Rack Elevation</span></a>
+      <a href="capacity-matrix.html" class="nav-item"><i class="fa-solid fa-th-large"></i><span>Capacity Matrix</span></a>
+      <a href="network-topology.html" class="nav-item"><i class="fa-solid fa-diagram-project"></i><span>Network Topology</span></a>
+      <a href="port-map.html" class="nav-item"><i class="fa-solid fa-ethernet"></i><span>Port Map</span></a>
+      <a href="power-map.html" class="nav-item"><i class="fa-solid fa-plug"></i><span>Power Map</span></a>
+            <a href="asset-list.html" class="nav-item nav-parent open" data-submenu="submenu-asset"><i class="fa-solid fa-list-ul"></i><span>Asset List</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+      <div class="nav-submenu open" id="submenu-asset">
+        <a href="server-list.html" class="nav-subitem" data-type="server"><i class="fa-solid fa-database"></i><span>Server</span></a>
+        <a href="storage-list.html" class="nav-subitem" data-type="storage"><i class="fa-solid fa-hard-drive"></i><span>Storage</span></a>
+        <a href="asset-list.html" class="nav-subitem nav-parent2 open" data-submenu2="submenu-asset-net"><i class="fa-solid fa-network-wired"></i><span>Network Device</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+        <div class="nav-submenu2 open" id="submenu-asset-net">
+          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Network Device</span></a>
+          <a href="firewall-list.html" class="nav-subitem2" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
+          <a href="router-list.html" class="nav-subitem2" data-type="router"><i class="fa-solid fa-tower-broadcast"></i><span>Router</span></a>
+        </div>
+        <a href="ups-list.html" class="nav-subitem" data-type="ups"><i class="fa-solid fa-plug-circle-bolt"></i><span>UPS</span></a>
+        <a href="accessories-list.html" class="nav-subitem" data-type="accessories"><i class="fa-solid fa-sliders"></i><span>Accessories</span></a>
+        <a href="asset-list.html" class="nav-subitem" data-type="other"><i class="fa-solid fa-ellipsis"></i><span>Lainnya</span></a>
+        <a href="pdu-list.html" class="nav-subitem"><i class="fa-solid fa-bolt"></i><span>PDU</span></a>
+        <a href="cable-registry.html" class="nav-subitem"><i class="fa-solid fa-tag"></i><span>Cable Registry</span></a>
+      </div>
+      <a href="#" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Discovery Center</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Admin</div>
+      <a href="#" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>User Management</span></a>
+      <a href="#" class="nav-item"><i class="fa-solid fa-file-lines"></i><span>Audit Log</span></a>
+      <a href="reports.html" class="nav-item"><i class="fa-solid fa-chart-column"></i><span>Reports</span></a>
+      <a href="branding-admin.html" class="nav-item"><i class="fa-solid fa-palette"></i><span>Settings → Branding</span></a>
+    </div>
+  </nav>
+  <div class="sidebar-foot">
+    <span class="agent-dot"></span>
+    <span class="sidebar-foot-text">Semua sistem <b>online</b></span>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div>
+      <h1>Sites</h1>
+      <div class="topbar-sub">Status lokasi datacenter & jumlah rack per site</div>
+    </div>
+    <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Cari site atau kota…"></div>
+    <div class="topbar-actions">
+      <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle theme">
+        <i class="fa-solid fa-sun icon-sun-only"></i><i class="fa-solid fa-moon icon-moon-only"></i>
+      </button>
+      <div class="icon-btn"><i class="fa-solid fa-bell"></i><span class="dot"></span></div>
+      <div class="user-chip">
+        <div class="avatar">JS</div>
+        <div class="user-meta"><div style="font-weight:600;color:var(--text-primary);">Joko S.</div><div class="role">NOC Supervisor</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="content">
+
+    <div class="site-toolbar">
+      <div>
+        <div class="card-title">Daftar Site Datacenter</div>
+        <div class="card-title-sub">4 lokasi &middot; kelola rack server di setiap site — rack baru langsung tampil di Rack Elevation</div>
+      </div>
+      <button class="btn primary" id="add-rack-btn"><i class="fa-solid fa-plus"></i>Tambah Rack</button>
+    </div>
+
+    <div class="grid grid-4" style="margin-bottom:16px;">
+      <div class="card stat-card">
+        <div class="stat-top"><span class="stat-label">Total Sites</span>
+          <div class="stat-icon" style="background:var(--accent-dim);color:var(--accent-text);"><i class="fa-solid fa-map-location-dot"></i></div></div>
+        <div class="stat-value">4</div>
+        <div class="stat-delta">3 negara bagian/kota</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-top"><span class="stat-label">Total Racks</span>
+          <div class="stat-icon" style="background:var(--info-dim);color:var(--info);"><i class="fa-solid fa-server"></i></div></div>
+        <div class="stat-value" id="total-racks">44</div>
+        <div class="stat-delta">di seluruh site</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-top"><span class="stat-label">Rata-rata Utilisasi</span>
+          <div class="stat-icon" style="background:var(--warning-dim);color:var(--warning);"><i class="fa-solid fa-chart-simple"></i></div></div>
+        <div class="stat-value">73<span>%</span></div>
+        <div class="stat-delta">Normal range</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-top"><span class="stat-label">Perlu Perhatian</span>
+          <div class="stat-icon" style="background:var(--danger-dim);color:var(--danger);"><i class="fa-solid fa-triangle-exclamation"></i></div></div>
+        <div class="stat-value">1<span>site</span></div>
+        <div class="stat-delta down">DC4 — power warning</div>
+      </div>
+    </div>
+
+    <div class="site-grid" id="site-grid"></div>
+
+    <div class="site-toast" id="site-toast"></div>
+
+  </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="rack-modal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title">Tambah Rack Baru</div>
+        <div class="modal-sub">Rack akan disimpan dan langsung tersambung ke menu Rack Elevation</div>
+      </div>
+      <div class="modal-close" id="rack-modal-close"><i class="fa-solid fa-xmark"></i></div>
+    </div>
+    <div class="form-grid">
+      <div class="full">
+        <label class="form-label">Site / Lokasi</label>
+        <select class="form-input" id="rack-site"></select>
+        <input class="form-input" id="rack-site-new" placeholder="Nama site baru — cth. DC5 — Karawang" style="display:none;margin-top:8px;">
+      </div>
+      <div>
+        <label class="form-label">Rack ID</label>
+        <input class="form-input" id="rack-id" placeholder="RK-45">
+      </div>
+      <div>
+        <label class="form-label">Tinggi Server Rack</label>
+        <select class="form-input" id="rack-size"></select>
+      </div>
+      <div>
+        <label class="form-label">Zona / Posisi</label>
+        <input class="form-input" id="rack-zone" placeholder="Zona A">
+      </div>
+      <div class="full">
+        <label class="form-label">Status</label>
+        <select class="form-input" id="rack-status">
+          <option value="online">Online</option>
+          <option value="maintenance">Maintenance</option>
+          <option value="degraded">Degraded</option>
+        </select>
+      </div>
+    </div>
+    <div class="save-msg" id="rack-save-msg"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="rack-modal-cancel">Batal</button>
+      <button class="btn primary" id="rack-save-btn"><i class="fa-solid fa-floppy-disk"></i>Simpan Rack</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/brand.js"></script>
+<script src="js/app.js"></script>
+<script src="js/api.js"></script>
+<script src="js/rack-data.js"></script>
+<script src="js/server-data.js"></script>
+<script src="js/sites.js"></script>
+
+</body>
+</html>
+

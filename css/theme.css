@@ -1,0 +1,107 @@
+/* ============================================
+   RackView — theme foundation
+   Palette structure follows the reference dashboard
+   (Vaultline) design system. --accent/--accent-text
+   are wired to the white-label brand color so the
+   admin panel can still recolor the whole app.
+   ============================================ */
+
+:root {
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --radius-lg: 14px;
+}
+
+/* ---------- Dark: "Datacenter Night" ---------- */
+[data-theme="dark"] {
+  --bg-base: #0A0D13;
+  --bg-surface: #10141F;
+  --bg-surface-2: #161B29;
+  --bg-surface-3: #1D2333;
+  --border: #242B3D;
+  --border-soft: #1A2030;
+  --text-primary: #E7E9F0;
+  --text-secondary: #8D95AC;
+  --text-muted: #565E76;
+
+  /* brand-configurable (Settings -> Branding) */
+  --brand-primary: #31D8A4;
+  --brand-secondary: #4C8DFF;
+  --brand-accent: #9C8CFF;
+
+  --accent: var(--brand-primary);
+  --accent-dim: color-mix(in srgb, var(--accent) 12%, transparent);
+  --accent-text: color-mix(in srgb, var(--accent) 80%, white 20%);
+  --accent-ink: #04231a;
+
+  /* fixed system status colors -- not brand-configurable */
+  --info: #4C8DFF;
+  --info-dim: rgba(76,141,255,0.12);
+  --danger: #FF5C6C;
+  --danger-dim: rgba(255,92,108,0.14);
+  --warning: #FFB020;
+  --warning-dim: rgba(255,176,32,0.14);
+  --violet: #9C8CFF;
+  --violet-dim: rgba(156,140,255,0.14);
+
+  --login-bg-image: radial-gradient(circle at 20% 20%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 40%),
+                     radial-gradient(circle at 80% 80%, rgba(76,141,255,0.05), transparent 40%);
+  --shadow-card: 0 20px 60px rgba(0,0,0,.35);
+}
+
+/* ---------- Light: "Pastel Day" ---------- */
+[data-theme="light"] {
+  --bg-base: #F7F4EE;
+  --bg-surface: #FFFFFF;
+  --bg-surface-2: #F5F0E8;
+  --bg-surface-3: #EDE6D9;
+  --border: #E4DCCC;
+  --border-soft: #ECE5D8;
+  --text-primary: #2D2A26;
+  --text-secondary: #6E6A63;
+  --text-muted: #9A948A;
+
+  --brand-primary: #3F9E7D;
+  --brand-secondary: #4C7EC9;
+  --brand-accent: #8B79C9;
+
+  --accent: var(--brand-primary);
+  --accent-dim: color-mix(in srgb, var(--accent) 14%, transparent);
+  --accent-text: color-mix(in srgb, var(--accent) 85%, black 15%);
+  --accent-ink: #ffffff;
+
+  --info: #4C7EC9;
+  --info-dim: rgba(76,126,201,0.12);
+  --danger: #D6465A;
+  --danger-dim: rgba(214,70,90,0.12);
+  --warning: #C8871E;
+  --warning-dim: rgba(200,135,30,0.14);
+  --violet: #8B79C9;
+  --violet-dim: rgba(139,121,201,0.14);
+
+  --login-bg-image: radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 45%),
+                     radial-gradient(circle at 80% 80%, rgba(76,126,201,0.06), transparent 40%);
+  --shadow-card: 0 16px 40px rgba(60,50,30,.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  min-height: 100vh;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; text-decoration: none; }
+::selection { background: var(--accent); color: var(--accent-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+

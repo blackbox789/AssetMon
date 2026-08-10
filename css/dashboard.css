@@ -1,0 +1,16 @@
+
+
+.watermark {
+  position: absolute; right: 10px; top: 10px; font-size: 150px; font-weight: 700;
+  color: var(--text-primary); opacity: 0.025; letter-spacing: -0.02em; pointer-events: none; white-space: nowrap;
+}
+.content { position: relative; overflow: hidden; }
+.welcome-line { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; position: relative; z-index: 1; }
+.welcome-line b { color: var(--accent-text); }
+.rack-strip { display: flex; flex-direction: column; gap: 8px; }
+.rack-row { display: flex; align-items: center; gap: 10px; font-size: 12.5px; }
+.rack-name { width: 78px; color: var(--text-muted); font-family: var(--font-mono); flex-shrink: 0; }
+.rack-bar { flex: 1; height: 8px; border-radius: 4px; background: var(--bg-surface-3); overflow: hidden; }
+.rack-fill { height: 100%; border-radius: 4px; background: var(--accent); }
+.rack-pct { width: 34px; text-align: right; color: var(--text-muted); font-family: var(--font-mono); }
+

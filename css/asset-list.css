@@ -1,0 +1,46 @@
+
+
+.filter-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.filter-count { margin-left: auto; font-size: 12.5px; color: var(--text-muted); }
+.row-actions { display: flex; gap: 6px; }
+.row-actions button { width: 28px; height: 28px; border: 1px solid var(--border); background: var(--bg-surface-2); color: var(--text-muted); border-radius: 7px; cursor: pointer; }
+.row-actions button:hover { color: var(--accent-text); border-color: var(--accent); }
+.table-footer { display: flex; align-items: center; justify-content: space-between; padding: 12px 4px 0; font-size: 12.5px; color: var(--text-muted); }
+.page-btns { display: flex; gap: 4px; }
+.page-btns button { width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-surface-2); color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.page-btns button.current { color: var(--accent-text); border-color: var(--accent); }
+
+.m-field { margin-bottom: 14px; }
+.brand-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.brand-tile { border: 1px solid var(--border); border-radius: 8px; padding: 10px 6px; text-align: center; font-size: 11.5px; font-weight: 600; cursor: pointer; background: var(--bg-surface-2); color: var(--text-muted); }
+.brand-tile.selected { border-color: var(--accent); color: var(--accent-text); background: var(--accent-dim); }
+.tag-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 9.5px; font-weight: 600; padding: 2px 7px; border-radius: 20px; margin: 3px 3px 0 0; }
+.tag-chip .tdot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.tag-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 18px; margin-bottom: 16px; }
+.field-item .k { font-size: 10.5px; color: var(--text-muted); margin-bottom: 2px; }
+.field-item .v { font-size: 13px; font-family: var(--font-mono); color: var(--text-primary); }
+
+.portmap-visual { background: var(--bg-surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 18px; }
+.portmap-grid-row { display: flex; gap: 4px; margin-bottom: 4px; }
+.portmap-grid-row:last-child { margin-bottom: 0; }
+.portmap-cell { flex: 1; height: 40px; border-radius: 5px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8.5px; font-family: var(--font-mono); font-weight: 700; cursor: default; color: #fff; }
+.portmap-cell.free { background: var(--bg-surface-3); color: var(--text-muted); font-weight: 500; }
+.portmap-cell .pnum { font-size: 8px; opacity: .85; margin-bottom: 1px; }
+.portmap-sfp-row { display: flex; gap: 10px; margin-top: 10px; justify-content: flex-end; }
+.portmap-sfp-box { width: 44px; height: 28px; border-radius: 4px; background: var(--bg-surface-3); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 8px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700; }
+.portmap-sfp-box.used { background: var(--violet); color: #fff; border-color: var(--violet); }
+.vlan-tag { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 5px; color: #fff; display: inline-block; }
+.portmap-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; font-size: 11px; color: var(--text-muted); }
+.portmap-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.portmap-legend .sw { width: 9px; height: 9px; border-radius: 3px; }
+
+.portmap-special-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.portmap-special-label { font-size: 10.5px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--text-muted); flex-shrink: 0; }
+.portmap-special-row .portmap-sfp-row { margin-top: 0; flex-wrap: wrap; justify-content: flex-start; }
+.portmap-special-box { min-width: 66px; height: 32px; border-radius: 5px; background: var(--bg-surface-3); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 8px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700; padding: 2px 8px; }
+.portmap-special-box .pnum { font-size: 8px; opacity: .9; margin-bottom: 1px; }
+.portmap-special-box.used { color: #fff; }
+
+

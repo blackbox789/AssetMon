@@ -1,0 +1,656 @@
+
+const overlay = document.getElementById("modal-overlay");
+document.getElementById("open-add-asset").addEventListener("click", () => overlay.classList.add("open"));
+document.getElementById("close-add-asset").addEventListener("click", () => { overlay.classList.remove("open"); resetAddModal(); });
+document.getElementById("cancel-add-asset").addEventListener("click", () => { overlay.classList.remove("open"); resetAddModal(); });
+overlay.addEventListener("click", e => { if (e.target === overlay) { overlay.classList.remove("open"); resetAddModal(); } });
+const tagPickerEl = document.getElementById("tag-picker");
+if (tagPickerEl) {
+  tagPickerEl.addEventListener("click", e => {
+    const chip = e.target.closest(".chip");
+    if (!chip || chip.dataset.addChip) return;
+    chip.classList.toggle("active");
+  });
+}
+
+// ---- PDU outlet count field: show only when Tipe Asset = PDU ----
+// ---- Custom category input: show only when Tipe Asset = Custom ----
+const assetTypeSelect = document.getElementById("asset-type-select");
+const pduOutletField = document.getElementById("pdu-outlet-field");
+const outletCustomInput = document.getElementById("outlet-custom-input");
+const assetTypeCustomInput = document.getElementById("asset-type-custom");
+
+function toggleOutletField() {
+  pduOutletField.style.display = assetTypeSelect.value === "PDU" ? "" : "none";
+  assetTypeCustomInput.style.display = assetTypeSelect.value === "Custom" ? "" : "none";
+  if (assetTypeSelect.value === "Custom") assetTypeCustomInput.focus();
+}
+assetTypeSelect.addEventListener("change", toggleOutletField);
+toggleOutletField();
+
+// ---- Server: tampilkan form Identitas Perangkat saat Tipe Asset = Server ----
+const serverSection = document.getElementById("server-section");
+function toggleServerSection() {
+  serverSection.style.display = assetTypeSelect.value === "Server" ? "" : "none";
+}
+assetTypeSelect.addEventListener("change", toggleServerSection);
+toggleServerSection();
+
+// ---- Network Switch: brand/model manual + Jenis Switch saat Tipe Asset = Switch ----
+const switchTypeField = document.getElementById("switch-type-field");
+const switchTypeSel = document.getElementById("switch-type");
+const brandManual = document.getElementById("brand-manual");
+const modelManual = document.getElementById("model-manual");
+const brandSelectEl = document.querySelector('[data-vendor-select]');
+const modelSelectEl = document.querySelector('[data-sf="model"]');
+const vendorOtherEl = document.querySelector('[data-vendor-other]');
+
+function toggleSwitchFields() {
+  const isSwitch = assetTypeSelect.value === "Switch";
+  if (switchTypeField) switchTypeField.style.display = isSwitch ? "" : "none";
+  if (brandManual) brandManual.style.display = isSwitch ? "" : "none";
+  if (modelManual) modelManual.style.display = isSwitch ? "" : "none";
+  if (brandSelectEl) brandSelectEl.style.display = isSwitch ? "none" : "";
+  if (modelSelectEl) modelSelectEl.style.display = isSwitch ? "none" : "";
+  if (vendorOtherEl) vendorOtherEl.style.display = "none";
+  if (isSwitch && switchTypeSel) switchTypeSel.focus();
+}
+assetTypeSelect.addEventListener("change", toggleSwitchFields);
+toggleSwitchFields();
+
+// ---- Model: combobox (datalist) per Brand untuk Server/Storage, manual utk tipe lain ----
+const MODEL_CATALOG = {
+  Dell: ["PowerEdge R750", "PowerEdge R750xd", "PowerEdge R650", "PowerEdge R740"],
+  HPE: ["ProLiant DL360", "ProLiant DL380", "ProLiant ML350"],
+  Lenovo: ["ThinkSystem BC2500", "ThinkSystem B4800", "ThinkSystem ST50", "ThinkSystem SR650"],
+  Cisco: ["UCS C220 M6", "UCS C240 M6"],
+  Supermicro: ["SYS-6029U-TR4", "SYS-1029U"],
+  IBM: ["Power System S922"],
+  Fujitsu: ["Primergy RX2530"],
+  Huawei: ["FusionServer 2288H"],
+  Inspur: ["NF5280M6"],
+  ASUS: ["RS720A-E11"],
+  Lainnya: [],
+};
+const CATALOG_TYPES = ["server", "storage"];
+const modelListEl = document.getElementById("model-list");
+
+function currentAssetTypeKey() {
+  return OPTION_TO_TYPE[assetTypeSelect.value] || "";
+}
+
+function modelSuggestions(brand, typeKey) {
+  if (!CATALOG_TYPES.includes(typeKey)) return [];
+  const list = (MODEL_CATALOG[brand] || []).slice();
+  if (typeof DEFAULT_SERVERS !== "undefined") {
+    DEFAULT_SERVERS.forEach(s => {
+      if (s.vendor === brand && s.model && !list.includes(s.model)) list.push(s.model);
+    });
+  }
+  return list;
+}
+
+function populateModelList() {
+  if (!modelListEl) return;
+  const brand = brandSelectEl ? brandSelectEl.value : "Dell";
+  const typeKey = currentAssetTypeKey();
+  modelListEl.innerHTML = modelSuggestions(brand, typeKey)
+    .map(m => `<option value="${escA(m)}">`)
+    .join("");
+  if (modelSelectEl) {
+    modelSelectEl.placeholder = CATALOG_TYPES.includes(typeKey)
+      ? `Pilih atau ketik model ${brand}…`
+      : "Ketik model manual…";
+  }
+}
+
+if (brandSelectEl) brandSelectEl.addEventListener("change", populateModelList);
+assetTypeSelect.addEventListener("change", populateModelList);
+populateModelList();
+
+// ---- Network Switch: template Port Map per Jenis Switch + simpan ke localStorage ----
+const SWITCH_STORAGE_KEY = "rv_switches";
+const SWITCH_TEMPLATES = {
+  ethernet:   { ports: 24, sfp: 2 },
+  san:        { ports: 24, sfp: 0 },
+  fc:         { ports: 24, sfp: 0 },
+  iscsi:      { ports: 24, sfp: 4 },
+  infiniband: { ports: 8,  sfp: 0 },
+  nvmeof:     { ports: 8,  sfp: 0 },
+};
+
+function readLocalSwitches() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(SWITCH_STORAGE_KEY) || "[]");
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+function saveLocalSwitch(sw) {
+  try {
+    const list = readLocalSwitches();
+    list.unshift(sw);
+    localStorage.setItem(SWITCH_STORAGE_KEY, JSON.stringify(list));
+    return true;
+  } catch { return false; }
+}
+
+function escA(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function switchTagChips(tags) {
+  const list = tags && tags.length ? tags : ["network-access"];
+  return list.map(t => `<span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>${escA(t)}</span>`).join("");
+}
+
+function switchRowHTML(sw) {
+  const brandModel = [sw.brand, sw.model].filter(Boolean).join(" ") || "—";
+  return `
+    <td><div class="strong">${escA(sw.name)}</div><div class="mono" style="font-size:11px;">${escA(sw.serial || "—")}</div><div style="margin-top:4px;">${switchTagChips(sw.tags)}</div></td>
+    <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
+    <td>${escA(sw.rack || "—")}${sw.posisiU ? " · " + escA(sw.posisiU) : ""}</td>
+    <td class="mono">${escA(sw.ip || "—")}</td>
+    <td>${escA(brandModel)}</td>
+    <td><span class="badge online"><span class="bdot"></span>Online</span></td>
+    <td>Manual</td>
+    <td><div class="row-actions">
+      <button title="Edit"><i class="fa-solid fa-pen"></i></button>
+      <button title="View"><i class="fa-solid fa-eye"></i></button>
+      <button title="Port Map" data-open-pm="${escA(sw.name)}"><i class="fa-solid fa-ethernet"></i></button>
+    </div></td>`;
+}
+
+function addSwitchRow(sw) {
+  const tbody = document.querySelector("tbody");
+  if (!tbody) return;
+  const tr = document.createElement("tr");
+  tr.setAttribute("data-site", sw.site || "DC1");
+  tr.setAttribute("data-type", "switch");
+  tr.setAttribute("data-status", "online");
+  tr.setAttribute("data-tags", (sw.tags || []).join(","));
+  tr.innerHTML = switchRowHTML(sw);
+  tbody.insertBefore(tr, tbody.firstChild);
+  if (typeof allRows !== "undefined" && allRows) allRows.push(tr);
+  applyFilters();
+}
+
+function collectSwitchAsset() {
+  const name = document.getElementById("asset-name").value.trim();
+  const type = switchTypeSel ? switchTypeSel.value : "ethernet";
+  const brand = brandManual ? brandManual.value.trim() : "";
+  const model = modelManual ? modelManual.value.trim() : "";
+  const rackSel = document.querySelector('[data-sf="rack"]');
+  const rack = rackSel ? rackSel.value : "";
+  const posisiU = (document.querySelector('[data-sf="posisiU"]') || {}).value || "";
+  const ip = document.getElementById("asset-ip").value.trim();
+  const serial = (document.querySelector('[data-sf="serial"]') || {}).value || "";
+  const tags = [...document.querySelectorAll("#tag-picker .chip.active")].map(c => c.textContent.trim());
+  return { name, type, brand, model, rack, posisiU, ip, serial, tags, site: "DC1" };
+}
+
+function saveSwitchAsset() {
+  const sw = collectSwitchAsset();
+  const nameField = document.getElementById("asset-name");
+  if (!sw.name) {
+    nameField.focus();
+    nameField.closest(".m-field").style.outline = "1px solid var(--danger)";
+    setTimeout(() => { nameField.closest(".m-field").style.outline = ""; }, 1600);
+    return;
+  }
+  if (typeof PORT_DATA !== "undefined") {
+    const tpl = SWITCH_TEMPLATES[sw.type] || SWITCH_TEMPLATES.ethernet;
+    PORT_DATA[sw.name] = { type: "switch", switchType: sw.type, ports: tpl.ports, sfp: tpl.sfp, rows: [] };
+    if (typeof savePortMap === "function") savePortMap(sw.name);
+  }
+  saveLocalSwitch(sw);
+  addSwitchRow(sw);
+  overlay.classList.remove("open");
+  if (typeof openPortMap === "function") openPortMap(sw.name, false, 0, { type: "switch", formFactor: "" });
+}
+
+function renderSavedSwitches() {
+  readLocalSwitches().forEach(sw => addSwitchRow(sw));
+}
+
+
+// ---- Asset aksesori (KVM Switch, Patch Panel, Cable Management, Cooling Fan, dll) ----
+const ACCESSORY_TYPES = ["kvm-switch", "patch", "cable-management", "cooling-fan", "storage", "ups", "pdu", "firewall", "router", "blanking-panel", "monitoring-sensor", "custom"];
+const ACC_STORAGE_KEY = "rv_accessories";
+
+function readLocalAccessories() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(ACC_STORAGE_KEY) || "[]");
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+
+function saveLocalAccessory(a) {
+  try {
+    const list = readLocalAccessories();
+    const idx = list.findIndex(x => x.name === a.name && x.type === a.type);
+    if (idx >= 0) list[idx] = a; else list.unshift(a);
+    localStorage.setItem(ACC_STORAGE_KEY, JSON.stringify(list));
+    return true;
+  } catch { return false; }
+}
+
+function accessoryRowHTML(a) {
+  const brandModel = [a.brand, a.model].filter(Boolean).join(" ") || "—";
+  const isPdu = a.type === "pdu";
+  const hasMap = a.type === "patch" || isPdu || a.type === "ups";
+  return `
+    <td><div class="strong">${escA(a.name)}</div><div class="mono" style="font-size:11px;">${escA(a.serial || "—")}</div><div style="margin-top:4px;">${switchTagChips(a.tags)}</div></td>
+    <td><span class="type-chip ${escA(a.type)}"><span class="dot"></span>${escA(TYPE_LABELS[a.type] || a.type)}</span></td>
+    <td>${escA(a.rack || "—")}${a.posisiU ? " · " + escA(a.posisiU) : ""}</td>
+    <td class="mono">${escA(a.ip || "—")}</td>
+    <td>${escA(brandModel)}</td>
+    <td><span class="badge online"><span class="bdot"></span>Online</span></td>
+    <td>Manual</td>
+    <td><div class="row-actions">
+      <button title="Edit"><i class="fa-solid fa-pen"></i></button>
+      <button title="View"><i class="fa-solid fa-eye"></i></button>
+      ${hasMap ? `<button title="${isPdu ? "Power Map" : "Port Map"}" data-open-pm="${escA(a.name)}"><i class="fa-solid ${isPdu ? "fa-plug" : "fa-ethernet"}"></i></button>` : ""}
+    </div></td>`;
+}
+
+function addAccessoryRow(a) {
+  const tbody = document.querySelector("tbody");
+  if (!tbody) return;
+  const tr = document.createElement("tr");
+  tr.setAttribute("data-site", a.site || "DC1");
+  tr.setAttribute("data-type", a.type);
+  tr.setAttribute("data-status", "online");
+  tr.setAttribute("data-tags", (a.tags || []).join(","));
+  tr.innerHTML = accessoryRowHTML(a);
+  tbody.insertBefore(tr, tbody.firstChild);
+  if (typeof allRows !== "undefined" && allRows) allRows.push(tr);
+  applyFilters();
+}
+
+function collectAccessoryAsset() {
+  const type = OPTION_TO_TYPE[assetTypeSelect.value] || "custom";
+  const name = document.getElementById("asset-name").value.trim();
+  let brand = "", model = "";
+  if (brandSelectEl) brand = brandSelectEl.value;
+  if (brand === "Lainnya" && vendorOtherEl) brand = vendorOtherEl.value || "Lainnya";
+  if (modelSelectEl) model = modelSelectEl.value;
+  const rackSel = document.querySelector('[data-sf="rack"]');
+  const rack = rackSel ? rackSel.value : "";
+  const posisiU = (document.querySelector('[data-sf="posisiU"]') || {}).value || "";
+  const ip = document.getElementById("asset-ip").value.trim();
+  const serial = (document.querySelector('[data-sf="serial"]') || {}).value || "";
+  const tags = [...document.querySelectorAll("#tag-picker .chip.active")].map(c => c.textContent.trim());
+  return { name, type, brand, model, rack, posisiU, ip, serial, tags, site: "DC1" };
+}
+
+function saveAccessoryAsset() {
+  const a = collectAccessoryAsset();
+  const nameField = document.getElementById("asset-name");
+  if (!a.name) {
+    nameField.focus();
+    nameField.closest(".m-field").style.outline = "1px solid var(--danger)";
+    setTimeout(() => { nameField.closest(".m-field").style.outline = ""; }, 1600);
+    return;
+  }
+  if (["patch", "firewall", "router"].includes(a.type) && typeof PORT_DATA !== "undefined") {
+    PORT_DATA[a.name] = { type: a.type, ports: 24, sfp: 0, rows: [] };
+    if (typeof savePortMap === "function") savePortMap(a.name);
+  }
+  if (a.type === "pdu" && typeof POWER_DATA !== "undefined") {
+    const active = document.querySelector("#outlet-picker .chip.active");
+    const custom = outletCustomInput ? parseInt(outletCustomInput.value, 10) : 0;
+    const outlets = active && active.dataset.outlet === "custom" ? (custom || 12) : (active ? parseInt(active.dataset.outlet || "12", 10) : 12);
+    POWER_DATA[a.name] = { type: "pdu", ports: outlets, rows: [] };
+    if (typeof savePowerMap === "function") savePowerMap(a.name);
+  }
+  saveLocalAccessory(a);
+  addAccessoryRow(a);
+  overlay.classList.remove("open");
+  resetAddModal();
+  if (a.type === "patch" && typeof openPortMap === "function") openPortMap(a.name, false, 0, { type: "patch", formFactor: "" });
+  if (a.type === "pdu" && typeof openPowerMap === "function") openPowerMap(a.name);
+}
+
+function renderSavedAccessories() {
+  readLocalAccessories().forEach(a => addAccessoryRow(a));
+}
+
+
+// ---- View / Edit asset dari tabel "Semua Asset" ----
+const viewOverlay = document.getElementById("view-overlay");
+const viewPmBtn = document.getElementById("view-pm-btn");
+let viewPmName = null;
+let viewPmType = null;
+
+const TYPE_TO_OPTION = {
+  server: "Server", switch: "Switch", pdu: "PDU", firewall: "Firewall",
+  router: "Router", patch: "Patch Panel", ups: "UPS", storage: "Storage",
+  "kvm-switch": "KVM Switch", "cable-management": "Cable Management",
+  "cooling-fan": "Cooling Fan", "blanking-panel": "Blanking Panel",
+  "monitoring-sensor": "Monitoring Sensor", custom: "Custom"
+};
+const OPTION_TO_TYPE = Object.fromEntries(Object.entries(TYPE_TO_OPTION).map(([k, v]) => [v, k]));
+const TYPE_LABELS = {
+  server: "Server", switch: "Network Switch", pdu: "Rack PDU", firewall: "Firewall",
+  router: "Router", patch: "Patch Panel", ups: "UPS", storage: "Storage",
+  "kvm-switch": "KVM Switch", "cable-management": "Cable Management",
+  "cooling-fan": "Cooling Fan", "blanking-panel": "Blanking Panel",
+  "monitoring-sensor": "Monitoring Sensor", custom: "Custom"
+};
+
+function readAssetRow(tr) {
+  const cells = tr.querySelectorAll("td");
+  const name = (cells[0]?.querySelector(".strong")?.textContent || "").trim();
+  const serial = (cells[0]?.querySelector(".mono")?.textContent || "").trim();
+  const tags = [...(cells[0]?.querySelectorAll(".tag-chip") || [])].map(c => c.textContent.trim());
+  const type = tr.dataset.type || "";
+  const rackText = (cells[2]?.textContent || "").trim();
+  const [rack = "", posisiU = ""] = rackText.split("·").map(s => s.trim());
+  const ip = (cells[3]?.textContent || "").trim();
+  const brandModel = (cells[4]?.textContent || "").trim();
+  const status = (cells[5]?.textContent || "").trim();
+  const source = (cells[6]?.textContent || "").trim();
+  return { name, serial, tags, type, rack, posisiU, ip, brandModel, status, source };
+}
+
+function openViewAsset(tr) {
+  const a = readAssetRow(tr);
+  viewPmName = a.name;
+  viewPmType = a.type;
+  document.getElementById("view-title").textContent = a.name;
+  document.getElementById("view-sub").textContent = `${TYPE_LABELS[a.type] || a.type || "Asset"} · ${a.brandModel || "—"}`;
+  const pmVisible = ["switch", "server", "firewall", "router", "patch", "ups", "pdu"].includes(a.type);
+  viewPmBtn.style.display = pmVisible ? "" : "none";
+  viewPmBtn.innerHTML = a.type === "pdu"
+    ? '<i class="fa-solid fa-plug"></i> Power Map'
+    : '<i class="fa-solid fa-ethernet"></i> Port Map';
+  document.getElementById("view-body").innerHTML = `
+    <div class="field-grid">
+      <div class="field-item"><div class="k">Tipe</div><div class="v">${escA(TYPE_LABELS[a.type] || a.type || "—")}</div></div>
+      <div class="field-item"><div class="k">Rack / Posisi</div><div class="v">${escA(a.rack || "—")}${a.posisiU ? " · " + escA(a.posisiU) : ""}</div></div>
+      <div class="field-item"><div class="k">IP Address</div><div class="v">${escA(a.ip || "—")}</div></div>
+      <div class="field-item"><div class="k">Brand / Model</div><div class="v">${escA(a.brandModel || "—")}</div></div>
+      <div class="field-item"><div class="k">Serial Number</div><div class="v">${escA(a.serial || "—")}</div></div>
+      <div class="field-item"><div class="k">Status</div><div class="v">${escA(a.status || "—")}</div></div>
+      <div class="field-item"><div class="k">Discovery Source</div><div class="v">${escA(a.source || "—")}</div></div>
+      <div class="field-item"><div class="k">Tags</div><div class="v">${a.tags.length ? a.tags.map(t => `<span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>${escA(t)}</span>`).join(" ") : "—"}</div></div>
+    </div>`;
+  viewOverlay.classList.add("open");
+}
+
+function closeView() {
+  viewOverlay.classList.remove("open");
+  viewPmName = null;
+}
+
+document.getElementById("view-close").addEventListener("click", closeView);
+viewOverlay.addEventListener("click", e => { if (e.target === viewOverlay) closeView(); });
+viewPmBtn.addEventListener("click", () => {
+  const n = viewPmName, t = viewPmType;
+  closeView();
+  if (!n) return;
+  if (t === "pdu") { if (typeof openPowerMap === "function") openPowerMap(n); }
+  else if (typeof openPortMap === "function") openPortMap(n, false, 0, { type: t || "server", formFactor: "" });
+});
+
+let editingAsset = null;
+
+function setSelectValue(sel, value) {
+  if (!sel) return;
+  if (!sel.options) { sel.value = value || ""; return; }
+  const opt = [...sel.options].find(o => o.value === value || o.textContent.trim() === value);
+  if (opt) { sel.value = opt.value; return; }
+  const o = document.createElement("option");
+  o.value = value; o.textContent = value;
+  sel.appendChild(o);
+  sel.value = value;
+}
+
+function resetAddModal() {
+  editingAsset = null;
+  const t = document.querySelector("#modal-overlay .modal-title");
+  const s = document.querySelector("#modal-overlay .modal-sub");
+  if (t) t.textContent = "Add Asset";
+  if (s) s.textContent = "Tambahkan asset baru ke inventory";
+  if (modalSaveBtn) modalSaveBtn.innerHTML = "Simpan Asset";
+}
+
+function openEditAsset(tr) {
+  const a = readAssetRow(tr);
+  const sw = a.type === "switch" ? readLocalSwitches().find(s => s.name === a.name) : null;
+  editingAsset = { tr, name: a.name, type: a.type, source: sw ? "switch" : "row" };
+
+  document.querySelector("#modal-overlay .modal-title").textContent = "Edit Asset";
+  document.querySelector("#modal-overlay .modal-sub").textContent = "Ubah data asset di inventory";
+  modalSaveBtn.innerHTML = '<i class="fa-solid fa-check"></i> Simpan Perubahan';
+
+  document.getElementById("asset-name").value = a.name;
+  assetTypeSelect.value = TYPE_TO_OPTION[a.type] || "Custom";
+  assetTypeSelect.dispatchEvent(new Event("change"));
+
+  if (sw) {
+    switchTypeSel.value = sw.type || "ethernet";
+    brandManual.value = sw.brand || "";
+    modelManual.value = sw.model || "";
+  } else {
+    const parts = a.brandModel.split(" ");
+    const brand = parts[0] || "";
+    const model = parts.slice(1).join(" ");
+    setSelectValue(brandSelectEl, brand);
+    populateModelList();
+    setSelectValue(modelSelectEl, model);
+  }
+  setSelectValue(document.querySelector('[data-sf="rack"]'), a.rack);
+  document.querySelector('[data-sf="posisiU"]').value = a.posisiU;
+  document.getElementById("asset-ip").value = a.ip === "—" ? "" : a.ip;
+  document.querySelector('[data-sf="serial"]').value = a.serial === "—" ? "" : a.serial;
+  document.querySelectorAll("#tag-picker .chip").forEach(c => c.classList.remove("active"));
+  a.tags.forEach(t => {
+    const chip = [...document.querySelectorAll("#tag-picker .chip")].find(c => c.textContent.trim() === t);
+    if (chip) chip.classList.add("active");
+  });
+  overlay.classList.add("open");
+}
+
+function saveEditAsset() {
+  const ed = editingAsset;
+  if (!ed) return;
+  const nameField = document.getElementById("asset-name");
+  const name = nameField.value.trim();
+  if (!name) {
+    nameField.focus();
+    nameField.closest(".m-field").style.outline = "1px solid var(--danger)";
+    setTimeout(() => { nameField.closest(".m-field").style.outline = ""; }, 1600);
+    return;
+  }
+  const type = OPTION_TO_TYPE[assetTypeSelect.value] || ed.type;
+  const rack = document.querySelector('[data-sf="rack"]').value;
+  const posisiU = document.querySelector('[data-sf="posisiU"]').value.trim();
+  const ip = document.getElementById("asset-ip").value.trim();
+  const serial = document.querySelector('[data-sf="serial"]').value.trim();
+  const tags = [...document.querySelectorAll("#tag-picker .chip.active")].map(c => c.textContent.trim());
+  let brand = "", model = "";
+  if (type === "switch") {
+    brand = brandManual ? brandManual.value.trim() : "";
+    model = modelManual ? modelManual.value.trim() : "";
+  } else {
+    brand = brandSelectEl ? brandSelectEl.value : "";
+    model = modelSelectEl ? modelSelectEl.value : "";
+  }
+  const brandModel = [brand, model].filter(Boolean).join(" ");
+
+  if (ed.source === "switch") {
+    const sw = collectSwitchAsset();
+    const list = readLocalSwitches();
+    const idx = list.findIndex(s => s.name === ed.name);
+    if (idx >= 0) list[idx] = sw; else list.unshift(sw);
+    localStorage.setItem(SWITCH_STORAGE_KEY, JSON.stringify(list));
+    if (typeof PORT_DATA !== "undefined") {
+      if (ed.name !== name && PORT_DATA[ed.name]) {
+        PORT_DATA[name] = PORT_DATA[ed.name];
+        delete PORT_DATA[ed.name];
+      }
+      const tpl = SWITCH_TEMPLATES[sw.type] || SWITCH_TEMPLATES.ethernet;
+      PORT_DATA[name] = { type: "switch", switchType: sw.type, ports: tpl.ports, sfp: tpl.sfp, rows: (PORT_DATA[name] && PORT_DATA[name].rows) || [] };
+      if (typeof savePortMap === "function") savePortMap(name);
+    }
+    ed.tr.remove();
+    addSwitchRow(sw);
+  } else {
+    const cells = ed.tr.querySelectorAll("td");
+    if (cells[0]) {
+      cells[0].innerHTML = `<div class="strong">${escA(name)}</div><div class="mono" style="font-size:11px;">${escA(serial || "—")}</div><div style="margin-top:4px;">${switchTagChips(tags)}</div>`;
+    }
+    if (cells[1]) {
+      const chipClass = ["server", "switch", "pdu", "firewall", "router", "patch", "storage", "ups", "kvm-switch", "cable-management", "cooling-fan", "blanking-panel", "monitoring-sensor", "custom"].includes(type) ? type : "custom";
+      cells[1].innerHTML = `<span class="type-chip ${chipClass}"><span class="dot"></span>${escA(TYPE_LABELS[type] || assetTypeSelect.value)}</span>`;
+    }
+    if (cells[2]) cells[2].textContent = `${rack}${posisiU ? " · " + posisiU : ""}`;
+    if (cells[3]) cells[3].textContent = ip || "—";
+    if (cells[4]) cells[4].textContent = brandModel || "—";
+    if (cells[7]) cells[7].innerHTML = cells[7].innerHTML.replaceAll(ed.name, name);
+    ed.tr.setAttribute("data-type", type);
+    ed.tr.setAttribute("data-tags", tags.join(","));
+  }
+  resetAddModal();
+  overlay.classList.remove("open");
+}
+
+
+// ---- Simpan Asset: jika Server, simpan ke rv_servers (server-data.js) lalu buka Daftar Server ----
+const modalSaveBtn = document.querySelector("#modal-overlay .modal-foot .btn.primary");
+if (modalSaveBtn) {
+  modalSaveBtn.addEventListener("click", () => {
+    if (editingAsset) {
+      saveEditAsset();
+      return;
+    }
+    if (assetTypeSelect.value === "Switch") {
+      saveSwitchAsset();
+      return;
+    }
+    const accType = OPTION_TO_TYPE[assetTypeSelect.value];
+    if (accType && ACCESSORY_TYPES.includes(accType)) {
+      saveAccessoryAsset();
+      return;
+    }
+    if (assetTypeSelect.value !== "Server") return;
+    if (typeof collectServerForm !== "function" || typeof saveServer !== "function") return;
+    const st = document.getElementById("server-type");
+    const mode = (st && typeof FORM_MODE !== "undefined" && FORM_MODE[st.value]) || "rack";
+    const server = mode === "blade" && typeof collectChassisForm === "function"
+      ? collectChassisForm()
+      : collectServerForm(document);
+    if (mode !== "blade" && !server.hostname) {
+      serverSection.scrollIntoView({ behavior: "smooth", block: "center" });
+      serverSection.style.outline = "1px solid var(--danger)";
+      setTimeout(() => { serverSection.style.outline = ""; }, 1600);
+      return;
+    }
+    saveServer(server);
+    window.location.href = "server-list.html";
+  });
+}
+
+document.querySelectorAll("#outlet-picker .chip").forEach(chip => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll("#outlet-picker .chip").forEach(c => c.classList.remove("active"));
+    chip.classList.add("active");
+    const isCustom = chip.dataset.outlet === "custom";
+    outletCustomInput.style.display = isCustom ? "" : "none";
+    if (isCustom) outletCustomInput.focus();
+  });
+});
+outletCustomInput.addEventListener("input", () => {
+  let v = parseInt(outletCustomInput.value, 10);
+  if (v > 36) outletCustomInput.value = 36;
+});
+
+// ---- Site / Type / Status filters ----
+const filterSite = document.getElementById("filter-site");
+const filterType = document.getElementById("filter-type");
+const filterStatus = document.getElementById("filter-status");
+const filterTag = document.getElementById("filter-tag");
+const filterCount = document.getElementById("filter-count");
+const allRows = Array.from(document.querySelectorAll("tbody tr[data-site]"));
+const totalRowCount = allRows.length;
+
+function applyFilters() {
+  const site = filterSite.value;
+  const type = filterType.value;
+  const status = filterStatus.value;
+  const tag = filterTag.value;
+  let visible = 0;
+  allRows.forEach(row => {
+    const rowTags = (row.dataset.tags || "").split(",").filter(Boolean);
+    const matchSite = site === "all" || row.dataset.site === site;
+    const matchType = type === "all" || (type === "accessories"
+      ? ["kvm-switch", "patch", "cable-management", "cooling-fan"].includes(row.dataset.type)
+      : row.dataset.type === type);
+    const matchStatus = status === "all" || row.dataset.status === status;
+    const matchTag = tag === "all" || rowTags.includes(tag);
+    const show = matchSite && matchType && matchStatus && matchTag;
+    row.style.display = show ? "" : "none";
+    if (show) visible++;
+  });
+  filterCount.textContent = visible === totalRowCount
+    ? `Menampilkan ${visible} dari 1,284 asset`
+    : `Menampilkan ${visible} dari ${totalRowCount} asset di halaman ini (1,284 total)`;
+}
+
+[filterSite, filterType, filterStatus, filterTag].forEach(sel => sel.addEventListener("change", applyFilters));
+
+// pre-select site filter from ?site=DC1 query param (e.g. coming from sites.html)
+const params = new URLSearchParams(window.location.search);
+const siteParam = params.get("site");
+if (siteParam && [...filterSite.options].some(o => o.value === siteParam)) {
+  filterSite.value = siteParam;
+}
+
+// pre-select type filter from ?type=server (e.g. coming from nav Asset List submenu)
+const typeParam = params.get("type");
+if (typeParam) {
+  const navLink = document.querySelector(`.nav-subitem[data-type="${typeParam}"], .nav-subitem2[data-type="${typeParam}"]`);
+  if (navLink) {
+    navLink.classList.add("active");
+    const group = navLink.closest(".nav-submenu2");
+    if (group) {
+      const parent = document.querySelector(`[data-submenu2="${group.id}"]`);
+      if (parent) parent.classList.add("open");
+      group.classList.add("open");
+    }
+  }
+  if ([...filterType.options].some(o => o.value === typeParam)) {
+    filterType.value = typeParam;
+  }
+}
+
+document.querySelector("tbody").addEventListener("click", e => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const tr = btn.closest("tr");
+  if (btn.title === "Edit" && !btn.hasAttribute("onclick")) {
+    if (tr) openEditAsset(tr);
+    return;
+  }
+  if (btn.title === "View") {
+    if (tr) openViewAsset(tr);
+    return;
+  }
+  const pm = btn.hasAttribute("data-open-pm") ? btn : e.target.closest("[data-open-pm]");
+  if (!pm) return;
+  const name = pm.dataset.openPm;
+  const pmType = (pm.closest("tr") && pm.closest("tr").dataset.type) || "switch";
+  if (pmType === "pdu" && typeof openPowerMap === "function") {
+    openPowerMap(name);
+    return;
+  }
+  if (typeof openPortMap === "function") openPortMap(name, false, 0, { type: pmType, formFactor: "" });
+});
+
+renderSavedSwitches();
+renderSavedAccessories();
+applyFilters();
+    
+

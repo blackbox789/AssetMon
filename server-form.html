@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Identitas Perangkat - Server</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/server-form.css">
+</head>
+<body>
+<div class="app-shell" id="app-shell">
+<aside class="sidebar" id="sidebar">
+  <div class="brand" id="brand-header">
+    <div class="brand-mark" data-brand-logo-small>RV</div>
+    <div class="brand-text" style="flex:1;min-width:0;">
+      <div class="brand-name" data-brand-name>RackView</div>
+      <div class="brand-sub" data-brand-tagline>Datacenter Asset Mgmt</div>
+    </div>
+    <button class="sidebar-collapse-btn" id="collapse-btn" aria-label="Collapse sidebar"><i class="fa-solid fa-angles-left"></i></button>
+  </div>
+  <nav class="nav">
+    <div class="nav-group">
+      <div class="nav-label">Overview</div>
+      <a href="dashboard.html" class="nav-item"><i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Inventory</div>
+      <a href="sites.html" class="nav-item"><i class="fa-solid fa-map-location-dot"></i><span>Sites</span></a>
+      <a href="rack-elevation.html" class="nav-item"><i class="fa-solid fa-server"></i><span>Rack Elevation</span></a>
+      <a href="capacity-matrix.html" class="nav-item"><i class="fa-solid fa-th-large"></i><span>Capacity Matrix</span></a>
+      <a href="network-topology.html" class="nav-item"><i class="fa-solid fa-diagram-project"></i><span>Network Topology</span></a>
+      <a href="port-map.html" class="nav-item"><i class="fa-solid fa-ethernet"></i><span>Port Map</span></a>
+      <a href="power-map.html" class="nav-item"><i class="fa-solid fa-plug"></i><span>Power Map</span></a>
+      <a href="asset-list.html" class="nav-item nav-parent open" data-submenu="submenu-asset"><i class="fa-solid fa-list-ul"></i><span>Asset List</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+      <div class="nav-submenu open" id="submenu-asset">
+        <a href="server-list.html" class="nav-subitem active" data-type="server"><i class="fa-solid fa-database"></i><span>Server</span></a>
+        <a href="storage-list.html" class="nav-subitem" data-type="storage"><i class="fa-solid fa-hard-drive"></i><span>Storage</span></a>
+        <a href="asset-list.html" class="nav-subitem nav-parent2 open" data-submenu2="submenu-asset-net"><i class="fa-solid fa-network-wired"></i><span>Network Device</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+        <div class="nav-submenu2 open" id="submenu-asset-net">
+          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Network Device</span></a>
+          <a href="firewall-list.html" class="nav-subitem2" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
+          <a href="router-list.html" class="nav-subitem2" data-type="router"><i class="fa-solid fa-tower-broadcast"></i><span>Router</span></a>
+        </div>
+        <a href="ups-list.html" class="nav-subitem" data-type="ups"><i class="fa-solid fa-plug-circle-bolt"></i><span>UPS</span></a>
+        <a href="accessories-list.html" class="nav-subitem" data-type="accessories"><i class="fa-solid fa-sliders"></i><span>Accessories</span></a>
+        <a href="asset-list.html" class="nav-subitem" data-type="other"><i class="fa-solid fa-ellipsis"></i><span>Lainnya</span></a>
+        <a href="pdu-list.html" class="nav-subitem"><i class="fa-solid fa-bolt"></i><span>PDU</span></a>
+        <a href="cable-registry.html" class="nav-subitem"><i class="fa-solid fa-tag"></i><span>Cable Registry</span></a>
+      </div>
+      <a href="#" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Discovery Center</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Admin</div>
+      <a href="#" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>User Management</span></a>
+      <a href="#" class="nav-item"><i class="fa-solid fa-file-lines"></i><span>Audit Log</span></a>
+      <a href="reports.html" class="nav-item"><i class="fa-solid fa-chart-column"></i><span>Reports</span></a>
+      <a href="branding-admin.html" class="nav-item"><i class="fa-solid fa-palette"></i><span>Settings → Branding</span></a>
+    </div>
+  </nav>
+  <div class="sidebar-foot">
+    <span class="agent-dot"></span>
+    <span class="sidebar-foot-text">Semua sistem <b>online</b></span>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div>
+      <h1 id="form-page-title">Identitas Perangkat — Server</h1>
+      <div class="topbar-sub">Form input identitas &amp; spesifikasi server (Server → Asset List)</div>
+    </div>
+    <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Cari asset, rack, atau IP…"></div>
+    <div class="topbar-actions">
+      <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle theme">
+        <i class="fa-solid fa-sun icon-sun-only"></i><i class="fa-solid fa-moon icon-moon-only"></i>
+      </button>
+      <div class="icon-btn"><i class="fa-solid fa-bell"></i><span class="dot"></span></div>
+      <div class="user-chip">
+        <div class="avatar">JS</div>
+        <div class="user-meta"><div style="font-weight:600;color:var(--text-primary);">Joko S.</div><div class="role">NOC Supervisor</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="content">
+
+    <div class="form-head">
+      <div>
+        <h2>Identitas Perangkat</h2>
+        <div class="form-head-sub">Lengkapi identitas, spesifikasi hardware, konektivitas, lokasi, status &amp; tagging server.</div>
+      </div>
+      <div class="form-actions">
+        <a href="asset-list.html" class="btn ghost"><i class="fa-solid fa-list"></i> Kembali ke Asset List</a>
+        <button class="btn primary" id="save-server"><i class="fa-solid fa-floppy-disk"></i> Simpan Server</button>
+      </div>
+    </div>
+
+    <div id="edit-banner" style="display:none;background:var(--info-dim, rgba(96,165,250,.12));color:var(--info, #60a5fa);padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:13px;align-items:center;gap:8px;font-weight:500;"></div>
+
+    <div class="card form-card">
+      <div class="card-head">
+        <div>
+          <div class="card-title"><i class="fa-solid fa-id-badge"></i> Identitas Perangkat</div>
+          <div class="card-title-sub">Informasi dasar &amp; identifikasi server</div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="m-field" data-node-only>
+          <label class="form-label">Nama Aset / Hostname</label>
+          <input class="form-input mono" type="text" placeholder="mis. SRV-APP-09" data-sf="hostname">
+        </div>
+        <div class="m-field">
+          <label class="form-label">Tipe Server</label>
+          <select class="form-input" id="server-type" data-sf="tipeServer">
+            <option value="rack">Rack Server</option>
+            <option value="blade">Blade Server</option>
+            <option value="cloud">Cloud Server</option>
+            <option value="tower">Tower Server</option>
+          </select>
+        </div>
+        <div class="m-field">
+          <label class="form-label">Form Factor (U)</label>
+          <select class="form-input" id="form-factor" data-sf="formFactor"></select>
+          <div class="form-hint">Opsi menyesuaikan tipe server yang dipilih.</div>
+        </div>
+        <div class="m-field">
+          <label class="form-label">Vendor</label>
+          <select class="form-input" data-sf="vendor" data-vendor-select>
+            <option value="Dell" selected>Dell</option>
+            <option value="HPE">HPE</option>
+            <option value="Lenovo">Lenovo</option>
+            <option value="Cisco">Cisco</option>
+            <option value="Supermicro">Supermicro</option>
+            <option value="IBM">IBM</option>
+            <option value="Fujitsu">Fujitsu</option>
+            <option value="Huawei">Huawei</option>
+            <option value="Inspur">Inspur</option>
+            <option value="ASUS">ASUS</option>
+            <option value="Lainnya">Lainnya…</option>
+          </select>
+          <input class="form-input" type="text" data-sf="vendorOther" data-vendor-other placeholder="Masukkan nama vendor / brand lain" style="display:none;margin-top:8px;">
+        </div>
+        <div class="m-field">
+          <label class="form-label">Model</label>
+          <input class="form-input" type="text" list="model-list" placeholder="mis. PowerEdge R750" data-sf="model">
+          <datalist id="model-list">
+            <option value="PowerEdge R650"></option>
+            <option value="PowerEdge R750"></option>
+            <option value="PowerEdge R750xd"></option>
+            <option value="PowerEdge M640"></option>
+            <option value="ProLiant DL360"></option>
+            <option value="ProLiant DL380"></option>
+            <option value="ProLiant BL460c"></option>
+            <option value="Supermicro SYS-6029U"></option>
+            <option value="ThinkSystem SR650"></option>
+            <option value="UCS C220"></option>
+          </datalist>
+        </div>
+        <div class="m-field">
+          <label class="form-label">Serial Number</label>
+          <input class="form-input mono" type="text" placeholder="mis. SVC-R750-XXXX" data-sf="serial">
+        </div>
+        <div class="m-field">
+          <label class="form-label">Tahun Pembelian</label>
+          <input class="form-input" type="text" placeholder="mis. 2024" data-sf="tahunPembelian">
+        </div>
+        <div class="m-field">
+          <label class="form-label">Warranty</label>
+          <input class="form-input" type="text" placeholder="mis. ProSupport Plus s.d. 2027" data-sf="warranty">
+        </div>
+        <div class="m-field" data-node-only>
+          <label class="form-label">Sistem Operasi</label>
+          <select class="form-input" id="server-os" data-sf="os">
+            <option value="windows">Windows</option>
+            <option value="linux">Linux</option>
+            <option value="other">Lainnya</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card form-card" data-chassis-only style="display:none;">
+      <div class="card-head">
+        <div>
+          <div class="card-title"><i class="fa-solid fa-server"></i> Node Server</div>
+          <div class="card-title-sub">Node-node di dalam chassis blade/cloud — isian tiap node sama seperti server rack.</div>
+        </div>
+        <button class="btn primary btn-sm" type="button" data-node-add><i class="fa-solid fa-plus"></i> Tambah Node</button>
+      </div>
+      <div class="form-grid">
+        <div class="m-field">
+          <label class="form-label">Total Slot Node (kapasitas chassis)</label>
+          <input class="form-input mono" type="text" placeholder="mis. 4" data-sf="nodeTotal">
+        </div>
+      </div>
+      <div style="overflow-x:auto;margin-top:6px;">
+        <table class="table node-table">
+          <thead>
+            <tr><th>Node</th><th>Hostname</th><th>Processor</th><th>RAM</th><th>OS / Hypervisor</th><th>Kondisi</th><th></th></tr>
+          </thead>
+          <tbody data-node-tbody>
+            <tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:18px;">Belum ada node. Klik "Tambah Node" untuk menambahkan node server.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card form-card" data-node-only>
+      <div class="card-head">
+        <div>
+          <div class="card-title"><i class="fa-solid fa-microchip"></i> Spesifikasi Hardware</div>
+          <div class="card-title-sub">Processor, memori, storage &amp; RAID</div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="m-field full">
+          <label class="form-label">Processor</label>
+          <div class="form-row">
+            <select class="form-input" data-sf="processorCount">
+              <option value="single">Single Processor</option>
+              <option value="dual">Dual Processor</option>
+            </select>
+            <input class="form-input" type="text" placeholder="Tipe, mis. Intel Xeon / AMD EPYC" data-sf="processorType">
+          </div>
+        </div>
+        <div class="m-field full">
+          <label class="form-label">Jumlah Core / Thread</label>
+          <div class="form-row">
+            <input class="form-input" type="text" placeholder="Core, mis. 16C" data-sf="core">
+            <input class="form-input" type="text" placeholder="Thread, mis. 32T" data-sf="thread">
+          </div>
+        </div>
+        <div class="m-field full" data-dimm-editor>
+          <label class="form-label">Slot Memory (DIMM)</label>
+          <div class="form-row form-row-3">
+            <input class="form-input" type="number" min="0" max="128" placeholder="Total slot, mis. 32" data-sf="dimmTotal" data-dimm-slots>
+            <input class="form-input" type="text" placeholder="Kapasitas default/slot, mis. 64 GB" data-sf="dimmPerSlot" title="Kapasitas default saat mengisi slot baru">
+            <input class="form-input mono" type="text" placeholder="Terpasang (otomatis)" data-sf="dimmInstalled" data-dimm-installed readonly>
+          </div>
+          <div class="storage-toolbar">
+            <span class="form-hint">Klik slot = isi/panel · Slot kosong otomatis memakai kapasitas default.</span>
+          </div>
+          <div class="storage-legend"><i class="st-st-online"></i>Online<i class="st-st-degradasi"></i>Degradasi<i class="st-st-failed"></i>Failed</div>
+          <div class="storage-grid" data-dimm-grid>
+            <div class="form-hint" data-dimm-empty>Masukkan jumlah slot untuk membuat grid DIMM.</div>
+          </div>
+          <div class="storage-edit" data-dimm-edit style="display:none;">
+            <span class="storage-edit-bay">Slot <b data-dimm-edit-slot>1</b></span>
+            <select class="form-input" data-dimm-edit-type>
+              <option value="DDR4">DDR4</option>
+              <option value="DDR5">DDR5</option>
+              <option value="DDR3">DDR3</option>
+              <option value="LRDIMM">LRDIMM</option>
+            </select>
+            <input class="form-input mono" type="number" min="1" placeholder="Kapasitas" data-dimm-edit-cap>
+            <select class="form-input" data-dimm-edit-unit>
+              <option value="GB">GB</option>
+              <option value="TB">TB</option>
+            </select>
+            <input class="form-input" list="dimm-brand-options" placeholder="Brand" title="Merek modul" data-dimm-edit-brand>
+            <select class="form-input" data-dimm-edit-status title="Status modul">
+              <option value="online">Online</option>
+              <option value="degradasi">Degradasi</option>
+              <option value="failed">Failed</option>
+            </select>
+            <input class="form-input" placeholder="Notes" title="Catatan modul" data-dimm-edit-notes>
+            <button class="btn ghost btn-sm" type="button" data-dimm-empty-btn title="Kosongkan slot"><i class="fa-solid fa-ban"></i> Kosongkan</button>
+          </div>
+          <datalist id="dimm-brand-options">
+            <option value="Samsung"></option>
+            <option value="SK hynix"></option>
+            <option value="Micron"></option>
+            <option value="Crucial"></option>
+            <option value="Kingston"></option>
+            <option value="Nanya"></option>
+            <option value="ADATA"></option>
+          </datalist>
+          <div class="storage-summary" data-dimm-summary style="display:none;"></div>
+        </div>
+        <div class="m-field full" data-storage-editor>
+          <label class="form-label">Storage Slot (HDD/SSD)</label>
+          <div class="form-row form-row-3">
+            <input class="form-input" type="number" min="0" max="36" placeholder="Jumlah bay, mis. 8" data-sf="storageBays" data-storage-bays>
+            <input class="form-input mono" type="text" placeholder="Total terisi (otomatis)" data-sf="storageCap" data-storage-total readonly>
+            <select class="form-input" data-sf="storageIface">
+              <option value="sata">Interface SATA</option>
+              <option value="sas">Interface SAS</option>
+              <option value="nvme">Interface NVMe</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </div>
+          <div class="storage-toolbar">
+            <span class="form-hint">Klik = isi/panel bay · Ctrl+klik = pilih banyak · Shift+klik = pilih rentang.</span>
+            <label class="storage-multiselect-toggle"><input type="checkbox" data-storage-multiselect><i class="fa-solid fa-object-group"></i> Pilih Banyak</label>
+          </div>
+          <div class="storage-legend"><i class="st-st-online"></i>Online<i class="st-st-degradasi"></i>Degradasi<i class="st-st-failed"></i>Failed</div>
+          <div class="storage-grid" data-storage-grid>
+            <div class="form-hint" data-storage-empty>Masukkan jumlah bay untuk membuat grid slot.</div>
+          </div>
+          <div class="storage-edit" data-storage-edit style="display:none;">
+            <span class="storage-edit-bay">Bay <b data-storage-edit-bay>1</b></span>
+            <select class="form-input" data-storage-edit-type>
+              <option value="SSD">SSD</option>
+              <option value="HDD">HDD</option>
+              <option value="NVMe">NVMe</option>
+            </select>
+            <input class="form-input mono" type="number" min="1" placeholder="Kapasitas" data-storage-edit-cap>
+            <select class="form-input" data-storage-edit-unit>
+              <option value="GB">GB</option>
+              <option value="TB">TB</option>
+            </select>
+            <input class="form-input" list="storage-brand-options" placeholder="Brand" title="Merek drive" data-storage-edit-brand>
+            <select class="form-input" data-storage-edit-status title="Status drive">
+              <option value="online">Online</option>
+              <option value="degradasi">Degradasi</option>
+              <option value="failed">Failed</option>
+            </select>
+            <input class="form-input" placeholder="Notes" title="Catatan drive" data-storage-edit-notes>
+            <button class="btn ghost btn-sm" type="button" data-storage-empty-btn title="Kosongkan slot"><i class="fa-solid fa-ban"></i> Kosongkan</button>
+          </div>
+          <datalist id="storage-brand-options">
+            <option value="Seagate"></option>
+            <option value="WD"></option>
+            <option value="Samsung"></option>
+            <option value="Intel"></option>
+            <option value="Kingston"></option>
+            <option value="Toshiba"></option>
+            <option value="HGST"></option>
+            <option value="Micron"></option>
+            <option value="Crucial"></option>
+            <option value="SanDisk"></option>
+          </datalist>
+          <div class="storage-edit storage-edit-group" data-storage-edit-group style="display:none;">
+            <span class="storage-edit-bay">Grup <b data-storage-edit-count>2</b> drive</span>
+            <select class="form-input" data-storage-edit-group-raid>
+              <option value="">RAID -</option>
+              <option value="RAID 0">RAID 0</option>
+              <option value="RAID 1">RAID 1</option>
+              <option value="RAID 5">RAID 5</option>
+              <option value="RAID 6">RAID 6</option>
+              <option value="RAID 10">RAID 10</option>
+            </select>
+            <span class="storage-group-preview" data-storage-group-preview></span>
+            <button class="btn ghost btn-sm" type="button" data-storage-group-clear>Batal</button>
+            <button class="btn primary btn-sm" type="button" data-storage-group-apply><i class="fa-solid fa-check"></i> Terapkan</button>
+          </div>
+          <div class="storage-summary" data-storage-summary style="display:none;"></div>
+        </div>
+        <div class="m-field">
+          <label class="form-label">RAID Controller</label>
+          <div class="tag-picker" data-single id="raid-toggle-picker" data-sf-pick="raid">
+            <div class="chip active" id="raid-yes">Ya</div>
+            <div class="chip" id="raid-no">Tidak</div>
+          </div>
+        </div>
+        <div class="m-field" id="raid-type-field">
+          <label class="form-label">Tipe RAID Support</label>
+          <div class="tag-picker" data-multi data-sf-pick="raidTypes">
+            <div class="chip" data-raid="0">RAID 0</div>
+            <div class="chip active" data-raid="1">RAID 1</div>
+            <div class="chip active" data-raid="10">RAID 10</div>
+            <div class="chip" data-raid="5">RAID 5</div>
+            <div class="chip" data-raid="6">RAID 6</div>
+            <div class="chip" data-raid="50">RAID 50</div>
+            <div class="chip" data-raid="60">RAID 60</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card form-card">
+      <div class="card-head">
+        <div>
+          <div class="card-title"><i class="fa-solid fa-network-wired"></i> Port &amp; Konektivitas</div>
+          <div class="card-title-sub">Port jaringan, manajemen, ekspansi &amp; daya</div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="m-field full">
+          <label class="form-label">LAN Port Map</label>
+          <div class="form-row form-row-3">
+            <input class="form-input" type="text" placeholder="Port RJ-45, mis. 4" data-sf="lanRj45">
+            <input class="form-input" type="text" placeholder="Port SFP, mis. 2" data-sf="lanSfp">
+            <input class="form-input" type="text" placeholder="Port QSFP, mis. 1" data-sf="lanQsfp">
+          </div>
+        </div>
+        <div class="m-field">
+          <label class="form-label">Kecepatan Port</label>
+          <div class="tag-picker" data-single data-sf-pick="speed">
+            <div class="chip" data-speed="1G">1G</div>
+            <div class="chip active" data-speed="10G">10G</div>
+            <div class="chip" data-speed="25G">25G</div>
+            <div class="chip" data-speed="40G">40G</div>
+          </div>
+        </div>
+        <div class="m-field">
+          <label class="form-label">Management Port</label>
+          <div class="tag-picker" data-single data-sf-pick="mgmtPort">
+            <div class="chip active" data-mgmt="iDRAC">iDRAC</div>
+            <div class="chip" data-mgmt="iLO">iLO</div>
+            <div class="chip" data-mgmt="ipmi">IPMI</div>
+          </div>
+        </div>
+        <div class="m-field full">
+          <label class="form-label">Expansion Slot (PCIe)</label>
+          <div class="form-row">
+            <input class="form-input" type="text" placeholder="Jumlah slot, mis. 3" data-sf="pcieCount">
+            <input class="form-input" type="text" placeholder="Versi, mis. Gen4" data-sf="pcieGen">
+          </div>
+        </div>
+        <div class="m-field full">
+          <label class="form-label">Power Port Map</label>
+          <div class="form-row">
+            <input class="form-input" type="text" placeholder="Jumlah PSU, mis. 2" data-sf="psuCount">
+            <input class="form-input" type="text" placeholder="Kapasitas, mis. 750 W" data-sf="psuWatt">
+          </div>
+          <div class="tag-picker" data-single style="margin-top:10px;" data-sf-pick="powerRedundancy">
+            <div class="chip active" data-power="redundant">Redundant</div>
+            <div class="chip" data-power="non">Non-redundant</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card form-card">
+      <div class="card-head">
+        <div>
+          <div class="card-title"><i class="fa-solid fa-map-location-dot"></i> Lokasi &amp; Rack Mapping</div>
+          <div class="card-title-sub">Penempatan fisik &amp; koneksi jaringan</div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="m-field full">
+          <label class="form-label">Rack ID / Lokasi</label>
+          <div class="form-row">
+            <select class="form-input" id="form-site" data-sf="site"></select>
+            <select class="form-input" id="form-rack" data-sf="rack"></select>
+          </div>
+        </div>
+        <div class="m-field">
+          <label class="form-label">Posisi Rack (U)</label>
+          <input class="form-input mono" type="text" placeholder="mis. U12–U13" data-sf="posisiU">
+        </div>
+        <div class="m-field full">
+          <label class="form-label">Background Color (Rack Elevation)</label>
+          <div class="color-picker" id="rack-color-picker">
+            <div class="swatch active" data-color="" title="Otomatis per ukuran (1U/2U/3U/4U)">Auto</div>
+            <div class="swatch" data-color="#58A6FF" style="--sw:#58A6FF" title="1U"></div>
+            <div class="swatch" data-color="#2FB5C8" style="--sw:#2FB5C8" title="2U"></div>
+            <div class="swatch" data-color="#E5A13D" style="--sw:#E5A13D" title="3U"></div>
+            <div class="swatch" data-color="#C8569E" style="--sw:#C8569E" title="4U+"></div>
+            <input type="color" class="color-input" id="rack-color-input" value="#58A6FF" title="Pilih warna kustom">
+          </div>
+          <input type="hidden" data-sf="rackColor" id="rack-color-value">
+          <div class="form-hint">Default: otomatis — 1U / 2U / 3U / 4U+ punya warna berbeda di Rack Elevation. Pilih warna kustom untuk override.</div>
+        </div>
+        <div class="m-field">
+          <label class="form-label">Network VLAN / Segment</label>
+          <input class="form-input" type="text" placeholder="mis. VLAN 100 — Server Farm" data-sf="vlan">
+        </div>
+        <div class="m-field full">
+          <label class="form-label">Cable Management</label>
+          <div class="form-row">
+            <input class="form-input" type="text" placeholder="Patch panel, mis. PP-01-A" data-sf="cablePanel">
+            <input class="form-input" type="text" placeholder="Labeling port, mis. P1–P4" data-sf="cablePorts">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card form-card" data-node-only>
+      <div class="card-head">
+        <div>
+          <div class="card-title"><i class="fa-solid fa-heart-pulse"></i> Status &amp; Monitoring</div>
+          <div class="card-title-sub">Sistem, fungsi, monitoring &amp; kondisi</div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="m-field">
+          <label class="form-label">OS / Hypervisor</label>
+          <select class="form-input" data-sf="hypervisor">
+            <option value="windows-server">Windows Server</option>
+            <option value="linux">Linux</option>
+            <option value="esxi">VMware ESXi</option>
+            <option value="other">Lainnya</option>
+          </select>
+        </div>
+        <div class="m-field">
+          <label class="form-label">Kondisi</label>
+          <div class="tag-picker" data-single data-sf-pick="kondisi">
+            <div class="chip active" data-cond="active">Active</div>
+            <div class="chip" data-cond="standby">Standby</div>
+            <div class="chip" data-cond="decom">Decommissioned</div>
+          </div>
+        </div>
+        <div class="m-field full">
+          <label class="form-label">Fungsi Server</label>
+          <div class="tag-picker" data-multi data-sf-pick="fungsi">
+            <div class="chip" data-fn="database">Database</div>
+            <div class="chip active" data-fn="web">Web</div>
+            <div class="chip" data-fn="virtualization">Virtualization</div>
+            <div class="chip" data-fn="backup">Backup</div>
+            <button class="chip chip-add" type="button" data-add-chip title="Tambah fungsi lainnya"><i class="fa-solid fa-plus"></i></button>
+          </div>
+          <div class="chip-add-row" data-add-row style="display:none;">
+            <input class="form-input" type="text" data-add-input placeholder="Fungsi lain, mis. Monitoring">
+            <button class="btn primary btn-sm" type="button" data-add-confirm title="Tambah"><i class="fa-solid fa-check"></i></button>
+            <button class="btn ghost btn-sm" type="button" data-add-cancel title="Batal"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+        <div class="m-field full">
+          <label class="form-label">Monitoring</label>
+          <div class="tag-picker" data-multi data-sf-pick="monitoring">
+            <div class="chip active" data-mon="snmp">SNMP</div>
+            <div class="chip active" data-mon="ipmi">IPMI</div>
+            <div class="chip" data-mon="dcim">DCIM Integration</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card form-card" data-node-only>
+      <div class="card-head">
+        <div>
+          <div class="card-title"><i class="fa-solid fa-tags"></i> Tagging</div>
+          <div class="card-title-sub">Integrasi inventori fisik &amp; kategorisasi</div>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="m-field">
+          <label class="form-label">Asset Tag / QR Code</label>
+          <input class="form-input mono" type="text" placeholder="mis. ASET-RV-000123" data-sf="assetTag">
+        </div>
+        <div class="m-field">
+          <label class="form-label">Site / Lokasi</label>
+          <input class="form-input" type="text" placeholder="Terisi otomatis dari Rack ID" disabled>
+        </div>
+        <div class="m-field full">
+          <label class="form-label">Tag</label>
+          <div class="tag-picker" data-multi data-sf-pick="tags">
+            <div class="chip" data-tag="production">production</div>
+            <div class="chip" data-tag="staging">staging</div>
+            <div class="chip" data-tag="development">development</div>
+            <div class="chip" data-tag="database">database</div>
+            <div class="chip" data-tag="web">web</div>
+            <div class="chip" data-tag="application">application</div>
+            <div class="chip" data-tag="backup">backup</div>
+            <div class="chip" data-tag="security">security</div>
+            <button class="chip chip-add" type="button" data-add-chip title="Tambah tag lainnya"><i class="fa-solid fa-plus"></i></button>
+          </div>
+          <div class="chip-add-row" data-add-row style="display:none;">
+            <input class="form-input" type="text" data-add-input placeholder="Tag lain, mis. monitoring">
+            <button class="btn primary btn-sm" type="button" data-add-confirm title="Tambah"><i class="fa-solid fa-check"></i></button>
+            <button class="btn ghost btn-sm" type="button" data-add-cancel title="Batal"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+      </div>
+      <div class="save-msg" id="save-msg">
+        <i class="fa-solid fa-circle-check"></i>
+        Server berhasil disimpan (prototype — data belum dipersistenkan ke backend).
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<div class="modal-overlay" id="nm-overlay">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="nm-title">Node Server</div>
+        <div class="modal-sub" id="nm-sub">Isi spesifikasi node server di dalam chassis.</div>
+      </div>
+      <div class="modal-close" id="nm-close"><i class="fa-solid fa-xmark"></i></div>
+    </div>
+    <div id="nm-body"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" type="button" data-node-cancel>Batal</button>
+      <button class="btn primary" type="button" data-node-confirm><i class="fa-solid fa-check"></i> Simpan Node</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/brand.js"></script>
+<script src="js/app.js"></script>
+<script src="js/api.js"></script>
+<script src="js/rack-data.js"></script>
+<script src="js/server-data.js"></script>
+<script src="js/server-form.js"></script>
+</body>
+</html>

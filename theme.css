@@ -1,0 +1,110 @@
+/* ============================================
+   RackView — White-label theme foundation
+   Base palettes are fixed; --brand-* are the
+   admin-configurable layer (see js/brand.js)
+   ============================================ */
+
+:root {
+  --font-ui: 'IBM Plex Sans', -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', monospace;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.24), 0 8px 24px rgba(0,0,0,0.18);
+}
+
+/* ---------- Dark: "Datacenter Night" ---------- */
+[data-theme="dark"] {
+  --bg-primary: #0D1117;
+  --bg-secondary: #161B22;
+  --bg-tertiary: #21262D;
+  --surface: #1C2128;
+  --border: #30363D;
+  --text-primary: #E6EDF3;
+  --text-secondary: #8B949E;
+
+  --brand-primary: #58A6FF;
+  --brand-secondary: #3FB950;
+  --brand-accent: #A371F7;
+  --brand-logo-filter: none;
+
+  --login-bg: radial-gradient(circle at 20% 20%, #1B2838 0%, #0D1117 55%),
+              linear-gradient(135deg, #0D1117 0%, #0A0E14 100%);
+  --card-glass-bg: rgba(33, 38, 45, 0.72);
+  --card-glass-border: rgba(255,255,255,0.08);
+  --card-glass-blur: 18px;
+}
+
+/* ---------- Light: "Pastel Day" ---------- */
+[data-theme="light"] {
+  --bg-primary: #FEFDF9;
+  --bg-secondary: #F5F0EB;
+  --bg-tertiary: #FFFFFF;
+  --surface: #F0EBE3;
+  --border: #E8E0D5;
+  --text-primary: #2D2A26;
+  --text-secondary: #8C857C;
+
+  --brand-primary: #6B9BD1;
+  --brand-secondary: #7BC67E;
+  --brand-accent: #A98BC9;
+  --brand-logo-filter: none;
+
+  --login-bg: radial-gradient(circle at 80% 0%, #F3E9DD 0%, #FEFDF9 55%),
+              linear-gradient(135deg, #F5F0EB 0%, #FEFDF9 100%);
+  --card-glass-bg: #FFFFFF;
+  --card-glass-border: #E8E0D5;
+  --card-glass-blur: 0px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  font-family: var(--font-ui);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: inherit; }
+
+::selection { background: var(--brand-primary); color: #fff; }
+
+.mono { font-family: var(--font-mono); letter-spacing: 0.01em; }
+
+/* ---------- Theme toggle ---------- */
+.theme-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 0.2s;
+}
+.theme-toggle:hover { color: var(--brand-primary); border-color: var(--brand-primary); }
+.theme-toggle:active { transform: scale(0.92); }
+.theme-toggle svg { width: 18px; height: 18px; }
+[data-theme="dark"] .icon-sun { display: block; }
+[data-theme="dark"] .icon-moon { display: none; }
+[data-theme="light"] .icon-sun { display: none; }
+[data-theme="light"] .icon-moon { display: block; }
+
+/* ---------- Focus visibility ---------- */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
