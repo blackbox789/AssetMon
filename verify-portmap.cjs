@@ -89,7 +89,7 @@ check("grid RJ45 = 4 (data-port-edit=4 ada)", html1.includes(`data-port-edit="4"
 check("tidak ada port 5 (bukan double-count)", !html1.includes(`data-port-edit="5"`));
 check("kotak SFP1 & SFP2 ada", html1.includes("SFP1") && html1.includes("SFP2"));
 check("kotak QSFP1 & QSFP2 ada", html1.includes("QSFP1") && html1.includes("QSFP2"));
-check("sub teks sesuai", elements["portmap-sub"].textContent === "0 port terpakai dari 4 port + 2 SFP + 2 QSFP");
+check("sub teks sesuai (termasuk speed 10G)", elements["portmap-sub"].textContent === "0 port terpakai dari 4 port + 2 SFP + 2 QSFP · 10G");
 check("tombol Ubah Jumlah Port ada", html1.includes(`id="portmap-count-btn"`));
 check("panel edit port ada", html1.includes(`id="portmap-count-rj45"`));
 check("lastPortMeta menyimpan qsfp (dipakai editor saat buat data baru)", E(`lastPortMeta.qsfp`) === 2 && E(`lastPortMeta.ports`) === 4);
@@ -106,7 +106,7 @@ check("layout tersinkron dari record: ports=4", E(`PORT_DATA["SRV-QSFP-02"].port
 check("sfp tersinkron = 2", E(`PORT_DATA["SRV-QSFP-02"].sfp`) === 2);
 check("qsfp tersinkron = 1", E(`PORT_DATA["SRV-QSFP-02"].qsfp`) === 1);
 check("render QSFP1 ada", html2.includes("QSFP1"));
-check("sub teks SRV-QSFP-02 sinkron", elements["portmap-sub"].textContent === "0 port terpakai dari 4 port + 2 SFP + 1 QSFP");
+check("sub teks SRV-QSFP-02 sinkron (+ speed)", elements["portmap-sub"].textContent === "0 port terpakai dari 4 port + 2 SFP + 1 QSFP · 10G");
 
 // 3c. toolbar Simpan: ubah jumlah port → update PORT_DATA + server record + re-render
 console.log("[3c] toolbar Ubah Jumlah Port — simpan & tulis balik ke server record");

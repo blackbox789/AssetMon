@@ -205,19 +205,21 @@ function openPortMap(deviceKey, startInEdit, psuCount, opts) {
   if (!Array.isArray(data.specials)) data.specials = [];
   if (data.sfp == null) data.sfp = 0;
   if (data.qsfp == null) data.qsfp = 0;
+  let portMapSpeed = "";
   if (data.type === "server" && typeof getServers === "function") {
     try {
       const srv = getServers().find(s => (s.hostname || "").toLowerCase() === String(deviceKey).toLowerCase());
       if (srv) {
         const l = portLayoutFromServer(srv, data.ports, data.sfp, data.qsfp);
         data.ports = l.ports; data.sfp = l.sfp; data.qsfp = l.qsfp;
+        portMapSpeed = String(srv.speed || "").trim();
       }
     } catch (err) { /* abaikan */ }
   }
   currentPortKey = deviceKey || null;
   lastPortMeta = { type: data.type, ports: data.ports, sfp: data.sfp, qsfp: data.qsfp };
   document.getElementById("portmap-title").textContent = deviceKey + " — Port Map";
-  document.getElementById("portmap-sub").textContent = `${data.rows.length} port terpakai dari ${data.ports} port` + (data.sfp ? ` + ${data.sfp} SFP` : "") + (data.qsfp ? ` + ${data.qsfp} QSFP` : "");
+  document.getElementById("portmap-sub").textContent = `${data.rows.length} port terpakai dari ${data.ports} port` + (data.sfp ? ` + ${data.sfp} SFP` : "") + (data.qsfp ? ` + ${data.qsfp} QSFP` : "") + (portMapSpeed ? ` · ${portMapSpeed}` : "");
 
   let visualHtml = "";
   const sfpCells = data.sfp ? Array.from({ length: data.sfp }, (_, i) => {
