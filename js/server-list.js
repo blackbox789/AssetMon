@@ -101,7 +101,9 @@ function renderPagination(total) {
     last = p;
   });
   btns.push(`<button type="button" data-pg="next" ${page === pages ? "disabled" : ""}><i class="fa-solid fa-chevron-right"></i></button>`);
-  btns.push(`<span class="pg-info">${total} server</span>`);
+  const from = total === 0 ? 0 : (page - 1) * size + 1;
+  const to = Math.min(page * size, total);
+  btns.push(`<span class="pg-info">Menampilkan <b>${from}–${to}</b> dari <b>${total}</b> server</span>`);
   wrap.innerHTML = btns.join("");
   const sizeSelEl = document.getElementById("pg-size");
   if (sizeSelEl) {

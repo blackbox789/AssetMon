@@ -2,6 +2,55 @@
 const tbody = document.getElementById("pdu-tbody");
 const countEl = document.getElementById("filter-count");
 
+// ---- Pagination (10/20/30/40/50 per halaman, berbagi rv_page_size) ----
+const PDU_PAGE_SIZES = [10, 20, 30, 40, 50];
+let pduPage = 1;
+let pduVisibleRows = [];
+function getPduPageSize() {
+  const v = parseInt(localStorage.getItem(PAGE_SIZE_KEY) || "", 10);
+  return PDU_PAGE_SIZES.includes(v) ? v : 50;
+}
+function pduPaging(total, page, size) {
+  const pages = Math.max(1, Math.ceil(total / size));
+  const p = Math.min(Math.max(1, page), pages);
+  const from = total === 0 ? 0 : (p - 1) * size;
+  const to = Math.min(p * size, total);
+  return { pages, page: p, from, to };
+}
+function renderPduPagination(total, pg) {
+  const wrap = document.querySelector(".table-footer");
+  if (!wrap) return;
+  const size = getPduPageSize();
+  const btns = [];
+  btns.push(`<select id="ppg-size" class="pg-size-select" title="Jumlah PDU per halaman">${
+    PDU_PAGE_SIZES.map(n => `<option value="${n}"${n === size ? " selected" : ""}>${n}/hlm</option>`).join("")
+  }</select>`);
+  btns.push(`<span class="pg-info">Hal <b>${pg.page}</b> / ${pg.pages}</span>`);
+  btns.push(`<button type="button" data-pg="prev" ${pg.page === 1 ? "disabled" : ""}><i class="fa-solid fa-chevron-left"></i></button>`);
+  const shown = new Set([1, pg.pages, pg.page, pg.page - 1, pg.page + 1].filter(p => p >= 1 && p <= pg.pages));
+  let last = 0;
+  [...shown].sort((a, b) => a - b).forEach(p => {
+    if (p - last > 1) btns.push(`<span class="pg-info">…</span>`);
+    btns.push(`<button type="button" data-pg="${p}" class="${p === pg.page ? "active" : ""}">${p}</button>`);
+    last = p;
+  });
+  btns.push(`<button type="button" data-pg="next" ${pg.page === pg.pages ? "disabled" : ""}><i class="fa-solid fa-chevron-right"></i></button>`);
+  wrap.innerHTML = `<div class="page-pager">${btns.join("")}</div>`;
+  const sizeSelEl = document.getElementById("ppg-size");
+  if (sizeSelEl) sizeSelEl.addEventListener("change", () => {
+    localStorage.setItem(PAGE_SIZE_KEY, String(parseInt(sizeSelEl.value, 10)));
+    pduPage = 1;
+    renderTable();
+  });
+  wrap.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    const v = b.dataset.pg;
+    const next = v === "prev" ? pduPage - 1 : v === "next" ? pduPage + 1 : parseInt(v, 10);
+    const pg2 = pduPaging(pduVisibleRows.length, next, getPduPageSize());
+    pduPage = pg2.page;
+    renderTable();
+  }));
+}
+
 const STATUS_BADGE = {
   online: '<span class="badge online"><span class="bdot"></span>Online</span>',
   offline: '<span class="badge offline"><span class="bdot"></span>Offline</span>',
@@ -36,8 +85,11 @@ function renderTable() {
     const matchQ = !q || [p.name, p.rack, p.ip, p.brand, p.model].join(" ").toLowerCase().includes(q);
     return matchSite && matchType && matchStatus && matchQ;
   });
+  pduVisibleRows = rows;
+  const pg = pduPaging(rows.length, pduPage, getPduPageSize());
+  pduPage = pg.page;
 
-  tbody.innerHTML = rows.map(p => `
+  tbody.innerHTML = rows.slice(pg.from, pg.to).map(p => `
     <tr data-pdu-name="${escHtml(p.name)}" data-site="${p.site}" data-type="${p.type}" data-status="${p.status}">
       <td><div class="strong">${p.name}</div><div class="mono" style="font-size:11px;">${p.serial || ""}</div></td>
       <td><span class="pdu-type-chip ${p.type}"><span class="dot"></span>${p.type === "vertical" ? "Vertikal" : "Horizontal"}</span></td>
@@ -54,9 +106,10 @@ function renderTable() {
       </div></td>
     </tr>`).join("");
 
-  countEl.textContent = rows.length === PDU_DATA.length
-    ? `Menampilkan ${rows.length} dari ${PDU_DATA.length} PDU`
-    : `Menampilkan ${rows.length} dari ${PDU_DATA.length} PDU (setelah filter)`;
+  countEl.innerHTML = rows.length === 0
+    ? "Tidak ada PDU yang cocok dengan filter"
+    : `Menampilkan <b>${pg.from + 1}–${pg.to}</b> dari <b>${rows.length}</b> PDU`;
+  renderPduPagination(rows.length, pg);
   updateStats();
 }
 
@@ -68,7 +121,7 @@ function updateStats() {
 }
 
 ["top-search", "filter-site", "filter-type", "filter-status"].forEach(id => {
-  document.getElementById(id).addEventListener("input", renderTable);
+  document.getElementById(id).addEventListener("input", () => { pduPage = 1; renderTable(); });
 });
 
 // ---- Add/Edit PDU modal ----
@@ -254,6 +307,7 @@ document.getElementById("save-add-pdu").addEventListener("click", () => {
   if (typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: name, type: "pdu", name });
   if (typeof savePowerMap === "function") savePowerMap(name);
   setAddTitle("add");
+  pduPage = 1;
   renderTable();
   closeModal();
 });

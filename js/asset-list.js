@@ -259,6 +259,7 @@ function addSwitchRow(sw) {
   tr.innerHTML = switchRowHTML(sw);
   tbody.insertBefore(tr, tbody.firstChild);
   if (typeof allRows !== "undefined" && allRows) allRows.push(tr);
+  assetCurrentPage = 1;
   applyFilters();
 }
 
@@ -361,6 +362,7 @@ function addAccessoryRow(a) {
   tr.innerHTML = accessoryRowHTML(a);
   tbody.insertBefore(tr, tbody.firstChild);
   if (typeof allRows !== "undefined" && allRows) allRows.push(tr);
+  assetCurrentPage = 1;
   applyFilters();
 }
 
@@ -474,6 +476,7 @@ function deleteAssetRow(tr) {
   tr.remove();
   const i = allRows.indexOf(tr);
   if (i >= 0) allRows.splice(i, 1);
+  if (selectedAssetRow === tr) clearAssetDetail();
   applyFilters();
 }
 
@@ -530,6 +533,145 @@ viewPmBtn.addEventListener("click", () => {
   if (t === "pdu") { if (typeof openPowerMap === "function") openPowerMap(n); }
   else if (typeof openPortMap === "function") openPortMap(n, false, 0, { type: t || "server", formFactor: "" });
 });
+
+// ---- Ringkasan Identitas Perangkat: panel detail di bawah tabel (ala server-list.html) ----
+let selectedAssetRow = null;
+
+function assetSummaryKvRow(label, value) {
+  if (value == null || String(value).trim() === "") return "";
+  return `<div class="kv-row"><span class="kv-label">${escA(label)}</span><span class="kv-value">${escA(value)}</span></div>`;
+}
+
+function assetSummaryGroup(title, rowsHtml) {
+  if (!rowsHtml.trim()) return "";
+  return `<div class="kv-group"><div class="kv-group-title">${escA(title)}</div>${rowsHtml}</div>`;
+}
+
+function assetSummaryChip(text, accent) {
+  const style = accent
+    ? "background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"
+    : "background:var(--bg-surface-3);color:var(--text-secondary)";
+  return `<span class="tag-chip" style="${style}"><span class="tdot"></span>${escA(text)}</span>`;
+}
+
+function assetSummaryMapLink(rec, type) {
+  const name = (rec && rec.name) || "";
+  if (!name) return "";
+  if (type === "pdu" && typeof openPowerMap === "function") {
+    const psu = Math.max(1, parseInt(rec.psuCount, 10) || 2);
+    return `<button type="button" class="srv-map-link" onclick="openPowerMap('${escA(name)}', false, ${psu});return false;">Buka Power Map <i class="fa-solid fa-arrow-up-right-from-square"></i></button>`;
+  }
+  if (["switch", "server", "firewall", "router", "patch", "ups", "storage"].includes(type) && typeof openPortMap === "function") {
+    return `<button type="button" class="srv-map-link" onclick="openPortMap('${escA(name)}', false, 0, { type: '${escA(type)}', formFactor: '' });return false;">Buka Port Map <i class="fa-solid fa-arrow-up-right-from-square"></i></button>`;
+  }
+  return "";
+}
+
+const PURCHASE_FIELDS = ["tahunPembelian", "warranty", "monitoring"];
+
+function buildAssetSummaryHTML(rec, tr) {
+  const rowInfo = tr ? readAssetRow(tr) : {};
+  const src = Object.assign({}, rowInfo, rec || {});
+  const type = src.type || "";
+  const name = src.name || "";
+  const brandModel = [src.brand, src.model].filter(Boolean).join(" ") || src.brandModel || "";
+  const header = `
+    <div class="srv-detail-head">
+      <div class="strong" style="font-size:14px;">${escA(name)}</div>
+      <div class="srv-meta-row" style="margin-top:6px;">
+        ${assetSummaryChip(TYPE_LABELS[type] || "Asset", true)}
+        ${brandModel ? assetSummaryChip(brandModel) : ""}
+        ${(src.tags || []).map(t => assetSummaryChip(t)).join("")}
+      </div>
+    </div>`;
+  const identityRows =
+    assetSummaryKvRow("Tipe", TYPE_LABELS[type] || type || "") +
+    assetSummaryKvRow("Brand / Model", brandModel) +
+    assetSummaryKvRow("Rack", src.rack) +
+    assetSummaryKvRow("Posisi U", src.posisiU) +
+    assetSummaryKvRow("IP Address", src.ip) +
+    assetSummaryKvRow("Serial Number", src.serial) +
+    assetSummaryKvRow("Site", src.site);
+  const netRows = Object.keys(NF_LABELS)
+    .filter(f => !PURCHASE_FIELDS.includes(f))
+    .map(f => ({ f, v: src[f] }))
+    .filter(x => x.v != null && String(x.v) !== "")
+    .map(x => assetSummaryKvRow(NF_LABELS[x.f], x.v))
+    .join("");
+  const purchaseRows = PURCHASE_FIELDS
+    .map(f => ({ f, v: src[f] }))
+    .filter(x => x.v != null && String(x.v) !== "")
+    .map(x => assetSummaryKvRow(NF_LABELS[x.f], x.v))
+    .join("");
+  return header +
+    assetSummaryGroup("Identitas", identityRows) +
+    assetSummaryGroup("Network & Daya", netRows) +
+    assetSummaryGroup("Pembelian", purchaseRows) +
+    assetSummaryGroup("Pemetaan", assetSummaryMapLink(src, type));
+}
+
+function renderAssetDetail(tr) {
+  if (selectedAssetRow) selectedAssetRow.classList.remove("row-selected");
+  selectedAssetRow = tr;
+  tr.classList.add("row-selected");
+  const name = (tr.querySelector(".strong")?.textContent || "").trim();
+  const type = tr.dataset.type || "";
+  let rec = null;
+  try {
+    rec = type === "switch"
+      ? readLocalSwitches().find(s => s.name === name) || null
+      : readLocalAccessories().find(x => x.name === name) || null;
+  } catch (e) { /* abaikan */ }
+  const body = document.getElementById("asset-detail-body");
+  if (body) body.innerHTML = buildAssetSummaryHTML(rec, tr);
+  const closeBtn = document.getElementById("asset-detail-close");
+  if (closeBtn) closeBtn.style.display = "";
+  const panel = document.getElementById("asset-detail");
+  if (panel) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function clearAssetDetail() {
+  if (selectedAssetRow) { selectedAssetRow.classList.remove("row-selected"); selectedAssetRow = null; }
+  const body = document.getElementById("asset-detail-body");
+  if (body) body.innerHTML = '<div class="form-hint">Klik baris pada tabel untuk melihat ringkasan identitas perangkat.</div>';
+  const closeBtn = document.getElementById("asset-detail-close");
+  if (closeBtn) closeBtn.style.display = "none";
+}
+
+function refreshSelectedAssetDetail() {
+  if (!selectedAssetRow) return;
+  if (!selectedAssetRow.isConnected) { clearAssetDetail(); return; }
+  renderAssetDetail(selectedAssetRow);
+}
+
+function initAssetDetailPanel() {
+  if (document.getElementById("asset-detail")) return;
+  const assetTable = Array.from(document.querySelectorAll(".content table"))
+    .find(t => (t.querySelector("thead th")?.textContent || "").trim() === "Asset");
+  const anchor = assetTable ? assetTable.closest(".card") : null;
+  if (!anchor) return;
+  const layout = document.createElement("div");
+  layout.className = "asset-detail-layout";
+  const tableCol = document.createElement("div");
+  tableCol.className = "asset-detail-table";
+  anchor.before(layout);
+  layout.appendChild(tableCol);
+  tableCol.appendChild(anchor);
+  const wrap = document.createElement("div");
+  wrap.innerHTML = `
+    <div class="card detail-sticky" id="asset-detail">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;">
+        <div>
+          <div class="card-title"><i class="fa-solid fa-id-badge" style="color:var(--accent);margin-right:8px;"></i> Ringkasan Identitas Perangkat</div>
+          <div class="card-title-sub">Ringkasan isian asset terpilih</div>
+        </div>
+        <button type="button" class="btn ghost" id="asset-detail-close" style="display:none;"><i class="fa-solid fa-xmark"></i> Tutup</button>
+      </div>
+      <div id="asset-detail-body"><div class="form-hint">Klik baris pada tabel untuk melihat ringkasan identitas perangkat.</div></div>
+    </div>`;
+  layout.appendChild(wrap.firstElementChild);
+  document.getElementById("asset-detail-close").addEventListener("click", clearAssetDetail);
+}
 
 let editingAsset = null;
 
@@ -697,6 +839,7 @@ function saveEditAsset() {
   }
   resetAddModal();
   overlay.classList.remove("open");
+  refreshSelectedAssetDetail();
 }
 
 
@@ -749,7 +892,7 @@ outletCustomInput.addEventListener("input", () => {
   if (v > 36) outletCustomInput.value = 36;
 });
 
-// ---- Site / Type / Status filters ----
+// ---- Site / Type / Status filters + Pagination (10/20/30/40/50 per halaman) ----
 const filterSite = document.getElementById("filter-site");
 const filterType = document.getElementById("filter-type");
 const filterStatus = document.getElementById("filter-status");
@@ -758,13 +901,29 @@ const filterCount = document.getElementById("filter-count");
 const allRows = Array.from(document.querySelectorAll("tbody tr[data-site]"));
 const totalRowCount = allRows.length;
 
+const ASSET_PAGE_SIZES = [10, 20, 30, 40, 50];
+let assetCurrentPage = 1;
+let assetVisibleRows = [];
+
+function getAssetPageSize() {
+  const v = parseInt(localStorage.getItem(PAGE_SIZE_KEY) || "", 10);
+  return ASSET_PAGE_SIZES.includes(v) ? v : 50;
+}
+
+function assetPaging(total, page, size) {
+  const pages = Math.max(1, Math.ceil(total / size));
+  const p = Math.min(Math.max(1, page), pages);
+  const from = total === 0 ? 0 : (p - 1) * size;
+  const to = Math.min(p * size, total);
+  return { pages, page: p, from, to };
+}
+
 function applyFilters() {
   const site = filterSite.value;
   const type = filterType.value;
   const status = filterStatus.value;
   const tag = filterTag.value;
-  let visible = 0;
-  allRows.forEach(row => {
+  assetVisibleRows = allRows.filter(row => {
     const rowTags = (row.dataset.tags || "").split(",").filter(Boolean);
     const matchSite = site === "all" || row.dataset.site === site;
     const matchType = type === "all" || (type === "accessories"
@@ -772,16 +931,71 @@ function applyFilters() {
       : row.dataset.type === type);
     const matchStatus = status === "all" || row.dataset.status === status;
     const matchTag = tag === "all" || rowTags.includes(tag);
-    const show = matchSite && matchType && matchStatus && matchTag;
-    row.style.display = show ? "" : "none";
-    if (show) visible++;
+    return matchSite && matchType && matchStatus && matchTag;
   });
-  filterCount.textContent = visible === totalRowCount
-    ? `Menampilkan ${visible} dari 1,284 asset`
-    : `Menampilkan ${visible} dari ${totalRowCount} asset di halaman ini (1,284 total)`;
+  renderRows();
 }
 
-[filterSite, filterType, filterStatus, filterTag].forEach(sel => sel.addEventListener("change", applyFilters));
+function renderRows() {
+  const total = assetVisibleRows.length;
+  const pg = assetPaging(total, assetCurrentPage, getAssetPageSize());
+  assetCurrentPage = pg.page;
+  allRows.forEach(row => { row.style.display = "none"; });
+  assetVisibleRows.slice(pg.from, pg.to).forEach(row => { row.style.display = ""; });
+  filterCount.innerHTML = total === 0
+    ? "Tidak ada asset yang cocok dengan filter"
+    : `Menampilkan <b>${pg.from + 1}–${pg.to}</b> dari <b>${total}</b> asset`;
+  renderPagination(total, pg);
+}
+
+function assetPaginationWrap() {
+  return document.querySelector(".asset-detail-table .table-footer")
+      || document.querySelector(".content .table-footer");
+}
+
+function renderPagination(total, pg) {
+  const wrap = assetPaginationWrap();
+  if (!wrap) return;
+  const size = getAssetPageSize();
+  const btns = [];
+  btns.push(`<select id="apg-size" class="pg-size-select" title="Jumlah asset per halaman">${
+    ASSET_PAGE_SIZES.map(n => `<option value="${n}"${n === size ? " selected" : ""}>${n}/hlm</option>`).join("")
+  }</select>`);
+  btns.push(`<span class="pg-info">Hal <b>${pg.page}</b> / ${pg.pages}</span>`);
+  btns.push(`<button type="button" data-pg="prev" ${pg.page === 1 ? "disabled" : ""}><i class="fa-solid fa-chevron-left"></i></button>`);
+  const shown = new Set([1, pg.pages, pg.page, pg.page - 1, pg.page + 1].filter(p => p >= 1 && p <= pg.pages));
+  let last = 0;
+  [...shown].sort((a, b) => a - b).forEach(p => {
+    if (p - last > 1) btns.push(`<span class="pg-info">…</span>`);
+    btns.push(`<button type="button" data-pg="${p}" class="${p === pg.page ? "active" : ""}">${p}</button>`);
+    last = p;
+  });
+  btns.push(`<button type="button" data-pg="next" ${pg.page === pg.pages ? "disabled" : ""}><i class="fa-solid fa-chevron-right"></i></button>`);
+  wrap.innerHTML = `<div class="page-pager">${btns.join("")}</div>`;
+  const sizeSelEl = document.getElementById("apg-size");
+  if (sizeSelEl) sizeSelEl.addEventListener("change", () => {
+    localStorage.setItem(PAGE_SIZE_KEY, String(parseInt(sizeSelEl.value, 10)));
+    assetCurrentPage = 1;
+    applyFilters();
+  });
+  wrap.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+    const v = b.dataset.pg;
+    goToAssetPage(v === "prev" ? assetCurrentPage - 1 : v === "next" ? assetCurrentPage + 1 : parseInt(v, 10));
+  }));
+}
+
+function goToAssetPage(page) {
+  const pg = assetPaging(assetVisibleRows.length, page, getAssetPageSize());
+  assetCurrentPage = pg.page;
+  renderRows();
+}
+
+function onFilterChange() {
+  assetCurrentPage = 1;
+  applyFilters();
+}
+
+[filterSite, filterType, filterStatus, filterTag].forEach(sel => sel.addEventListener("change", onFilterChange));
 
 // pre-select site filter from ?site=DC1 query param (e.g. coming from sites.html)
 const params = new URLSearchParams(window.location.search);
@@ -810,33 +1024,37 @@ if (typeParam) {
 
 document.querySelector("tbody").addEventListener("click", e => {
   const btn = e.target.closest("button");
-  if (!btn) return;
-  const tr = btn.closest("tr");
-  if (btn.title === "Edit" && !btn.hasAttribute("onclick")) {
-    if (tr) openEditAsset(tr);
-    return;
-  }
-  if (btn.title === "View") {
-    if (tr) openViewAsset(tr);
-    return;
-  }
-  if (btn.title === "Hapus") {
-    if (!tr) return;
-    const nm = (tr.querySelector(".strong")?.textContent || "").trim();
-    if (confirm(`Hapus ${nm}? Record asset, Port/Power Map, dan registri perangkat ikut dihapus.`)) {
-      deleteAssetRow(tr);
+  const tr = btn ? btn.closest("tr") : e.target.closest("tr");
+  if (!tr) return;
+  if (btn) {
+    if (btn.title === "Edit" && !btn.hasAttribute("onclick")) {
+      openEditAsset(tr);
+      return;
     }
-    return;
+    if (btn.title === "View") {
+      openViewAsset(tr);
+      return;
+    }
+    if (btn.title === "Hapus") {
+      const nm = (tr.querySelector(".strong")?.textContent || "").trim();
+      if (confirm(`Hapus ${nm}? Record asset, Port/Power Map, dan registri perangkat ikut dihapus.`)) {
+        deleteAssetRow(tr);
+      }
+      return;
+    }
+    const pm = btn.hasAttribute("data-open-pm") ? btn : e.target.closest("[data-open-pm]");
+    if (pm) {
+      const name = pm.dataset.openPm;
+      const pmType = (pm.closest("tr") && pm.closest("tr").dataset.type) || "switch";
+      if (pmType === "pdu" && typeof openPowerMap === "function") {
+        openPowerMap(name);
+        return;
+      }
+      if (typeof openPortMap === "function") openPortMap(name, false, 0, { type: pmType, formFactor: "" });
+      return;
+    }
   }
-  const pm = btn.hasAttribute("data-open-pm") ? btn : e.target.closest("[data-open-pm]");
-  if (!pm) return;
-  const name = pm.dataset.openPm;
-  const pmType = (pm.closest("tr") && pm.closest("tr").dataset.type) || "switch";
-  if (pmType === "pdu" && typeof openPowerMap === "function") {
-    openPowerMap(name);
-    return;
-  }
-  if (typeof openPortMap === "function") openPortMap(name, false, 0, { type: pmType, formFactor: "" });
+  renderAssetDetail(tr);
 });
 
 // ---- Kolom Spesifikasi: baris statis (HTML lama) diberi sel spesifikasi ----
@@ -910,6 +1128,7 @@ function removeStaticNetworkDuplicates() {
 }
 
 window.addEventListener("load", () => {
+  initAssetDetailPanel();
   normalizeSpecCells();
   seedNetworkDemoData();
   removeStaticNetworkDuplicates();

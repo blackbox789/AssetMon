@@ -104,6 +104,7 @@ tbody tr.row-selected .strong { color: var(--accent-text); }
   margin: 0 6px;
   white-space: nowrap;
 }
+.srv-pagination .pg-info b { color: var(--accent-text); font-size: 13px; }
 .pg-size-select {
   height: 32px;
   padding: 0 8px;
