@@ -768,7 +768,7 @@ function applyFilters() {
     const rowTags = (row.dataset.tags || "").split(",").filter(Boolean);
     const matchSite = site === "all" || row.dataset.site === site;
     const matchType = type === "all" || (type === "accessories"
-      ? ["kvm-switch", "patch", "cable-management", "cooling-fan"].includes(row.dataset.type)
+      ? ACCESSORY_TYPES.includes(row.dataset.type)
       : row.dataset.type === type);
     const matchStatus = status === "all" || row.dataset.status === status;
     const matchTag = tag === "all" || rowTags.includes(tag);
