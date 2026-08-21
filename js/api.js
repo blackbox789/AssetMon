@@ -46,6 +46,25 @@ function apiSaveServer(server) {
   return apiRequest("POST", "/servers", server);
 }
 
+// ---- Master sites (site.id = masterKey; picklist OPS & referensi racks) ----
+function apiGetSites() {
+  const r = apiRequest("GET", "/sites");
+  return Array.isArray(r) ? r : null;
+}
+
+function apiSaveSite(site) {
+  return apiRequest("POST", "/sites", site);
+}
+
+// ---- Referensi data (lookups) ----
+function apiGetRefs() {
+  return apiRequest("GET", "/refs");
+}
+
+function apiSaveRefs(kind, items) {
+  return apiRequest("POST", "/refs/" + encodeURIComponent(kind), items);
+}
+
 function apiGetMaps(kind) {
   const r = apiRequest("GET", "/maps/" + encodeURIComponent(kind));
   return Array.isArray(r) ? r : null;
@@ -75,4 +94,9 @@ function apiDeleteDevice(deviceKey) {
 
 function apiRenameDevice(oldKey, newKey) {
   return apiRequest("PUT", "/devices/" + encodeURIComponent(oldKey) + "/rename", { to: newKey });
+}
+
+// ---- Bulk update lokasi device (site + rackId dari penempatan rack) ----
+function apiSaveDeviceLocations(list) {
+  return apiRequest("POST", "/devices/locations", list);
 }

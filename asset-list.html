@@ -31,7 +31,6 @@
       <div class="nav-label">Inventory</div>
       <a href="sites.html" class="nav-item"><i class="fa-solid fa-map-location-dot"></i><span>Sites</span></a>
       <a href="rack-elevation.html" class="nav-item"><i class="fa-solid fa-server"></i><span>Rack Elevation</span></a>
-      <a href="capacity-matrix.html" class="nav-item"><i class="fa-solid fa-th-large"></i><span>Capacity Matrix</span></a>
       <a href="network-topology.html" class="nav-item"><i class="fa-solid fa-diagram-project"></i><span>Network Topology</span></a>
       <a href="port-map.html" class="nav-item"><i class="fa-solid fa-ethernet"></i><span>Port Map</span></a>
       <a href="power-map.html" class="nav-item"><i class="fa-solid fa-plug"></i><span>Power Map</span></a>
@@ -41,29 +40,39 @@
         <a href="storage-list.html" class="nav-subitem" data-type="storage"><i class="fa-solid fa-hard-drive"></i><span>Storage</span></a>
         <a href="asset-list.html" class="nav-subitem nav-parent2 open" data-submenu2="submenu-asset-net"><i class="fa-solid fa-network-wired"></i><span>Network Device</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
         <div class="nav-submenu2 open" id="submenu-asset-net">
-          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Network Device</span></a>
+          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Switch</span></a>
           <a href="firewall-list.html" class="nav-subitem2" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
           <a href="router-list.html" class="nav-subitem2" data-type="router"><i class="fa-solid fa-tower-broadcast"></i><span>Router</span></a>
         </div>
         <a href="ups-list.html" class="nav-subitem" data-type="ups"><i class="fa-solid fa-plug-circle-bolt"></i><span>UPS</span></a>
         <a href="accessories-list.html" class="nav-subitem" data-type="accessories"><i class="fa-solid fa-sliders"></i><span>Accessories</span></a>
-        <a href="asset-list.html" class="nav-subitem" data-type="other"><i class="fa-solid fa-ellipsis"></i><span>Lainnya</span></a>
+        
         <a href="pdu-list.html" class="nav-subitem"><i class="fa-solid fa-bolt"></i><span>PDU</span></a>
         <a href="cable-registry.html" class="nav-subitem"><i class="fa-solid fa-tag"></i><span>Cable Registry</span></a>
       </div>
       <a href="#" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Discovery Center</span></a>
     </div>
     <div class="nav-group">
+      <div class="nav-label">Operasional</div>
+      <a href="kunjungan-site.html" class="nav-item"><i class="fa-solid fa-user-clock"></i><span>Kunjungan Site</span></a>
+      <a href="incident-report.html" class="nav-item"><i class="fa-solid fa-triangle-exclamation"></i><span>Incident Report</span></a>
+      <a href="maintenance.html" class="nav-item"><i class="fa-solid fa-screwdriver-wrench"></i><span>Maintenance</span></a>
+    </div>
+    <div class="nav-group">
       <div class="nav-label">Admin</div>
-      <a href="#" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>User Management</span></a>
-      <a href="#" class="nav-item"><i class="fa-solid fa-file-lines"></i><span>Audit Log</span></a>
-      <a href="reports.html" class="nav-item"><i class="fa-solid fa-chart-column"></i><span>Reports</span></a>
+      <a href="user-management.html" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>User Management</span></a>
+      <a href="audit-log.html" class="nav-item"><i class="fa-solid fa-file-lines"></i><span>Audit Log</span></a>
+      <a href="reports.html" class="nav-item nav-parent open" data-submenu="submenu-reports"><i class="fa-solid fa-chart-column"></i><span>Reports</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+      <div class="nav-submenu open" id="submenu-reports">
+        <a href="capacity-matrix.html" class="nav-subitem"><i class="fa-solid fa-th-large"></i><span>Capacity Matrix</span></a>
+<a href="capacity-plan.html" class="nav-subitem"><i class="fa-solid fa-chart-line"></i><span>Capacity Plan</span></a>
+      </div>
       <a href="branding-admin.html" class="nav-item"><i class="fa-solid fa-palette"></i><span>Settings → Branding</span></a>
     </div>
   </nav>
   <div class="sidebar-foot">
     <span class="agent-dot"></span>
-    <span class="sidebar-foot-text">Semua sistem <b>online</b></span>
+    <span class="sidebar-foot-text" id="sidebar-user">Semua sistem <b>online</b></span>
   </div>
 </aside>
 <div class="main">
@@ -78,9 +87,9 @@
         <i class="fa-solid fa-sun icon-sun-only"></i><i class="fa-solid fa-moon icon-moon-only"></i>
       </button>
       <div class="icon-btn"><i class="fa-solid fa-bell"></i><span class="dot"></span></div>
-      <div class="user-chip">
-        <div class="avatar">JS</div>
-        <div class="user-meta"><div style="font-weight:600;color:var(--text-primary);">Joko S.</div><div class="role">NOC Supervisor</div></div>
+      <div class="user-chip" id="topbar-user-chip">
+        <div class="avatar" id="topbar-avatar">JS</div>
+        <div class="user-meta"><div style="font-weight:600;color:var(--text-primary);" id="topbar-username">Joko S.</div><div class="role" id="topbar-role">NOC Supervisor</div></div>
       </div>
     </div>
   </div>
@@ -204,10 +213,10 @@
           <button title="Port Map" onclick="openPortMap('FW-EDGE-02')"><i class="fa-solid fa-ethernet"></i></button>
         </div></td>
       </tr>
-      <tr data-site="DC2" data-type="server" data-status="offline" data-tags="development,web">
+      <tr data-site="DC1" data-type="server" data-status="offline" data-tags="development,web">
         <td><div class="strong">SRV-WEB-02</div><div class="mono" style="font-size:11px;">SVC-DL380-2290</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--info) 18%, transparent);color:var(--info)"><span class="tdot"></span>development</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>web</span></div></td>
         <td><span class="type-chip server"><span class="dot"></span>Server</span></td>
-        <td>R2-B14 · U15–U18</td>
+        <td>R1-A12 · U15–U18</td>
         <td class="mono">10.10.4.22</td>
         <td>HPE ProLiant DL380</td>
         <td><span class="badge offline"><span class="bdot"></span>Offline</span></td>
@@ -218,10 +227,10 @@
           <button title="Port Map" onclick="openPortMap('SRV-WEB-02')"><i class="fa-solid fa-ethernet"></i></button>
         </div></td>
       </tr>
-      <tr data-site="DC2" data-type="switch" data-status="online" data-tags="production,network-access">
+      <tr data-site="DC1" data-type="switch" data-status="online" data-tags="production,network-access">
         <td><div class="strong">SW-ACC-03</div><div class="mono" style="font-size:11px;">SW-CAT-2960-077</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>network-access</span></div></td>
         <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
-        <td>R2-B14 · U21</td>
+        <td>R1-A12 · U21</td>
         <td class="mono">10.10.0.23</td>
         <td>Cisco Catalyst 2960-X</td>
         <td><span class="badge online"><span class="bdot"></span>Online</span></td>
@@ -232,10 +241,10 @@
           <button title="Port Map" onclick="openPortMap('SW-ACC-03')"><i class="fa-solid fa-ethernet"></i></button>
         </div></td>
       </tr>
-      <tr data-site="DC3" data-type="server" data-status="online" data-tags="production,backup">
+      <tr data-site="DC1" data-type="server" data-status="online" data-tags="production,backup">
         <td><div class="strong">SRV-BKP-01</div><div class="mono" style="font-size:11px;">SVC-R750XD-1180</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--text-muted) 18%, transparent);color:var(--text-muted)"><span class="tdot"></span>backup</span></div></td>
         <td><span class="type-chip server"><span class="dot"></span>Server</span></td>
-        <td>R3-C05 · U22–U25</td>
+        <td>R1-A12 · U22–U25</td>
         <td class="mono">10.10.4.31</td>
         <td>Dell PowerEdge R750xd</td>
         <td><span class="badge online"><span class="bdot"></span>Online</span></td>
@@ -497,6 +506,9 @@
           <div class="m-field"><label class="form-label">Form Factor (U)</label>
             <select class="form-input" id="form-factor" data-sf="formFactor"></select>
           </div>
+          <div class="m-field"><label class="form-label">Tinggi Rack (U)</label>
+            <input class="form-input mono" type="number" min="1" max="16" placeholder="mis. 2" data-sf="uHeight">
+          </div>
         </div>
 
         <div data-chassis-only style="display:none;margin-top:14px;border-top:1px solid var(--border-soft);padding-top:14px;">
@@ -691,7 +703,7 @@
         </div>
 
         <div class="form-row">
-          <div class="m-field" data-node-only><label class="form-label">Asset Tag / QR Code</label><input class="form-input mono" type="text" placeholder="mis. ASET-RV-000123" data-sf="assetTag"></div>
+          <div class="m-field"><label class="form-label">Asset Tag / QR Code</label><input class="form-input mono" type="text" placeholder="mis. ASET-RV-000123" data-sf="assetTag"></div>
           <div class="m-field"><label class="form-label">Cable Management</label><input class="form-input" type="text" placeholder="Patch panel / labeling port" data-sf="cableManagement"></div>
         </div>
       </div>
@@ -722,6 +734,23 @@
       <div class="form-row">
         <div class="m-field"><label class="form-label">Rack</label><select class="form-input" data-sf="rack"><option>R1-A12</option><option>R2-B03</option><option>R3-C05</option></select></div>
         <div class="m-field"><label class="form-label">Posisi U</label><input class="form-input" type="text" placeholder="mis. U27–U30" data-sf="posisiU"></div>
+      </div>
+      <div class="m-field">
+        <label class="form-label">Gambar Perangkat (Rack Elevation)</label>
+        <div class="devimg-upload" style="margin-bottom:6px;">
+          <img class="devimg-preview" data-devimg-preview="front" alt="Depan" style="display:none;">
+          <button type="button" class="btn ghost" data-devimg-pick="front"><i class="fa-solid fa-upload"></i> Upload Depan</button>
+          <button type="button" class="btn ghost" data-devimg-clear="front" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+          <input type="file" accept="image/png,image/jpeg,image/webp" data-devimg-file="front" style="display:none;">
+        </div>
+        <div class="devimg-upload">
+          <img class="devimg-preview" data-devimg-preview="back" alt="Belakang" style="display:none;">
+          <button type="button" class="btn ghost" data-devimg-pick="back"><i class="fa-solid fa-upload"></i> Upload Belakang</button>
+          <button type="button" class="btn ghost" data-devimg-clear="back" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+          <input type="file" accept="image/png,image/jpeg,image/webp" data-devimg-file="back" style="display:none;">
+        </div>
+        <div class="form-hint" data-devimg-msg="front"></div>
+        <div class="form-hint" data-devimg-msg="back"></div>
       </div>
       <div class="m-field">
         <label class="form-label">Background Color (Rack Elevation)</label>
@@ -795,6 +824,7 @@
       <div id="view-body"></div>
       <div class="modal-foot" style="justify-content:flex-end;">
         <button class="btn primary" id="view-pm-btn" style="display:none;"><i class="fa-solid fa-ethernet"></i> Port Map</button>
+        <button class="btn ghost" id="view-pw-btn" style="display:none;"><i class="fa-solid fa-plug"></i> Power Map</button>
       </div>
     </div>
   </div>
@@ -802,6 +832,8 @@
 
     <script src="js/brand.js"></script>
 <script src="js/app.js"></script>
+<script src="js/auth.js"></script>
+<script>if(typeof authGuard==="function") authGuard();</script>
     
 
 <script src="js/keys.js"></script>

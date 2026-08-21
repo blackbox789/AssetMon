@@ -31,6 +31,7 @@ const summaryBlock = slice("// ---- Ringkasan Identitas Perangkat", "\nlet editi
 
 const code = [
   `const TYPE_LABELS = { switch: "Network Switch", firewall: "Firewall", router: "Router", pdu: "PDU", ups: "UPS", patch: "Patch Panel", storage: "Storage", server: "Server" };`,
+  `const ASSET_PORT_MAP_TYPES = ["switch", "server", "firewall", "router", "patch", "ups", "storage"];`,
   NF_LABELS,
   `function readAssetRow(tr) { return tr; }`,
   `const openPortMap = (name, ...a) => "PORT:" + name + ":" + JSON.stringify(a);`,
@@ -38,6 +39,8 @@ const code = [
   `function escA(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }`,
   summaryBlock,
 ].join("\n");
+
+global.window = global;
 
 vm.runInThisContext(code, { filename: "asset-list-summary.js" });
 

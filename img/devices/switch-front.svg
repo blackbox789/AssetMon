@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 24">
+  <rect width="100" height="24" rx="2" fill="#182236"/>
+  <rect x="1" y="1" width="98" height="22" rx="1.5" fill="#1e2a42" stroke="#2f4a78"/>
+  <rect x="5" y="8" width="16" height="8" rx="1" fill="#31D8A4" opacity=".9"/>
+  <rect x="24" y="8" width="16" height="8" rx="1" fill="#4C8DFF" opacity=".9"/>
+  <rect x="43" y="8" width="16" height="8" rx="1" fill="#4C8DFF" opacity=".9"/>
+  <rect x="62" y="8" width="16" height="8" rx="1" fill="#4C8DFF" opacity=".9"/>
+  <text x="5" y="20" font-family="Consolas, monospace" font-size="5" fill="#8fa7d0">SWITCH</text>
+</svg>

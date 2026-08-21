@@ -14,6 +14,9 @@ const DEFAULT_PORT_DATA = {
     { port: 5, vlan: "v99", dest: "SRV-DB-17", destPort: "eth1 (mgmt)", ip: "10.10.99.17", label: "CBL-1014", media: "Cat6" },
     { port: 6, vlan: "v10", dest: "SRV-WEB-02", destPort: "eth0", ip: "10.10.4.22", label: "CBL-1015", media: "Cat6" },
     { port: 7, vlan: "v99", dest: "SRV-WEB-02", destPort: "eth1 (mgmt)", ip: "10.10.99.22", label: "CBL-1016", media: "Cat6" },
+    { port: 8, vlan: "v10", dest: "SVR1U", destPort: "eth0", ip: "10.10.4.19", label: "CBL-1060", media: "Cat6A" },
+    { port: 9, vlan: "v99", dest: "SVR1U", destPort: "eth1 (mgmt)", ip: "10.10.99.19", label: "CBL-1061", media: "Cat6" },
+    { port: 12, vlan: "v30", dest: "SW-BACKUP-02", destPort: "5", ip: "10.10.0.25", label: "CBL-1062", media: "LC MM" },
     { port: "MGMT", vlan: "v99", dest: "SW-MGMT-02", destPort: "2", ip: "10.10.99.23", label: "CBL-1017", media: "Cat6" },
   ]},
   "FW-EDGE-02": { type: "firewall", ports: 6, sfp: 0, rows: [
@@ -34,6 +37,44 @@ const DEFAULT_PORT_DATA = {
   "SRV-WEB-02": { type: "server", ports: 2, sfp: 0, rows: [
     { port: "eth0", vlan: "v10", dest: "SW-ACC-03", destPort: "6", ip: "10.10.4.22", label: "CBL-1050", media: "Cat6A" },
     { port: "eth1 (mgmt)", vlan: "v99", dest: "SW-ACC-03", destPort: "7", ip: "10.10.99.22", label: "CBL-1051", media: "Cat6" },
+  ]},
+  "SVR1U": { type: "server", ports: 2, sfp: 0, rows: [
+    { port: "eth0", vlan: "v10", dest: "SW-ACC-03", destPort: "8", ip: "10.10.4.19", label: "CBL-1063", media: "Cat6A" },
+    { port: "eth1 (mgmt)", vlan: "v99", dest: "SW-ACC-03", destPort: "9", ip: "10.10.99.19", label: "CBL-1064", media: "Cat6" },
+  ]},
+  "SRV-BKP-01": { type: "server", ports: 2, sfp: 0, rows: [
+    { port: "eth0", vlan: "v30", dest: "SW-BACKUP-02", destPort: "1", ip: "10.10.4.31", label: "CBL-1065", media: "Cat6A" },
+    { port: "eth1 (mgmt)", vlan: "v99", dest: "SW-MGMT-02", destPort: "5", ip: "10.10.99.31", label: "CBL-1066", media: "Cat6" },
+  ]},
+  "SRV-NAS-01": { type: "server", ports: 2, sfp: 0, rows: [
+    { port: "eth0", vlan: "v30", dest: "SW-BACKUP-02", destPort: "2", ip: "10.10.4.40", label: "CBL-1090", media: "Cat6A" },
+    { port: "eth1 (mgmt)", vlan: "v99", dest: "SW-MGMT-02", destPort: "6", ip: "10.10.99.40", label: "CBL-1091", media: "Cat6" },
+  ]},
+  "SRV-NAS-02": { type: "server", ports: 2, sfp: 0, rows: [
+    { port: "eth0", vlan: "v30", dest: "SW-BACKUP-02", destPort: "3", ip: "10.10.4.41", label: "CBL-1092", media: "Cat6A" },
+    { port: "eth1 (mgmt)", vlan: "v99", dest: "SW-MGMT-02", destPort: "7", ip: "10.10.99.41", label: "CBL-1093", media: "Cat6" },
+  ]},
+  "SRV-BACKUP-01": { type: "server", ports: 2, sfp: 0, rows: [
+    { port: "eth0", vlan: "v30", dest: "SW-BACKUP-02", destPort: "4", ip: "10.10.4.50", label: "CBL-1094", media: "Cat6A" },
+    { port: "eth1 (mgmt)", vlan: "v99", dest: "SW-MGMT-02", destPort: "8", ip: "10.10.99.50", label: "CBL-1095", media: "Cat6" },
+  ]},
+  "SW-MGMT-02": { type: "switch", ports: 24, sfp: 2, rows: [
+    { port: 1, vlan: "v99", dest: "SW-CORE-01", destPort: "MGMT", ip: "10.10.99.1", label: "CBL-1080", media: "Cat6" },
+    { port: 2, vlan: "v99", dest: "SW-ACC-03", destPort: "MGMT", ip: "10.10.99.23", label: "CBL-1081", media: "Cat6" },
+    { port: 3, vlan: "v99", dest: "FW-EDGE-02", destPort: "MGMT", ip: "10.10.99.254", label: "CBL-1082", media: "Cat6" },
+    { port: 4, vlan: "v99", dest: "SW-BACKUP-02", destPort: "MGMT", ip: "10.10.99.25", label: "CBL-1083", media: "Cat6" },
+    { port: 5, vlan: "v99", dest: "SRV-BKP-01", destPort: "eth1 (mgmt)", ip: "10.10.99.31", label: "CBL-1084", media: "Cat6" },
+    { port: 6, vlan: "v99", dest: "SRV-NAS-01", destPort: "eth1 (mgmt)", ip: "10.10.99.40", label: "CBL-1085", media: "Cat6" },
+    { port: 7, vlan: "v99", dest: "SRV-NAS-02", destPort: "eth1 (mgmt)", ip: "10.10.99.41", label: "CBL-1086", media: "Cat6" },
+    { port: 8, vlan: "v99", dest: "SRV-BACKUP-01", destPort: "eth1 (mgmt)", ip: "10.10.99.50", label: "CBL-1087", media: "Cat6" },
+  ]},
+  "SW-BACKUP-02": { type: "switch", ports: 24, sfp: 2, rows: [
+    { port: 1, vlan: "v30", dest: "SRV-BKP-01", destPort: "eth0", ip: "10.10.4.31", label: "CBL-1070", media: "Cat6A" },
+    { port: 2, vlan: "v30", dest: "SRV-NAS-01", destPort: "eth0", ip: "10.10.4.40", label: "CBL-1071", media: "Cat6A" },
+    { port: 3, vlan: "v30", dest: "SRV-NAS-02", destPort: "eth0", ip: "10.10.4.41", label: "CBL-1072", media: "Cat6A" },
+    { port: 4, vlan: "v30", dest: "SRV-BACKUP-01", destPort: "eth0", ip: "10.10.4.50", label: "CBL-1073", media: "Cat6A" },
+    { port: 5, vlan: "v30", dest: "SW-ACC-03", destPort: "12", ip: "10.10.0.23", label: "CBL-1074", media: "LC MM" },
+    { port: "MGMT", vlan: "v99", dest: "SW-MGMT-02", destPort: "4", ip: "10.10.99.25", label: "CBL-1075", media: "Cat6" },
   ]},
   "PDU-A": { type: "pdu", ports: 1, sfp: 0, rows: [
     { port: "MGMT", vlan: "v99", dest: "SW-ACC-03", destPort: "15", ip: "10.10.9.1", label: "CBL-2015", media: "Cat6" },
@@ -389,11 +430,17 @@ const DEFAULT_POWER_DATA = {
     { outlet: 4, device: "FW-EDGE-02", psu: "Single PSU", watt: 65, label: "CBL-2004" },
     { outlet: 5, device: "SRV-WEB-02", psu: "PSU-A", watt: 205, label: "CBL-2005" },
     { outlet: 6, device: "SW-ACC-03", psu: "Single PSU", watt: 80, label: "CBL-2006" },
+    { outlet: 7, device: "SVR1U", psu: "PSU-A", watt: 145, label: "CBL-2020" },
+    { outlet: 8, device: "SRV-BKP-01", psu: "PSU-A", watt: 270, label: "CBL-2021" },
+    { outlet: 9, device: "SRV-TWR-01", psu: "Single PSU", watt: 120, label: "CBL-2022" },
   ]},
   "PDU-B": { ports: 24, rows: [
     { outlet: 1, device: "SRV-APP-04", psu: "PSU-B", watt: 240, label: "CBL-2010" },
     { outlet: 2, device: "SRV-DB-17", psu: "PSU-B", watt: 260, label: "CBL-2011" },
     { outlet: 3, device: "SRV-WEB-02", psu: "PSU-B", watt: 205, label: "CBL-2012" },
+    { outlet: 4, device: "SVR1U", psu: "PSU-B", watt: 145, label: "CBL-2023" },
+    { outlet: 5, device: "SRV-BKP-01", psu: "PSU-B", watt: 270, label: "CBL-2024" },
+    { outlet: 6, device: "SRV-TWR-02", psu: "Single PSU", watt: 70, label: "CBL-2025" },
   ]},
 };
 
@@ -695,6 +742,24 @@ function setDevicePsuCount(deviceKey, count) {
     : null;
   if (srv && typeof updateServer === "function") {
     updateServer(srv.id, { ...srv, psuCount: String(v) });
+  }
+  if (typeof readLocalSwitches === "function") {
+    const list = readLocalSwitches();
+    const sw = list.find(s => s.name === deviceKey);
+    if (sw) {
+      sw.psuCount = String(v);
+      if (typeof saveLocalSwitch === "function") saveLocalSwitch(sw);
+      if (typeof window.reloadAssetRow === "function") window.reloadAssetRow(deviceKey);
+    }
+  }
+  if (typeof readLocalAccessories === "function") {
+    const list = readLocalAccessories();
+    const acc = list.find(x => x.name === deviceKey);
+    if (acc) {
+      acc.psuCount = String(v);
+      if (typeof saveLocalAccessory === "function") saveLocalAccessory(acc);
+      if (typeof window.reloadAssetRow === "function") window.reloadAssetRow(deviceKey);
+    }
   }
   if (typeof window.reloadServerList === "function") window.reloadServerList();
   if (srv) {

@@ -1,0 +1,67 @@
+/* ============================================
+   RackView — Audit Log page
+   ============================================ */
+
+.al-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.al-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.al-pager button {
+  border: 1px solid var(--border);
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+}
+.al-pager button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent-text); }
+.al-pager button:disabled { opacity: .4; cursor: default; }
+.al-pager .al-pg-info { font-family: var(--font-mono); }
+.al-pager .al-pg-page { padding: 5px 9px; }
+
+/* badge aksi */
+.al-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.al-act i { font-size: 10px; }
+.al-act.auth  { background: var(--info-dim);    color: var(--info); }
+.al-act.user  { background: var(--violet-dim);  color: var(--violet); }
+.al-act.create{ background: var(--accent-dim);  color: var(--accent-text); }
+.al-act.update{ background: var(--warning-dim); color: var(--warning); }
+.al-act.delete{ background: var(--danger-dim);  color: var(--danger); }
+.al-act.ops   { background: var(--accent-dim);  color: var(--accent-text); }
+.al-act.transition { background: var(--info-dim); color: var(--info); }
+.al-act.asset { background: var(--bg-surface-3); color: var(--text-secondary); }
+.al-act.brand { background: var(--bg-surface-3); color: var(--text-secondary); }
+.al-act.misc  { background: var(--bg-surface-3); color: var(--text-muted); }
+
+.al-detail {
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  max-width: 340px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.al-arrow { color: var(--text-muted); font-size: 11px; }

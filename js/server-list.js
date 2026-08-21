@@ -50,9 +50,10 @@ function fmtHost(s) {
 }
 
 function fmtRack(s) {
+  const site = esc(s.siteName || s.site || "—");
   const r = s.rack && s.rack !== "-" ? s.rack : "—";
-  const u = s.posisiU && s.posisiU !== "-" ? s.posisiU : "—";
-  return `<div>${esc(r)}</div><div class="mono" style="font-size:11px;">${esc(u)}</div>`;
+  const u = s.posisiU && s.posisiU !== "-" ? s.posisiU : "";
+  return `<div>${site}</div><div class="mono" style="font-size:11px;">${esc(r)}${u ? " (" + esc(u) + ")" : ""}</div>`;
 }
 
 function matchFilters(s) {
@@ -144,7 +145,7 @@ function renderRows() {
     : "Menampilkan 0 server";
   renderPagination(list.length);
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:28px;">Tidak ada server yang cocok dengan filter.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);padding:28px;">Tidak ada server yang cocok dengan filter.</td></tr>`;
     return;
   }
   tbody.innerHTML = pageList.map(s => {
@@ -159,50 +160,141 @@ function renderRows() {
       <td>${fmtRack(s)}</td>
       <td>${esc(s.hypervisor || s.os || "—")}</td>
       <td><span class="badge ${condClass(s.kondisi)}"><span class="bdot"></span>${esc(s.kondisi)}</span></td>
-      <td>
-        <div class="row-actions">
-          <button type="button" class="row-action" title="Buka Power Map" data-srv-power><i class="fa-solid fa-plug"></i></button>
-          <button type="button" class="row-action" title="Lihat ringkasan" data-srv-view><i class="fa-solid fa-eye"></i></button>
-          <button type="button" class="row-action" title="Edit server" data-srv-edit><i class="fa-solid fa-pen"></i></button>
-        </div>
-      </td>
     </tr>`;
   }).join("");
   tbody.querySelectorAll("tr").forEach(tr => {
     tr.addEventListener("click", (e) => {
-      if (e.target.closest("[data-srv-view]") || e.target.closest("[data-srv-edit]") || e.target.closest("[data-srv-power]")) return;
+      if (e.target.closest("button, a")) return;
       selectedId = tr.dataset.id;
       tbody.querySelectorAll("tr").forEach(r => r.classList.toggle("row-selected", r === tr));
       renderDetail(servers.find(s => s.id === selectedId));
+      updateSrvCtxBar();
+    });
+    tr.addEventListener("dblclick", (e) => {
+      if (e.target.closest("button, a")) return;
+      gotoRackLocation(tr.dataset.id);
     });
   });
-  tbody.querySelectorAll("[data-srv-power]").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const s = servers.find(x => x.id === btn.closest("tr").dataset.id);
-      if (!s) return;
-      const key = s.hostname || s.id || "";
-      if (!key) return;
-      if (typeof openPowerMap === "function") {
-        openPowerMap(key, false, parseInt(s.psuCount, 10) || 2);
-      } else {
-        window.open("power-map.html?device=" + encodeURIComponent(key), "_blank", "noopener");
+  updateSrvCtxBar();
+}
+
+function buildSrvCtxBarHTML(s) {
+  const name = esc(s.hostname || s.id || "");
+  const key = String(s.hostname || s.id || "").replace(/'/g, "");
+  const form = String(s.formFactor || "").replace(/'/g, "");
+  const psu = Math.max(1, parseInt(s.psuCount, 10) || 2);
+  const rack = s.rack && s.rack !== "-" ? s.rack : "";
+  const loc = rack
+    ? `<button type="button" class="ctx-btn" title="Lokasi di Rack Elevation" data-ctx-act="loc"><i class="fa-solid fa-location-dot"></i> Lokasi</button>`
+    : `<button type="button" class="ctx-btn" title="Server belum ditempatkan di rack" data-ctx-act="loc" disabled><i class="fa-solid fa-location-dot"></i> Lokasi</button>`;
+  return `<div class="ctx-bar-info"><i class="fa-solid fa-caret-right"></i> <b>${name}</b></div>
+    <div class="ctx-bar-actions">
+      <button type="button" class="ctx-btn" title="Lihat ringkasan" data-ctx-act="view"><i class="fa-solid fa-eye"></i> Lihat</button>
+      <button type="button" class="ctx-btn" title="Edit server" data-ctx-act="edit"><i class="fa-solid fa-pen"></i> Edit</button>
+      <button type="button" class="ctx-btn" title="Buka Port Map" data-ctx-act="port"><i class="fa-solid fa-ethernet"></i> Port Map</button>
+      <button type="button" class="ctx-btn" title="Buka Power Map" data-ctx-act="power"><i class="fa-solid fa-plug"></i> Power Map</button>
+      ${loc}
+      <button type="button" class="ctx-btn danger" title="Hapus server" data-ctx-act="delete"><i class="fa-solid fa-trash"></i> Hapus</button>
+      <button type="button" class="ctx-btn" title="Tutup" data-ctx-act="close"><i class="fa-solid fa-xmark"></i></button>
+    </div>`;
+}
+
+function updateSrvCtxBar() {
+  const bar = document.getElementById("srv-ctx-bar");
+  if (!bar) return;
+  const s = servers.find(x => x.id === selectedId);
+  if (!s) { bar.hidden = true; return; }
+  bar.hidden = false;
+  bar.innerHTML = buildSrvCtxBarHTML(s);
+  const key = String(s.hostname || s.id || "").replace(/'/g, "");
+  const form = String(s.formFactor || "").replace(/'/g, "");
+  const psu = Math.max(1, parseInt(s.psuCount, 10) || 2);
+  bar.onclick = (e) => {
+    const actBtn = e.target.closest("[data-ctx-act]");
+    if (!actBtn) return;
+    const act = actBtn.dataset.ctxAct;
+    if (act === "close") { selectedId = null; renderDetail(null); renderRows(); return; }
+    if (act === "view") { if (typeof openSrvView === "function") openSrvView(s); return; }
+    if (act === "edit") {
+      if (typeof window.openServerEdit === "function") window.openServerEdit(s.id);
+      else window.location.href = "server-form.html?edit=" + encodeURIComponent(s.id);
+      return;
+    }
+    if (act === "port") {
+      if (typeof openPortMap === "function") openPortMap(key, false, 0, { type: "server", formFactor: form });
+      else window.open("port-map.html?device=" + encodeURIComponent(key), "_blank", "noopener");
+      return;
+    }
+    if (act === "power") {
+      if (typeof openPowerMap === "function") openPowerMap(key, false, psu);
+      else window.open("power-map.html?device=" + encodeURIComponent(key), "_blank", "noopener");
+      return;
+    }
+    if (act === "loc") { gotoRackLocation(s.id); return; }
+    if (act === "delete") { deleteServerRecord(s.id); return; }
+  };
+}
+
+function postAudit(action, target, detail) {
+  try {
+    const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+    fetch(base + "/audit/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, target, detail })
+    });
+  } catch (e) { /* abaikan */ }
+}
+
+function gotoRackLocation(id) {
+  const s = servers.find(x => x.id === id);
+  if (!s) return;
+  const name = s.hostname || s.id || "";
+  const rack = s.rack && s.rack !== "-" ? s.rack : "";
+  if (!rack) {
+    if (typeof showToast === "function") showToast("Server " + name + " belum ditempatkan di rack.", "warn");
+    else alert("Server " + name + " belum ditempatkan di rack.");
+    return;
+  }
+  const params = new URLSearchParams({ rack });
+  if (name) params.set("device", name);
+  window.location.href = "rack-elevation.html?" + params.toString();
+}
+
+function deleteServerRecord(id) {
+  const s = servers.find(x => x.id === id);
+  const name = (s && (s.hostname || s.id)) || id;
+  const doubleOk = typeof window.confirmDoubleDelete === "function"
+    ? window.confirmDoubleDelete(name)
+    : (confirm("Hapus " + name + "?") && confirm("Yakin ingin menghapus permanen? Data yang dihapus tidak dapat dikembalikan."));
+  if (!doubleOk) return;
+  try {
+    localStorage.setItem(SERVER_STORAGE_KEY, JSON.stringify(readLocalServers().filter(x => x.id !== id)));
+  } catch (e) { /* abaikan */ }
+  try {
+    const del = getDeletedServerIds();
+    if (id && !del.includes(id)) {
+      del.push(id);
+      localStorage.setItem(DELETED_SERVERS_KEY, JSON.stringify(del));
+    }
+  } catch (e) { /* abaikan */ }
+  if (name && typeof apiDeleteDevice === "function") apiDeleteDevice(name);
+  [PORT_STORAGE_KEY, POWER_STORAGE_KEY].forEach(k => {
+    try {
+      const obj = JSON.parse(localStorage.getItem(k) || "{}") || {};
+      if (obj && Object.prototype.hasOwnProperty.call(obj, name)) {
+        delete obj[name];
+        localStorage.setItem(k, JSON.stringify(obj));
       }
-    });
+    } catch (e) { /* abaikan */ }
   });
-  tbody.querySelectorAll("[data-srv-view]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const s = servers.find(x => x.id === btn.closest("tr").dataset.id);
-      if (s) openSrvView(s);
-    });
-  });
-  tbody.querySelectorAll("[data-srv-edit]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      if (typeof window.openServerEdit === "function") window.openServerEdit(btn.closest("tr").dataset.id);
-      else window.location.href = "server-form.html?edit=" + encodeURIComponent(btn.closest("tr").dataset.id);
-    });
-  });
+  if (typeof PORT_DATA !== "undefined") delete PORT_DATA[name];
+  if (typeof POWER_DATA !== "undefined") delete POWER_DATA[name];
+  if (typeof apiDeleteMap === "function") { apiDeleteMap("port", name); apiDeleteMap("power", name); }
+  postAudit("server.delete", name, "Dihapus dari List Server (double confirmation)");
+  if (typeof showToast === "function") showToast("Server " + name + " berhasil dihapus.", "success");
+  if (selectedId === id) { selectedId = null; renderDetail(null); }
+  window.reloadServerList();
 }
 
 function openSrvView(s) {
@@ -230,6 +322,7 @@ window.reloadServerList = function () {
   }
   render();
 };
+window.deleteServerRecord = deleteServerRecord;
 
 function closeSrvView() {
   const overlay = document.getElementById("srv-view-overlay");

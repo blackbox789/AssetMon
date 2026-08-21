@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Log</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/theme.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/ops.css">
+<link rel="stylesheet" href="css/audit-log.css">
+</head>
+<body>
+<div class="app-shell" id="app-shell">
+<aside class="sidebar" id="sidebar">
+  <div class="brand" id="brand-header">
+    <div class="brand-mark" data-brand-logo-small>RV</div>
+    <div class="brand-text" style="flex:1;min-width:0;">
+      <div class="brand-name" data-brand-name>RackView</div>
+      <div class="brand-sub" data-brand-tagline>Datacenter Asset Mgmt</div>
+    </div>
+    <button class="sidebar-collapse-btn" id="collapse-btn" aria-label="Collapse sidebar"><i class="fa-solid fa-angles-left"></i></button>
+  </div>
+  <nav class="nav">
+    <div class="nav-group">
+      <div class="nav-label">Overview</div>
+      <a href="dashboard.html" class="nav-item"><i class="fa-solid fa-gauge-high"></i><span>Dashboard</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Inventory</div>
+      <a href="sites.html" class="nav-item"><i class="fa-solid fa-map-location-dot"></i><span>Sites</span></a>
+      <a href="rack-elevation.html" class="nav-item"><i class="fa-solid fa-server"></i><span>Rack Elevation</span></a>
+      <a href="network-topology.html" class="nav-item"><i class="fa-solid fa-diagram-project"></i><span>Network Topology</span></a>
+      <a href="port-map.html" class="nav-item"><i class="fa-solid fa-ethernet"></i><span>Port Map</span></a>
+      <a href="power-map.html" class="nav-item"><i class="fa-solid fa-plug"></i><span>Power Map</span></a>
+      <a href="asset-list.html" class="nav-item nav-parent open" data-submenu="submenu-asset"><i class="fa-solid fa-list-ul"></i><span>Asset List</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+      <div class="nav-submenu open" id="submenu-asset">
+        <a href="server-list.html" class="nav-subitem" data-type="server"><i class="fa-solid fa-database"></i><span>Server</span></a>
+        <a href="storage-list.html" class="nav-subitem" data-type="storage"><i class="fa-solid fa-hard-drive"></i><span>Storage</span></a>
+        <a href="asset-list.html" class="nav-subitem nav-parent2 open" data-submenu2="submenu-asset-net"><i class="fa-solid fa-network-wired"></i><span>Network Device</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+        <div class="nav-submenu2 open" id="submenu-asset-net">
+          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Switch</span></a>
+          <a href="firewall-list.html" class="nav-subitem2" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
+          <a href="router-list.html" class="nav-subitem2" data-type="router"><i class="fa-solid fa-tower-broadcast"></i><span>Router</span></a>
+        </div>
+        <a href="ups-list.html" class="nav-subitem" data-type="ups"><i class="fa-solid fa-plug-circle-bolt"></i><span>UPS</span></a>
+        <a href="accessories-list.html" class="nav-subitem" data-type="accessories"><i class="fa-solid fa-sliders"></i><span>Accessories</span></a>
+        <a href="pdu-list.html" class="nav-subitem"><i class="fa-solid fa-bolt"></i><span>PDU</span></a>
+        <a href="cable-registry.html" class="nav-subitem"><i class="fa-solid fa-tag"></i><span>Cable Registry</span></a>
+      </div>
+      <a href="#" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Discovery Center</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Operasional</div>
+      <a href="kunjungan-site.html" class="nav-item"><i class="fa-solid fa-user-clock"></i><span>Kunjungan Site</span></a>
+      <a href="incident-report.html" class="nav-item"><i class="fa-solid fa-triangle-exclamation"></i><span>Incident Report</span></a>
+      <a href="maintenance.html" class="nav-item"><i class="fa-solid fa-screwdriver-wrench"></i><span>Maintenance</span></a>
+    </div>
+    <div class="nav-group">
+      <div class="nav-label">Admin</div>
+      <a href="user-management.html" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>User Management</span></a>
+      <a href="audit-log.html" class="nav-item active"><i class="fa-solid fa-file-lines"></i><span>Audit Log</span></a>
+      <a href="reports.html" class="nav-item nav-parent open" data-submenu="submenu-reports"><i class="fa-solid fa-chart-column"></i><span>Reports</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+      <div class="nav-submenu open" id="submenu-reports">
+        <a href="capacity-matrix.html" class="nav-subitem"><i class="fa-solid fa-th-large"></i><span>Capacity Matrix</span></a>
+        <a href="capacity-plan.html" class="nav-subitem"><i class="fa-solid fa-chart-line"></i><span>Capacity Plan</span></a>
+      </div>
+      <a href="branding-admin.html" class="nav-item"><i class="fa-solid fa-palette"></i><span>Settings → Branding</span></a>
+    </div>
+  </nav>
+  <div class="sidebar-foot">
+    <span class="agent-dot"></span>
+    <span class="sidebar-foot-text" id="sidebar-user">Semua sistem <b>online</b></span>
+  </div>
+</aside>
+<div class="main">
+  <div class="topbar">
+    <div>
+      <h1>Audit Log</h1>
+      <div class="topbar-sub">Jejak aktivitas sistem — login, perubahan data, dan transisi status</div>
+    </div>
+    <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Cari user, target, atau aksi…" id="al-search"></div>
+    <div class="topbar-actions">
+      <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle theme">
+        <i class="fa-solid fa-sun icon-sun-only"></i><i class="fa-solid fa-moon icon-moon-only"></i>
+      </button>
+      <div class="icon-btn"><i class="fa-solid fa-bell"></i><span class="dot"></span></div>
+      <div class="user-chip" id="topbar-user-chip">
+        <div class="avatar" id="topbar-avatar">JS</div>
+        <div class="user-meta"><div style="font-weight:600;color:var(--text-primary);" id="topbar-username">Joko S.</div><div class="role" id="topbar-role">NOC Supervisor</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="content">
+
+    <div class="grid grid-4" id="al-kpi"></div>
+
+    <div class="card" style="margin-top:16px;">
+      <div class="card-head">
+        <div><div class="card-title">Riwayat Aktivitas</div><div class="card-title-sub" id="al-count">Memuat…</div></div>
+        <div class="al-filters">
+          <select class="form-input" style="width:auto;" id="al-cat">
+            <option value="">Semua Kategori</option>
+            <option value="auth">Auth / Login</option>
+            <option value="user">User</option>
+            <option value="ops">Operasional (Visits/Incident/Maintenance)</option>
+            <option value="asset">Asset (Device/Rack/Site)</option>
+            <option value="brand">Branding</option>
+          </select>
+          <select class="form-input" style="width:auto;" id="al-action">
+            <option value="">Semua Aksi</option>
+          </select>
+          <input type="date" class="form-input" style="width:auto;" id="al-from" title="Dari tanggal">
+          <input type="date" class="form-input" style="width:auto;" id="al-to" title="Sampai tanggal">
+          <button class="btn ghost" id="al-reset" title="Reset filter"><i class="fa-solid fa-rotate-left"></i></button>
+          <button class="btn ghost" id="al-export" title="Export CSV"><i class="fa-solid fa-file-csv"></i>Export</button>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table id="al-table">
+          <thead><tr><th>Waktu</th><th>User</th><th>Aksi</th><th>Target</th><th>Detail</th><th>IP</th></tr></thead>
+          <tbody id="al-tbody"><tr><td colspan="6" style="color:var(--text-muted);padding:16px;">Memuat…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="al-pager" id="al-pager"></div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<script src="js/brand.js"></script>
+<script src="js/app.js"></script>
+<script src="js/auth.js"></script>
+<script>if(typeof authGuard==="function") authGuard();</script>
+<script src="js/audit-log.js"></script>
+</body>
+</html>

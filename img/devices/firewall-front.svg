@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 24">
+  <rect width="100" height="24" rx="2" fill="#2e2510"/>
+  <rect x="1" y="1" width="98" height="22" rx="1.5" fill="#3a2f16" stroke="#6b571f"/>
+  <rect x="5" y="5" width="20" height="14" rx="1" fill="#221b0c"/>
+  <rect x="29" y="8" width="8" height="3" fill="#FFB020" opacity=".9"/>
+  <rect x="41" y="8" width="8" height="3" fill="#FF5C6C" opacity=".9"/>
+  <rect x="53" y="8" width="8" height="3" fill="#31D8A4" opacity=".9"/>
+  <rect x="65" y="5" width="30" height="14" rx="1" fill="#221b0c"/>
+  <text x="5" y="22" font-family="Consolas, monospace" font-size="4.5" fill="#c8a86a">FIREWALL</text>
+</svg>

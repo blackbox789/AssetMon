@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 100">
+  <rect width="60" height="100" rx="3" fill="#2b2730"/>
+  <rect x="3" y="3" width="54" height="94" rx="2" fill="#332d39" stroke="#4a4352"/>
+  <rect x="12" y="10" width="36" height="8" rx="1.5" fill="#161a22"/>
+  <circle cx="18" cy="26" r="2.5" fill="#31D8A4"/>
+  <rect x="12" y="40" width="36" height="16" rx="1" fill="#221f28"/>
+  <rect x="12" y="60" width="36" height="16" rx="1" fill="#221f28"/>
+  <rect x="12" y="80" width="36" height="8" rx="1" fill="#161a22"/>
+  <text x="12" y="36" font-family="Consolas, monospace" font-size="5" fill="#8D95AC">TOWER</text>
+</svg>

@@ -8,6 +8,10 @@
 
 (function () {
   const modal = document.getElementById("rack-modal");
+
+  function escapeAttr(s) {
+    return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
   const addBtn = document.getElementById("add-rack-btn");
   const siteSel = document.getElementById("rack-site");
   const newSiteInput = document.getElementById("rack-site-new");
@@ -23,9 +27,61 @@
   const SITE_META = {
     DC1: { badge: "completed", badgeText: "Operational", power: "Normal", powerColor: "var(--accent-text)", uptime: "99.98", util: 84, fillClass: "", alert: "" },
     DC2: { badge: "completed", badgeText: "Operational", power: "Normal", powerColor: "var(--accent-text)", uptime: "99.99", util: 71, fillClass: "", alert: "" },
-    DC3: { badge: "maintenance", badgeText: "Maintenance", power: "Terjadwal", powerColor: "var(--warning)", uptime: "99.91", util: 45, fillClass: "", alert: '<i class="fa-solid fa-screwdriver-wrench"></i>1 rack sedang maintenance terjadwal hingga 06 Agu', alertStyle: "" },
+    DC3: { badge: "completed", badgeText: "Operational", power: "Normal", powerColor: "var(--accent-text)", uptime: "99.91", util: 45, fillClass: "" },
     DC4: { badge: "error", badgeText: "Degraded", power: "Warning", powerColor: "var(--danger)", uptime: "99.62", util: 92, fillClass: "crit", alert: '<i class="fa-solid fa-bolt"></i>Beban power mendekati kapasitas maksimum — perlu penambahan PDU', alertStyle: "color:var(--danger);background:var(--danger-dim);" },
   };
+
+  // ---- Alert maintenance: RECORD modul Maintenance (OPS) + fallback status RACKS ----
+  // Rendering pertama memakai status rack (sinkron). Setelah data OPS dimuat,
+  // refreshMaintenanceAlerts() memperbarui alert dari record Maintenance sungguhan
+  // (no MT, periode, rack) supaya selaras dengan jadwal di modul Maintenance.
+  function maintenanceAlert(siteId) {
+    const maintRacks = RACKS.filter(r => (r.site === siteId || String(r.siteName || "").toLowerCase().indexOf(String(siteId).toLowerCase()) >= 0) && r.status === "maintenance");
+    if (!maintRacks.length) return "";
+    const list = maintRacks.map(r => '<a class="site-alert-link" href="rack-elevation.html?rack=' + encodeURIComponent(r.rackId) + '">' + r.rackId + '</a>').join(", ");
+    const n = maintRacks.length;
+    return '<i class="fa-solid fa-screwdriver-wrench"></i>' + n + " rack sedang maintenance terjadwal — <b>" + list + "</b><div class=\"site-alert-sub\">Maintenance berlangsung; hindari penambahan perangkat hingga selesai.</div>";
+  }
+
+  async function refreshMaintenanceAlerts() {
+    if (!window.RackOps) return;
+    try {
+      const activeRacks = await RackOps.activeRacks();
+      const sites = getSiteList();
+      for (const site of sites) {
+        const el = document.querySelector('[data-site-alert="' + site.id + '"]');
+        if (!el) continue;
+        const racksHere = RACKS.filter(r => r.site === site.id || String(r.siteName || "").toLowerCase() === String(site.name).toLowerCase());
+        const matches = racksHere.map(r => r.rackId).filter(id => activeRacks[id]);
+        if (matches.length) {
+          const n = matches.length;
+          const links = matches.map(id => {
+            const rec = activeRacks[id].first;
+            const no = rec && rec.no ? ' · <a class="site-alert-link" href="maintenance.html?q=' + encodeURIComponent(rec.no) + '">' + rec.no + '</a>' : "";
+            const when = rec && rec.scheduled_at ? ' · ' + (rec.scheduled_at || "").slice(0, 10) : "";
+            return '<a class="site-alert-link" href="rack-elevation.html?rack=' + encodeURIComponent(id) + '">' + id + '</a>' + no + when;
+          });
+          const maintHtml = '<i class="fa-solid fa-screwdriver-wrench"></i>' + n + " maintenance aktif terjadwal — <b>" + links.join("</b> & <b>") + "</b><div class=\"site-alert-sub\">Lihat modul Maintenance untuk detail jadwal &amp; progress.</div>";
+          const metaHtml = el.dataset.metaAlert ? '<div class="site-alert-sub" style="margin-top:6px;">' + el.dataset.metaAlert + '</div>' : "";
+          el.className = "site-alert";
+          el.style.cssText = el.dataset.metaStyle || "";
+          el.innerHTML = maintHtml + metaHtml;
+        } else if (el.dataset.rackFallback) {
+          // Tidak ada record aktif dari modul — fallback ke status rack (RACKS).
+          el.className = "site-alert";
+          el.style.cssText = el.dataset.metaStyle || "";
+          el.innerHTML = el.dataset.rackFallback + (el.dataset.metaAlert ? '<div class="site-alert-sub" style="margin-top:6px;">' + el.dataset.metaAlert + '</div>' : "");
+        } else if (el.dataset.metaAlert) {
+          // Alert tetap (mis. DC4 power warning) — tampilkan kembali bila terhidden.
+          el.className = "site-alert";
+          el.style.cssText = el.dataset.metaStyle || "";
+          el.innerHTML = el.dataset.metaAlert;
+        } else {
+          el.style.display = "none";
+        }
+      }
+    } catch (e) {}
+  }
 
   function getSiteList() {
     const list = RACK_SITES.map(s => ({ id: s.id, name: s.name, loc: s.loc, zone: s.zone, custom: false }));
@@ -62,7 +118,13 @@
       const uptime = meta ? meta.uptime : "—";
       const util = meta ? meta.util : 0;
       const fillClass = meta ? meta.fillClass : "";
-      const alert = meta && meta.alert ? `<div class="site-alert"${meta.alertStyle ? ' style="' + meta.alertStyle + '"' : ""}>${meta.alert}</div>` : "";
+      const maintAlert = maintenanceAlert(site.id);
+      const metaAlert = meta && meta.alert ? meta.alert : "";
+      const metaStyle = meta && meta.alert ? (meta.alertStyle || "") : "";
+      let alertStyle = "";
+      if (!maintAlert && !metaAlert) alertStyle = "display:none;";
+      else if (!maintAlert && metaStyle) alertStyle = metaStyle;
+      const alertHtml = `<div class="site-alert" data-site-alert="${site.id}" data-rack-fallback="${escapeAttr(maintAlert || "")}" data-meta-alert="${escapeAttr(metaAlert || "")}" data-meta-style="${escapeAttr(metaStyle || "")}"${alertStyle ? ' style="' + alertStyle + '"' : ""}>${maintAlert || metaAlert}</div>`;
       return `
       <div class="card site-card" data-site="${site.id}">
         <div class="site-card-head">
@@ -81,12 +143,13 @@
           <div class="site-stat"><div class="k">Uptime</div><div class="v" style="font-size:13.5px;">${uptime}</div></div>
         </div>
         <div class="util-row"><span style="font-size:11.5px;color:var(--text-muted);width:64px;">Utilisasi</span><div class="util-bar"><div class="util-fill ${fillClass}" style="width:${util}%"></div></div><span class="util-pct">${util}%</span></div>
-        ${alert}
+        ${alertHtml}
         <div class="site-card-foot"><button class="btn ghost" onclick="location.href='${assetUrl}'"><i class="fa-solid fa-list-ul"></i>Lihat Asset</button><button class="btn ghost" onclick="location.href='${racksUrl}'"><i class="fa-solid fa-server"></i>Lihat Rack</button></div>
       </div>`;
     }).join("");
   }
   renderSiteCards();
+  refreshMaintenanceAlerts();
 
   RACK_HEIGHTS.forEach(u => {
     const opt = document.createElement("option");
@@ -198,6 +261,7 @@
     if (deleteRack(rack.rackId)) {
       populateSiteSelect();
       renderSiteCards();
+      refreshMaintenanceAlerts();
       toast('<i class="fa-solid fa-circle-check"></i> Site ' + site.name + ' beserta rack ' + rack.rackId + ' berhasil dihapus.');
     } else {
       toast('<i class="fa-solid fa-triangle-exclamation"></i> Gagal menghapus — coba lagi.', true);
@@ -238,10 +302,14 @@
         flash('<i class="fa-solid fa-triangle-exclamation"></i> Nama site baru wajib diisi.', true);
         return;
       }
+      // Site baru didaftarkan ke master sites (site.id = masterKey) supaya
+      // otomatis muncul di picklist OPS & referensi rack, bukan hanya hardcode
+      // di halaman ini. Gagal (offline) tidak fatal — tetap lanjut.
       siteId = text;
       siteName = text;
       siteLoc = text;
       siteZone = (zoneInput.value || "Zona A").trim();
+      if (typeof apiSaveSite === "function") apiSaveSite({ id: siteId, name: siteName, loc: siteLoc, zone: siteZone });
     } else {
       const known = RACK_SITES.find(s => s.id === val);
       if (known) {

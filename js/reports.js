@@ -7,6 +7,11 @@
    ============================================ */
 
 (function () {
+  if (!authGuard()) {
+    document.body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">Akses ditolak. <a href="login.html">Login</a></div>';
+    return;
+  }
+
   const repSite = document.getElementById("rep-site");
   const repPeriod = document.getElementById("rep-period");
   const exportBtn = document.getElementById("export-btn");
@@ -280,28 +285,61 @@
   }
 
   // ================= Operasional =================
-  const ACTIVITIES = [
-    { days: 0, text: 'Asset "SRV-DB-17" ditambahkan ke Rack R2-B03', actor: "Joko S.", tag: "add" },
-    { days: 0, text: "Rack R1-A08 mendekati batas power (84%)", actor: "Sistem", tag: "warn" },
-    { days: 1, text: "PDU-DC4-E01 terdeteksi offline", actor: "Sistem", tag: "warn" },
-    { days: 2, text: "CBL-4011 dipasang FW-EDGE-04 → PDU-R2B-U01", actor: "Dewi L.", tag: "cable" },
-    { days: 3, text: "SW-ACC-04 dimasukkan jadwal maintenance", actor: "Andi P.", tag: "maint" },
-    { days: 5, text: "Sinkronisasi auto-discovery selesai (DC1, DC2)", actor: "Sistem", tag: "sync" },
-    { days: 8, text: "Rack R3-B07 dimasukkan ke DC3 — Surabaya", actor: "Joko S.", tag: "add" },
-    { days: 12, text: "Firmware SW-CORE-01 diperbarui ke 17.9.4", actor: "Dewi L.", tag: "fw" },
-    { days: 20, text: "Kabel CBL-2016 diganti (SRV-BACKUP-01 PSU-B)", actor: "Andi P.", tag: "cable" },
-    { days: 33, text: "Backup konfigurasi seluruh switch berhasil", actor: "Sistem", tag: "sync" },
-  ];
   const TAG_META = {
+    incident: ["Insiden", "var(--danger-dim, #fde8e8)", "var(--danger, #f4574d)"],
+    visit: ["Kunjungan", "var(--accent-dim, #e0e7ff)", "var(--accent, #4f8cff)"],
+    maintenance: ["Maintenance", "var(--violet-dim, #ede9fe)", "var(--violet, #7c3aed)"],
     add: ["Penambahan", "var(--accent-dim)", "var(--accent-text)"],
     warn: ["Peringatan", "var(--warning-dim)", "var(--warning)"],
     cable: ["Kabel", "var(--info-dim)", "var(--info)"],
-    maint: ["Maintenance", "var(--violet-dim)", "var(--violet)"],
     sync: ["Sistem", "var(--bg-surface-3)", "var(--text-muted)"],
     fw: ["Firmware", "var(--bg-surface-3)", "var(--text-muted)"],
   };
 
-  function renderOps() {
+  async function buildOpsActivities() {
+    const activities = [];
+    try {
+      if (typeof OPS !== "undefined" && OPS.load) {
+        const incidents = (await OPS.load("incidents")) || [];
+        incidents.forEach(r => {
+          const when = r.occurred_at || r.created_at || "";
+          const daysAgo = when ? Math.floor((Date.now() - new Date(when).getTime()) / 86400000) : 999;
+          activities.push({
+            days: Math.max(0, daysAgo),
+            text: (r.no || "") + " — " + (r.title || "Insiden"),
+            actor: r.assignee || r.created_by || "—",
+            tag: "incident",
+          });
+        });
+        const visits = (await OPS.load("visits")) || [];
+        visits.forEach(r => {
+          const when = r.tanggal || r.created_at || "";
+          const daysAgo = when ? Math.floor((Date.now() - new Date(when).getTime()) / 86400000) : 999;
+          activities.push({
+            days: Math.max(0, daysAgo),
+            text: (r.no || "") + " — " + (r.tujuan || "Kunjungan") + (r.site ? " @ " + r.site : ""),
+            actor: r.tim || r.created_by || "—",
+            tag: "visit",
+          });
+        });
+        const maintenance = (await OPS.load("maintenance")) || [];
+        maintenance.forEach(r => {
+          const when = r.scheduled_at || r.created_at || "";
+          const daysAgo = when ? Math.floor((Date.now() - new Date(when).getTime()) / 86400000) : 999;
+          activities.push({
+            days: Math.max(0, daysAgo),
+            text: (r.no || "") + " — " + (r.title || "Maintenance"),
+            actor: r.assignee || r.created_by || "—",
+            tag: "maintenance",
+          });
+        });
+      }
+    } catch (e) { /* OPS tidak tersedia, fallback kosong */ }
+    activities.sort((a, b) => a.days - b.days);
+    return activities;
+  }
+
+  async function renderOps() {
     const racks = filteredRacks();
     const degraded = racks.filter(r => r.status === "degraded").length;
     const maintenance = racks.filter(r => r.status === "maintenance").length;
@@ -348,11 +386,13 @@
     setTable("pdu-status-table", pduCols, pduRows);
     storeCsv("ops", "pdu-status", pduCols, pduRows);
 
+    // Dynamic OPS activities from visits/incidents/maintenance
+    const ACTIVITIES = await buildOpsActivities();
     const period = repPeriod.value;
     const actRows = ACTIVITIES.filter(a => period === "all" || a.days <= +period).map(a => {
       const meta = TAG_META[a.tag] || TAG_META.sync;
       return {
-        time: a.days === 0 ? "Hari ini" : fmt(a.days) + " hari lalu",
+        time: a.days === 0 ? "Hari ini" : a.days + " hari lalu",
         text: a.text,
         actor: a.actor,
         tagLabel: meta[0],
@@ -364,18 +404,18 @@
       col("Waktu", "time", v => `<span class="mono" style="font-size:12px;">${esc(v)}</span>`),
       col("Aktivitas", "text", v => `<div class="strong">${esc(v)}</div>`),
       col("Oleh", "actor", v => esc(v)),
-      col("Jenis", "tagLabel", v => `<span style="display:inline-block;background:${v === "Penambahan" ? "var(--accent-dim)" : v === "Peringatan" ? "var(--warning-dim)" : v === "Kabel" ? "var(--info-dim)" : v === "Maintenance" ? "var(--violet-dim)" : "var(--bg-surface-3)"};color:${v === "Penambahan" ? "var(--accent-text)" : v === "Peringatan" ? "var(--warning)" : v === "Kabel" ? "var(--info)" : v === "Maintenance" ? "var(--violet)" : "var(--text-muted)"};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;">${esc(v)}</span>`),
+      col("Jenis", "tagLabel", v => `<span style="display:inline-block;background:${esc(v === "Insiden" ? "var(--danger-dim, #fde8e8)" : v === "Kunjungan" ? "var(--accent-dim, #e0e7ff)" : v === "Maintenance" ? "var(--violet-dim, #ede9fe)" : "var(--bg-surface-3)")};color:${esc(v === "Insiden" ? "var(--danger, #f4574d)" : v === "Kunjungan" ? "var(--accent, #4f8cff)" : v === "Maintenance" ? "var(--violet, #7c3aed)" : "var(--text-muted)")};padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;">${esc(v)}</span>`),
     ];
     setTable("activity-table", actCols, actRows);
     storeCsv("ops", "aktivitas-terbaru", actCols, actRows);
   }
 
-  function renderAll() {
+  async function renderAll() {
     csvData.asset = []; csvData.capacity = []; csvData.network = []; csvData.ops = [];
     renderAsset();
     renderCapacity();
     renderNetwork();
-    renderOps();
+    await renderOps();
   }
 
   // ---- export CSV tab aktif ----
@@ -407,7 +447,7 @@
       activeTab = btn.dataset.tab;
     });
   });
-  repSite.addEventListener("change", renderAll);
+  repSite.addEventListener("change", () => { renderAll(); });
   repPeriod.addEventListener("change", () => { renderOps(); });
   exportBtn.addEventListener("click", exportActive);
 

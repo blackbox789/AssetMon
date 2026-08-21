@@ -1,0 +1,66 @@
+/* ============================================
+   RackView — Capacity Plan page
+   ============================================ */
+
+.cp-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.cp-slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+}
+.cp-slider-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.cp-slider input[type="range"] { width: 140px; accent-color: var(--accent); }
+.cp-slider-val {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent-dim);
+  padding: 3px 9px;
+  border-radius: 6px;
+  min-width: 72px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.cp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.cp-badge.good  { background: var(--accent-dim);    color: var(--accent-text); }
+.cp-badge.warn  { background: var(--warning-dim);   color: var(--warning); }
+.cp-badge.crit  { background: var(--danger-dim);    color: var(--danger); }
+.cp-badge.na    { background: var(--bg-surface-3);  color: var(--text-muted); }
+
+.cp-months {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.cp-months.warn { color: var(--warning); }
+.cp-months.crit { color: var(--danger); }
+.cp-months.ok   { color: var(--success, #3fca8c); }
+
+.cp-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}

@@ -159,6 +159,53 @@ function srvSummaryStorage(s) {
   return srvSummaryKvRow("Storage", `${srvSummaryEsc(bays)} bay · ${srvSummaryEsc(s.storageCap)} · ${srvSummaryEsc(iface)}`);
 }
 
+function srvSummaryNodeStorage(n) {
+  const slots = Array.isArray(n.storageSlots) && n.storageSlots.length ? n.storageSlots : null;
+  if (!slots) {
+    const bays = n.storageBays || "—";
+    const cap = n.storageCap || "";
+    return `${srvSummaryEsc(bays)} bay · ${srvSummaryEsc(cap)}${n.storageIface ? " · " + srvSummaryEsc(n.storageIface) : ""}`;
+  }
+  const counts = {};
+  slots.forEach(x => { const k = (x.type || "?") + (x.cap ? " " + x.cap : ""); counts[k] = (counts[k] || 0) + 1; });
+  const chips = Object.keys(counts).map(k =>
+    `<span class="tag-chip st-chip">${srvSummaryEsc(k)} <b>${srvSummaryEsc(counts[k])}</b></span>`).join("");
+  const capRes = srvSummaryUsable(slots);
+  const usb = capRes.usable
+    ? ` · usable <b>${srvSummaryFmtGB(capRes.usable)}</b>/${srvSummaryFmtGB(capRes.raw)}`
+    : "";
+  const stCounts = {};
+  slots.forEach(x => { const st = x.status; if (st) stCounts[st] = (stCounts[st] || 0) + 1; });
+  const stChips = Object.keys(stCounts).map(st =>
+    `<span class="tag-chip st-chip ${SRV_STATUS_CLS[st] || ""}">${srvSummaryEsc(SRV_DRIVE_STATUS[st] || st)} <b>${srvSummaryEsc(stCounts[st])}</b></span>`).join("");
+  return `<div class="srv-chips">${chips}${stChips}</div>${usb}`;
+}
+
+function srvSummaryNodeRaid(n) {
+  if (n.raid === "Ya") {
+    const types = Array.isArray(n.raidTypes) && n.raidTypes.length
+      ? `<span class="srv-chips">${n.raidTypes.map(t => `<span class="tag-chip st-chip">${srvSummaryEsc(t)}</span>`).join("")}</span>`
+      : "";
+    return `Ya${types}`;
+  }
+  return "Tidak";
+}
+
+function srvSummaryMapActions(s) {
+  const rawKey = s.hostname || s.id || "";
+  if (!rawKey) return "";
+  const key = String(rawKey).replace(/'/g, "");
+  const form = String(s.formFactor || "").replace(/'/g, "");
+  const psu = Math.max(1, parseInt(s.psuCount, 10) || 2);
+  const port = typeof openPortMap === "function"
+    ? `<button type="button" class="srv-map-action" title="Buka Port Map" onclick="openPortMap('${key}', false, 0, { type: 'server', formFactor: '${form}' });return false;"><i class="fa-solid fa-ethernet"></i> Port Map</button>`
+    : `<a class="srv-map-action" href="port-map.html?device=${encodeURIComponent(rawKey)}" target="_blank" rel="noopener" title="Buka Port Map"><i class="fa-solid fa-ethernet"></i> Port Map</a>`;
+  const power = typeof openPowerMap === "function"
+    ? `<button type="button" class="srv-map-action" title="Buka Power Map" onclick="openPowerMap('${key}', false, ${psu});return false;"><i class="fa-solid fa-plug"></i> Power Map</button>`
+    : `<a class="srv-map-action" href="power-map.html?device=${encodeURIComponent(rawKey)}" target="_blank" rel="noopener" title="Buka Power Map"><i class="fa-solid fa-plug"></i> Power Map</a>`;
+  return `<div class="srv-map-actions">${port}${power}</div>`;
+}
+
 function buildServerSummaryHTML(s) {
   if (!s) return "";
   const raidTxt = s.raid === "Ya" ? `<b>Ya</b> ${srvSummaryChips(s.raidTypes || [])}` : "Tidak";
@@ -196,6 +243,8 @@ function buildServerSummaryHTML(s) {
     <td class="strong">${srvSummaryEsc(n.hostname || "—")}</td>
     <td>${srvSummaryEsc(n.processorType || "—")}</td>
     <td>${srvSummaryEsc(n.dimmInstalled || "—")}</td>
+    <td>${srvSummaryNodeStorage(n)}</td>
+    <td>${srvSummaryNodeRaid(n)}</td>
     <td>${srvSummaryEsc(n.hypervisor || "—")}</td>
     <td><span class="badge ${srvSummaryCondClass(n.kondisi)}"><span class="bdot"></span>${srvSummaryEsc(n.kondisi || "—")}</span></td>
   </tr>`).join("");
@@ -208,7 +257,7 @@ function buildServerSummaryHTML(s) {
     <div class="kv-group">
       <div class="kv-group-title"><i class="fa-solid fa-server"></i> Node Server <span class="tag-chip" style="margin-left:auto;">${srvSummaryEsc(s.nodes.length)}/${srvSummaryEsc(s.nodeTotal || "—")} terisi</span></div>
       <table class="table node-table">
-        <thead><tr><th>Node</th><th>Hostname</th><th>Processor</th><th>RAM</th><th>OS / Hypervisor</th><th>Kondisi</th></tr></thead>
+        <thead><tr><th>Node</th><th>Hostname</th><th>Processor</th><th>RAM</th><th>Storage (HDD/SSD)</th><th>RAID</th><th>OS / Hypervisor</th><th>Kondisi</th></tr></thead>
         <tbody>${nodeRows}</tbody>
       </table>
     </div>` : "";
@@ -225,6 +274,7 @@ function buildServerSummaryHTML(s) {
       <span class="tag-chip">${srvSummaryEsc(s.vendor)} ${srvSummaryEsc(s.model)}</span>
       ${srvSummaryChips(s.tags || [])}
     </div>
+    ${srvSummaryMapActions(s)}
     ${nodeGroup}
     ${group("Spesifikasi Hardware", "fa-microchip", hw)}
     ${group("Port &amp; Konektivitas", "fa-network-wired", conn)}

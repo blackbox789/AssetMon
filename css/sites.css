@@ -33,4 +33,8 @@
 .util-pct { font-size: 12px; font-family: var(--font-mono); color: var(--text-secondary); width: 38px; text-align: right; }
 .site-card-foot { display: flex; justify-content: flex-end; gap: 8px; }
 .site-alert { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--warning); background: var(--warning-dim); border-radius: 8px; padding: 8px 12px; }
+.site-alert b { font-weight: 600; }
+.site-alert-link { color: var(--warning); font-weight: 700; text-decoration: underline; cursor: pointer; }
+.site-alert-link:hover { text-decoration: none; opacity: .8; }
+.site-alert-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 

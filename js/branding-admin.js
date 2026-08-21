@@ -1,3 +1,58 @@
+if (!authGuard()) {
+  document.body.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text-muted);">Akses ditolak. <a href="login.html">Login</a></div>';
+} else {
+
+function apiReq(method, path, body) {
+  const token = localStorage.getItem("rv_auth_token");
+  const xhr = new XMLHttpRequest();
+  xhr.open(method, path, false);
+  xhr.setRequestHeader("Content-Type", "application/json");
+  if (token) xhr.setRequestHeader("Authorization", "Bearer " + token);
+  xhr.send(body !== undefined ? JSON.stringify(body) : null);
+  if (xhr.status < 200 || xhr.status >= 300) return null;
+  return xhr.responseText ? JSON.parse(xhr.responseText) : null;
+}
+
+function setupUpload(inputId, boxId, previewId, logoKey, maxBytes) {
+  const input = document.getElementById(inputId);
+  const box = document.getElementById(boxId);
+  const preview = document.getElementById(previewId);
+  if (!input || !box) return;
+  box.addEventListener("click", () => input.click());
+  box.addEventListener("dragover", e => { e.preventDefault(); box.style.borderColor = "var(--accent, #4f8cff)"; });
+  box.addEventListener("dragleave", () => { box.style.borderColor = ""; });
+  box.addEventListener("drop", e => {
+    e.preventDefault();
+    box.style.borderColor = "";
+    const file = (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) || null;
+    if (file) processFile(file);
+  });
+  input.addEventListener("change", () => {
+    const file = (input.files && input.files[0]) || null;
+    if (file) processFile(file);
+  });
+  function processFile(file) {
+    if (!file.type.match(/^image\/(png|svg\+xml|jpeg|jpg)$/)) { alert("Format harus PNG/SVG/JPG."); return; }
+    if (maxBytes && file.size > maxBytes) { alert("Ukuran file melebihi " + (maxBytes / 1024) + "KB."); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result;
+      const res = apiReq("POST", "/api/brand/logo?key=" + logoKey, { data: base64 });
+      if (res && res.ok) {
+        if (preview) preview.innerHTML = '<img src="' + res.url + '" style="max-width:100%;max-height:60px;object-fit:contain;">';
+      } else {
+        alert("Gagal upload logo: " + (res && res.error ? res.error : "unknown"));
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+  const brand = apiReq("GET", "/api/brand") || {};
+  const url = brand[logoKey] || "";
+  if (url && preview) preview.innerHTML = '<img src="' + url + '" style="max-width:100%;max-height:60px;object-fit:contain;">';
+}
+
+setupUpload("in-logo", "upload-logo-box", "logo-preview", "logo", 500 * 1024);
+setupUpload("in-logo-small", "upload-logo-small-box", "logo-small-preview", "logo-small", 200 * 1024);
 
 document.querySelectorAll(".tab-btn").forEach(btn => {
   btn.addEventListener("click", () => {
@@ -58,6 +113,39 @@ document.getElementById("in-company-name").addEventListener("input", e => {
 document.getElementById("in-tagline").addEventListener("input", e => {
   document.getElementById("pv-tag").textContent = e.target.value;
 });
+
+function loadBrand() {
+  const brand = apiReq("GET", "/api/brand") || {};
+  if (brand.companyName) {
+    document.getElementById("in-company-name").value = brand.companyName;
+    document.getElementById("pv-cname").textContent = brand.companyName;
+    document.getElementById("pv-sb-name").textContent = brand.companyName;
+  }
+  if (brand.tagline) {
+    document.getElementById("in-tagline").value = brand.tagline;
+    document.getElementById("pv-tag").textContent = brand.tagline;
+  }
+}
+
+function saveBrand() {
+  const body = {
+    companyName: document.getElementById("in-company-name").value,
+    tagline: document.getElementById("in-tagline").value,
+    footerText: document.getElementById("in-footer") ? document.getElementById("in-footer").value : "",
+    supportUrl: document.getElementById("in-support") ? document.getElementById("in-support").value : "",
+    privacyUrl: document.getElementById("in-privacy") ? document.getElementById("in-privacy").value : "",
+    termsUrl: document.getElementById("in-terms") ? document.getElementById("in-terms").value : "",
+  };
+  const res = apiReq("POST", "/api/brand", body);
+  if (res && res.ok) {
+    alert("Branding berhasil disimpan.");
+    location.reload();
+  } else {
+    alert("Gagal menyimpan branding.");
+  }
+}
+
+loadBrand();
 applyPrimary(primaryColor.value);
 applySecondary(secondaryColor.value);
 document.getElementById("reset-btn").addEventListener("click", () => {
@@ -68,6 +156,8 @@ document.getElementById("reset-btn").addEventListener("click", () => {
   document.getElementById("pv-cname").textContent = "RackView";
   document.getElementById("pv-sb-name").textContent = "RackView";
   document.getElementById("pv-tag").textContent = "Datacenter Asset Management";
+  saveBrand();
 });
-    
-
+const applyBtn = document.getElementById("apply-btn");
+if (applyBtn) applyBtn.addEventListener("click", saveBrand);
+}

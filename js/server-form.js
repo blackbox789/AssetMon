@@ -10,13 +10,38 @@
 // ---- Form Factor (U) mengikuti tipe server ----
 const FORM_FACTORS = {
   rack:  ["1U", "2U", "3U", "4U"],
-  blade: ["3U", "4U", "6U", "8U", "10U", "12U", "16U (Blade Chassis)"],
+  blade: ["3U", "4U", "5U", "6U", "7U", "8U", "9U", "10U", "12U", "14U", "16U (Blade Chassis)"],
   cloud: ["1U", "2U", "3U", "4U"],
   tower: ["Tower / Desktop (non-U)"],
 };
 
 const serverType = document.getElementById("server-type");
 const formFactor = document.getElementById("form-factor");
+
+function syncUHeightFromFormFactor() {
+  document.querySelectorAll('[data-sf="uHeight"]').forEach(el => {
+    if (el.closest("[data-storage-form-box]")) return;
+    const m = String(formFactor.value).match(/^(\d+)/);
+    el.value = m ? m[1] : "";
+  });
+}
+
+function syncFormFactorFromUHeight() {
+  if (!formFactor) return;
+  document.querySelectorAll('[data-sf="uHeight"]').forEach(el => {
+    if (el.closest("[data-storage-form-box]")) return;
+    const n = parseInt(el.value, 10);
+    if (!n || n < 1) return;
+    const label = n + "U";
+    if (![...formFactor.options].some(o => o.value === label)) {
+      const o = document.createElement("option");
+      o.value = label;
+      o.textContent = label;
+      formFactor.appendChild(o);
+    }
+    formFactor.value = label;
+  });
+}
 
 if (serverType && formFactor) {
   function populateFormFactor() {
@@ -27,8 +52,14 @@ if (serverType && formFactor) {
       o.textContent = f;
       formFactor.appendChild(o);
     });
+    syncUHeightFromFormFactor();
   }
   serverType.addEventListener("change", populateFormFactor);
+  formFactor.addEventListener("change", syncUHeightFromFormFactor);
+  document.querySelectorAll('[data-sf="uHeight"]').forEach(el => {
+    if (el.closest("[data-storage-form-box]")) return;
+    el.addEventListener("input", syncFormFactorFromUHeight);
+  });
   populateFormFactor();
 }
 
@@ -695,6 +726,138 @@ const EDIT_ID = new URLSearchParams(location.search).get("edit");
 const IN_EDIT_MODAL = !!document.getElementById("edit-server-overlay");
 let editingId = null;
 
+// ---- Upload gambar depan/belakang perangkat (Rack Elevation) ----
+// Dipakai di server-form.html & modal edit server-list.html (dan asset-list modal).
+// Upload langsung via POST /api/device-image/:slug/:view (backend simpan file).
+const DEVIMG = {
+  current: { front: null, back: null }, // {file?, url?, cleared?}
+  init(root) {
+    root = root || document;
+    root.querySelectorAll("[data-devimg-pick]").forEach(btn => {
+      const view = btn.dataset.devimgPick;
+      const input = root.querySelector(`[data-devimg-file="${view}"]`);
+      btn.addEventListener("click", () => { if (input) input.click(); });
+    });
+    root.querySelectorAll("[data-devimg-file]").forEach(input => {
+      input.addEventListener("change", () => {
+        const view = input.dataset.devimgFile;
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
+          DEVIMG.msg(view, "Format tidak didukung — gunakan PNG/JPG/WEBP.", "err");
+          return;
+        }
+        const slug = DEVIMG.slugOf();
+        if (!slug) {
+          DEVIMG.msg(view, "Isi Nama Aset / Hostname dulu sebelum upload gambar.", "err");
+          return;
+        }
+        DEVIMG.current[view] = { file };
+        DEVIMG.upload(view, slug, file);
+      });
+    });
+    root.querySelectorAll("[data-devimg-clear]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const view = btn.dataset.devimgClear;
+        DEVIMG.current[view] = { cleared: true };
+        const img = root.querySelector(`[data-devimg-preview="${view}"]`);
+        if (img) { img.style.display = "none"; img.removeAttribute("src"); }
+        btn.style.display = "none";
+        DEVIMG.msg(view, "Menghapus gambar…", "ok");
+        const slug = DEVIMG.slugOf();
+        if (slug) {
+          fetch("/api/device-image/" + encodeURIComponent(slug) + "/" + view, { method: "DELETE" })
+            .then(r => { DEVIMG.msg(view, r.ok ? "Gambar dihapus." : "Gagal menghapus (offline) — gambar tetap di server.", "ok"); })
+            .catch(() => { DEVIMG.msg(view, "Gagal menghapus (offline) — gambar tetap di server.", "ok"); });
+        } else {
+          DEVIMG.msg(view, "Gambar akan dihapus saat server disimpan.", "ok");
+        }
+      });
+    });
+  },
+  slugOf() {
+    const el = document.querySelector('[data-sf="hostname"]');
+    return String(el ? el.value : "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  },
+  msg(view, text, kind) {
+    const el = document.querySelector(`[data-devimg-msg="${view}"]`);
+    if (!el) return;
+    el.textContent = text || "";
+    el.style.color = kind === "err" ? "var(--danger)" : "var(--text-secondary)";
+  },
+  async upload(view, slug, file) {
+    try {
+      const res = await fetch("/api/device-image/" + encodeURIComponent(slug) + "/" + view, {
+        method: "POST",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        DEVIMG.msg(view, "Upload gagal: " + (err.error || res.status), "err");
+        return;
+      }
+      const data = await res.json();
+      DEVIMG.current[view] = { url: data.url, name: data.name };
+      DEVIMG.showPreview(view, data.url);
+      DEVIMG.msg(view, "Gambar tampak " + (view === "front" ? "depan" : "belakang") + " terpasang.", "ok");
+    } catch (e) {
+      DEVIMG.msg(view, "Upload gagal — pastikan server backend aktif.", "err");
+    }
+  },
+  showPreview(view, url) {
+    const img = document.querySelector(`[data-devimg-preview="${view}"]`);
+    const btn = document.querySelector(`[data-devimg-clear="${view}"]`);
+    if (img) { img.src = url; img.style.display = ""; }
+    if (btn) btn.style.display = "";
+  },
+  loadExisting(s) {
+    if (!s) return;
+    ["front", "back"].forEach(view => {
+      const slug = String(s.hostname || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      if (!slug) return;
+      const url = s.image && s.image[view];
+      if (url) {
+        DEVIMG.current[view] = { url };
+        DEVIMG.showPreview(view, url);
+        DEVIMG.msg(view, "");
+        return;
+      }
+      const exts = ["jpg", "png", "jpeg", "webp"];
+      let i = 0;
+      const probe = () => {
+        if (i >= exts.length) return;
+        const cand = "/data/uploads/devices/" + slug + "-" + view + "." + exts[i++];
+        const t = new Image();
+        t.onload = () => {
+          DEVIMG.current[view] = { url: cand };
+          DEVIMG.showPreview(view, cand);
+        };
+        t.onerror = probe;
+        t.src = cand;
+      };
+      probe();
+    });
+  },
+  reset(root) {
+    root = root || document;
+    DEVIMG.current = { front: null, back: null };
+    ["front", "back"].forEach(view => {
+      const img = root.querySelector(`[data-devimg-preview="${view}"]`);
+      if (img) { img.style.display = "none"; img.removeAttribute("src"); }
+      const btn = root.querySelector(`[data-devimg-clear="${view}"]`);
+      if (btn) btn.style.display = "none";
+      DEVIMG.msg(view, "");
+    });
+  },
+};
+DEVIMG.init(document);
+if (EDIT_ID && typeof getServers === "function") {
+  const s = getServers().find(x => x.id === EDIT_ID);
+  if (s) setTimeout(() => DEVIMG.loadExisting(s), 0);
+}
+
+// ---- Mode edit: server-form.html?edit=<id> atau popup di server-list.html ----
 function prefillServerForm(s) {
   if (!s) return;
   editingId = s.id;
@@ -729,6 +892,10 @@ function prefillServerForm(s) {
     serverType.dispatchEvent(new Event("change"));
   }
   if (formFactor && s.formFactor) formFactor.value = s.formFactor;
+  document.querySelectorAll('[data-sf="uHeight"]').forEach(el => {
+    const h = s.uHeight != null ? String(s.uHeight) : "";
+    el.value = h || (formFactor ? String(formFactor.value).match(/^(\d+)/)?.[1] : "") || "";
+  });
 
   document.querySelectorAll("[data-sf]").forEach(el => {
     const k = el.dataset.sf;
@@ -865,6 +1032,7 @@ if (IN_EDIT_MODAL) {
     if (pc) pc.value = "2";
     const pw = editFormBox.querySelector('[data-sf="psuWatt"]');
     if (pw) pw.value = "750 W";
+    if (typeof DEVIMG !== "undefined") DEVIMG.reset(editFormBox);
   }
 
   function setEditSaveLabel() {
@@ -880,6 +1048,7 @@ if (IN_EDIT_MODAL) {
     resetEditServerForm();
     editingId = s.id;
     prefillServerForm(s);
+    if (typeof DEVIMG !== "undefined") DEVIMG.loadExisting(s);
     setEditSaveLabel();
     editOverlay.classList.add("open");
   };
@@ -911,7 +1080,7 @@ if (IN_EDIT_MODAL) {
   if (editSaveBtn) {
     editSaveBtn.addEventListener("click", () => {
       const mode = FORM_MODE[(serverType && serverType.value) || "rack"] || "rack";
-      const server = mode === "blade" ? collectChassisForm() : collectServerForm();
+      const server = mergeDevImg(mode === "blade" ? collectChassisForm() : collectServerForm());
       if (mode !== "blade" && !server.hostname) {
         if (saveMsg) {
           saveMsg.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Nama Aset / Hostname wajib diisi sebelum menyimpan.';
@@ -1631,6 +1800,7 @@ function collectServerForm(root) {
     hostname: sf("hostname"),
     tipeServer: sf("tipeServer") || "rack",
     formFactor: sf("formFactor"),
+    uHeight: sf("uHeight"),
     nodeNumber: sf("nodeNumber"),
     nodeTotal: sf("nodeTotal"),
     vendor,
@@ -1678,12 +1848,28 @@ function collectServerForm(root) {
   };
 }
 
+// ---- Sinkronkan referensi gambar (image.front/back) dari DEVIMG ke record ----
+// Dipanggil sebelum collectServerForm dipakai untuk save, supaya URL gambar
+// (yang sudah di-upload / dihapus via DEVIMG) ikut tersimpan di SQLite.
+function mergeDevImg(server) {
+  if (typeof DEVIMG === "undefined") return server;
+  const img = server.image && typeof server.image === "object" ? { ...server.image } : {};
+  ["front", "back"].forEach(view => {
+    const cur = DEVIMG.current[view];
+    if (cur && cur.url) img[view] = cur.url;
+    else if (cur && cur.cleared) delete img[view];
+  });
+  if (!Object.keys(img).length) delete server.image;
+  else server.image = img;
+  return server;
+}
+
 const saveBtn = document.getElementById("save-server");
 const saveMsg = document.getElementById("save-msg");
 if (saveBtn && saveMsg) {
   saveBtn.addEventListener("click", () => {
     const mode = FORM_MODE[(serverType && serverType.value) || "rack"] || "rack";
-    const server = mode === "blade" ? collectChassisForm() : collectServerForm();
+    const server = mergeDevImg(mode === "blade" ? collectChassisForm() : collectServerForm());
     if (mode !== "blade" && !server.hostname) {
       saveMsg.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Nama Aset / Hostname wajib diisi sebelum menyimpan.';
       saveMsg.classList.add("show", "error");

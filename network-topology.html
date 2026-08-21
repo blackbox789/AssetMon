@@ -31,7 +31,6 @@
       <div class="nav-label">Inventory</div>
       <a href="sites.html" class="nav-item"><i class="fa-solid fa-map-location-dot"></i><span>Sites</span></a>
       <a href="rack-elevation.html" class="nav-item"><i class="fa-solid fa-server"></i><span>Rack Elevation</span></a>
-      <a href="capacity-matrix.html" class="nav-item"><i class="fa-solid fa-th-large"></i><span>Capacity Matrix</span></a>
       <a href="network-topology.html" class="nav-item active"><i class="fa-solid fa-diagram-project"></i><span>Network Topology</span></a>
       <a href="port-map.html" class="nav-item"><i class="fa-solid fa-ethernet"></i><span>Port Map</span></a>
       <a href="power-map.html" class="nav-item"><i class="fa-solid fa-plug"></i><span>Power Map</span></a>
@@ -41,29 +40,39 @@
         <a href="storage-list.html" class="nav-subitem" data-type="storage"><i class="fa-solid fa-hard-drive"></i><span>Storage</span></a>
         <a href="asset-list.html" class="nav-subitem nav-parent2 open" data-submenu2="submenu-asset-net"><i class="fa-solid fa-network-wired"></i><span>Network Device</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
         <div class="nav-submenu2 open" id="submenu-asset-net">
-          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Network Device</span></a>
+          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Switch</span></a>
           <a href="firewall-list.html" class="nav-subitem2" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
           <a href="router-list.html" class="nav-subitem2" data-type="router"><i class="fa-solid fa-tower-broadcast"></i><span>Router</span></a>
         </div>
         <a href="ups-list.html" class="nav-subitem" data-type="ups"><i class="fa-solid fa-plug-circle-bolt"></i><span>UPS</span></a>
         <a href="accessories-list.html" class="nav-subitem" data-type="accessories"><i class="fa-solid fa-sliders"></i><span>Accessories</span></a>
-        <a href="asset-list.html" class="nav-subitem" data-type="other"><i class="fa-solid fa-ellipsis"></i><span>Lainnya</span></a>
+        
         <a href="pdu-list.html" class="nav-subitem"><i class="fa-solid fa-bolt"></i><span>PDU</span></a>
         <a href="cable-registry.html" class="nav-subitem"><i class="fa-solid fa-tag"></i><span>Cable Registry</span></a>
       </div>
       <a href="#" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Discovery Center</span></a>
     </div>
     <div class="nav-group">
+      <div class="nav-label">Operasional</div>
+      <a href="kunjungan-site.html" class="nav-item"><i class="fa-solid fa-user-clock"></i><span>Kunjungan Site</span></a>
+      <a href="incident-report.html" class="nav-item"><i class="fa-solid fa-triangle-exclamation"></i><span>Incident Report</span></a>
+      <a href="maintenance.html" class="nav-item"><i class="fa-solid fa-screwdriver-wrench"></i><span>Maintenance</span></a>
+    </div>
+    <div class="nav-group">
       <div class="nav-label">Admin</div>
-      <a href="#" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>User Management</span></a>
-      <a href="#" class="nav-item"><i class="fa-solid fa-file-lines"></i><span>Audit Log</span></a>
-      <a href="reports.html" class="nav-item"><i class="fa-solid fa-chart-column"></i><span>Reports</span></a>
+      <a href="user-management.html" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>User Management</span></a>
+      <a href="audit-log.html" class="nav-item"><i class="fa-solid fa-file-lines"></i><span>Audit Log</span></a>
+      <a href="reports.html" class="nav-item nav-parent open" data-submenu="submenu-reports"><i class="fa-solid fa-chart-column"></i><span>Reports</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+      <div class="nav-submenu open" id="submenu-reports">
+        <a href="capacity-matrix.html" class="nav-subitem"><i class="fa-solid fa-th-large"></i><span>Capacity Matrix</span></a>
+<a href="capacity-plan.html" class="nav-subitem"><i class="fa-solid fa-chart-line"></i><span>Capacity Plan</span></a>
+      </div>
       <a href="branding-admin.html" class="nav-item"><i class="fa-solid fa-palette"></i><span>Settings → Branding</span></a>
     </div>
   </nav>
   <div class="sidebar-foot">
     <span class="agent-dot"></span>
-    <span class="sidebar-foot-text">Semua sistem <b>online</b></span>
+    <span class="sidebar-foot-text" id="sidebar-user">Semua sistem <b>online</b></span>
   </div>
 </aside>
 <div class="main">
@@ -78,9 +87,9 @@
         <i class="fa-solid fa-sun icon-sun-only"></i><i class="fa-solid fa-moon icon-moon-only"></i>
       </button>
       <div class="icon-btn"><i class="fa-solid fa-bell"></i><span class="dot"></span></div>
-      <div class="user-chip">
-        <div class="avatar">JS</div>
-        <div class="user-meta"><div style="font-weight:600;color:var(--text-primary);">Joko S.</div><div class="role">NOC Supervisor</div></div>
+      <div class="user-chip" id="topbar-user-chip">
+        <div class="avatar" id="topbar-avatar">JS</div>
+        <div class="user-meta"><div style="font-weight:600;color:var(--text-primary);" id="topbar-username">Joko S.</div><div class="role" id="topbar-role">NOC Supervisor</div></div>
       </div>
     </div>
   </div>
@@ -88,32 +97,63 @@
 
       <div class="page-toolbar">
         <div class="legend" style="margin-bottom:0;">
-          <div class="legend-item"><span class="legend-swatch" style="background:var(--accent)"></span>Server</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--accent)"></span>Server / Storage</div>
           <div class="legend-item"><span class="legend-swatch" style="background:var(--info)"></span>Network Switch</div>
           <div class="legend-item"><span class="legend-swatch" style="background:var(--violet)"></span>Rack PDU</div>
           <div class="legend-item"><span class="legend-swatch" style="background:var(--warning)"></span>Firewall</div>
-          <div class="legend-item"><span class="legend-swatch" style="background:var(--text-muted)"></span>Internet / Router</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--text-muted)"></span>Router / Eksternal</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--info);height:2px;width:16px;border-radius:0;"></span>Link Data</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:var(--violet);height:2px;width:16px;border-radius:0;border-top:2px dashed var(--violet);"></span>Link Power</div>
+          <div class="legend-item"><span class="legend-swatch" style="background:transparent;border:1px dashed var(--text-muted);"></span>Node referensi (belum ada di data)</div>
         </div>
-        <div class="toolbar">
-          <select class="form-input" style="width:auto;" id="trace-from"><option value="internet">Dari: Internet</option></select>
-          <select class="form-input" style="width:auto;" id="trace-to">
-            <option value="srv-db-17">Ke: SRV-DB-17</option>
-            <option value="srv-app-04">Ke: SRV-APP-04</option>
-            <option value="srv-web-02">Ke: SRV-WEB-02</option>
-            <option value="srv-bkp-01">Ke: SRV-BKP-01</option>
-          </select>
-          <button class="btn primary" id="trace-btn"><i class="fa-solid fa-route"></i>Trace Path</button>
-          <button class="btn ghost" id="clear-trace-btn">Clear</button>
+        <div class="toolbar" style="width:100%;justify-content:space-between;align-items:center;">
+          <div class="toolbar" style="flex-wrap:wrap;">
+            <div class="btn-group" id="layout-buttons" style="display:flex;gap:4px;">
+              <button type="button" class="btn ghost layout-btn active" data-layout="logical"><i class="fa-solid fa-sitemap"></i> Logis</button>
+              <button type="button" class="btn ghost layout-btn" data-layout="physical"><i class="fa-solid fa-server"></i> Fisik (Rack)</button>
+            </div>
+            <div class="btn-group" id="layer-buttons" style="display:flex;gap:4px;">
+              <button type="button" class="btn ghost layer-btn active" data-layer="data"><i class="fa-solid fa-network-wired"></i> Data</button>
+              <button type="button" class="btn ghost layer-btn" data-layer="power"><i class="fa-solid fa-plug"></i> Power</button>
+              <button type="button" class="btn ghost layer-btn" data-layer="all"><i class="fa-solid fa-diagram-project"></i> Semua</button>
+            </div>
+            <select class="form-input" style="width:auto;" id="filter-rack"><option value="all">Semua Rack</option></select>
+            <button type="button" class="btn ghost" id="topo-layers-btn" title="Pilih layer, lalu assign perangkat"><i class="fa-solid fa-layer-group"></i> Atur Layer</button>
+            <select class="form-input" style="width:auto;" id="trace-from"></select>
+            <select class="form-input" style="width:auto;" id="trace-to"></select>
+            <button class="btn primary" id="trace-btn"><i class="fa-solid fa-route"></i>Trace Path</button>
+            <button class="btn ghost" id="clear-trace-btn">Clear</button>
+          </div>
+          <div class="toolbar" style="flex-wrap:wrap;">
+            <span class="topo-info" id="topo-info"></span>
+            <button class="btn ghost" id="zoom-in-btn" title="Perbesar"><i class="fa-solid fa-plus"></i></button>
+            <button class="btn ghost" id="zoom-out-btn" title="Perkecil"><i class="fa-solid fa-minus"></i></button>
+            <button class="btn ghost" id="zoom-reset-btn" title="Reset zoom"><i class="fa-solid fa-expand"></i></button>
+          </div>
         </div>
       </div>
 
       <div class="topo-layout">
-        <div class="card">
+        <div class="card topo-viewport">
           <svg id="topo-svg" viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg"></svg>
         </div>
         <div class="card" id="detail-panel" style="min-height:400px;">
           <div class="detail-empty"><i class="fa-solid fa-arrow-pointer" style="font-size:20px;display:block;margin-bottom:10px;opacity:.5;"></i>Klik salah satu node pada topologi untuk melihat detail koneksi.</div>
         </div>
+      </div>
+
+      <div class="topo-editbar" id="topo-editbar" style="display:none;">
+        <label class="topo-scope"><span>Site</span>
+          <select class="form-input" id="topo-site-sel" style="width:auto;"></select>
+        </label>
+        <label class="topo-scope"><span>Rack</span>
+          <select class="form-input" id="topo-rack-sel" style="width:auto;"></select>
+        </label>
+        <span class="topo-editbar-hint"><i class="fa-solid fa-mouse-pointer"></i> Pilih site &amp; rack dulu — klik baris layer untuk menambah perangkat dari rack itu saja.</span>
+        <span class="toolbar" style="margin-left:auto;">
+          <button class="btn ghost" id="topo-edit-auto" title="Isi mapping dengan hasil deteksi otomatis"><i class="fa-solid fa-wand-magic-sparkles"></i> Saran Otomatis</button>
+          <button class="btn ghost" id="topo-edit-reset" title="Kosongkan semua assign manual"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+        </span>
       </div>
   </div>
 </div>
@@ -121,9 +161,13 @@
 
     <script src="js/brand.js"></script>
 <script src="js/app.js"></script>
+<script src="js/auth.js"></script>
+<script>if(typeof authGuard==="function") authGuard();</script>
     
 
 <script src="js/keys.js"></script>
+    <script src="js/rack-data.js"></script>
+    <script src="js/pdu-data.js"></script>
     <script src="js/network-topology.js"></script>
 
     <div class="modal-overlay" id="portmap-overlay">

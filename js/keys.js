@@ -15,10 +15,14 @@ const SCHEMA_VERSION_KEY = "rv_schema_version";
 const SERVER_STORAGE_KEY  = "rv_servers";
 const SWITCH_STORAGE_KEY  = "rv_switches";
 const ACC_STORAGE_KEY     = "rv_accessories";
+const STORAGE_STORAGE_KEY = "rv_storage";
+const STORAGE_REFS_KEY    = "rv_refs_storage";
 const RACK_STORAGE_KEY    = "rv_custom_racks";
 const PORT_STORAGE_KEY    = "rv_port_maps";
 const POWER_STORAGE_KEY   = "rv_power_maps";
 const PAGE_SIZE_KEY       = "rv_page_size";
+const DELETED_SERVERS_KEY = "rv_deleted_servers";
+const TOPO_LAYERS_KEY     = "rv_topo_layers";
 
 // ---- Normalisasi master key perangkat ----
 // Semua key perangkat (hostname server, nama switch/PDU/aksesori, deviceKey

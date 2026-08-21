@@ -31,7 +31,6 @@
       <div class="nav-label">Inventory</div>
       <a href="sites.html" class="nav-item"><i class="fa-solid fa-map-location-dot"></i><span>Sites</span></a>
       <a href="rack-elevation.html" class="nav-item"><i class="fa-solid fa-server"></i><span>Rack Elevation</span></a>
-      <a href="capacity-matrix.html" class="nav-item"><i class="fa-solid fa-th-large"></i><span>Capacity Matrix</span></a>
       <a href="network-topology.html" class="nav-item"><i class="fa-solid fa-diagram-project"></i><span>Network Topology</span></a>
       <a href="port-map.html" class="nav-item"><i class="fa-solid fa-ethernet"></i><span>Port Map</span></a>
       <a href="power-map.html" class="nav-item"><i class="fa-solid fa-plug"></i><span>Power Map</span></a>
@@ -41,29 +40,39 @@
         <a href="storage-list.html" class="nav-subitem" data-type="storage"><i class="fa-solid fa-hard-drive"></i><span>Storage</span></a>
         <a href="asset-list.html" class="nav-subitem nav-parent2 open" data-submenu2="submenu-asset-net"><i class="fa-solid fa-network-wired"></i><span>Network Device</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
         <div class="nav-submenu2 open" id="submenu-asset-net">
-          <a href="network-device-list.html" class="nav-subitem2 active" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Network Device</span></a>
+          <a href="network-device-list.html" class="nav-subitem2 active" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Switch</span></a>
           <a href="firewall-list.html" class="nav-subitem2" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
           <a href="router-list.html" class="nav-subitem2" data-type="router"><i class="fa-solid fa-tower-broadcast"></i><span>Router</span></a>
         </div>
         <a href="ups-list.html" class="nav-subitem" data-type="ups"><i class="fa-solid fa-plug-circle-bolt"></i><span>UPS</span></a>
         <a href="accessories-list.html" class="nav-subitem" data-type="accessories"><i class="fa-solid fa-sliders"></i><span>Accessories</span></a>
-        <a href="asset-list.html" class="nav-subitem" data-type="other"><i class="fa-solid fa-ellipsis"></i><span>Lainnya</span></a>
+        
         <a href="pdu-list.html" class="nav-subitem"><i class="fa-solid fa-bolt"></i><span>PDU</span></a>
         <a href="cable-registry.html" class="nav-subitem"><i class="fa-solid fa-tag"></i><span>Cable Registry</span></a>
       </div>
       <a href="#" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Discovery Center</span></a>
     </div>
     <div class="nav-group">
+      <div class="nav-label">Operasional</div>
+      <a href="kunjungan-site.html" class="nav-item"><i class="fa-solid fa-user-clock"></i><span>Kunjungan Site</span></a>
+      <a href="incident-report.html" class="nav-item"><i class="fa-solid fa-triangle-exclamation"></i><span>Incident Report</span></a>
+      <a href="maintenance.html" class="nav-item"><i class="fa-solid fa-screwdriver-wrench"></i><span>Maintenance</span></a>
+    </div>
+    <div class="nav-group">
       <div class="nav-label">Admin</div>
-      <a href="#" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>User Management</span></a>
-      <a href="#" class="nav-item"><i class="fa-solid fa-file-lines"></i><span>Audit Log</span></a>
-      <a href="reports.html" class="nav-item"><i class="fa-solid fa-chart-column"></i><span>Reports</span></a>
+      <a href="user-management.html" class="nav-item"><i class="fa-solid fa-users-gear"></i><span>User Management</span></a>
+      <a href="audit-log.html" class="nav-item"><i class="fa-solid fa-file-lines"></i><span>Audit Log</span></a>
+      <a href="reports.html" class="nav-item nav-parent open" data-submenu="submenu-reports"><i class="fa-solid fa-chart-column"></i><span>Reports</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+      <div class="nav-submenu open" id="submenu-reports">
+        <a href="capacity-matrix.html" class="nav-subitem"><i class="fa-solid fa-th-large"></i><span>Capacity Matrix</span></a>
+<a href="capacity-plan.html" class="nav-subitem"><i class="fa-solid fa-chart-line"></i><span>Capacity Plan</span></a>
+      </div>
       <a href="branding-admin.html" class="nav-item"><i class="fa-solid fa-palette"></i><span>Settings → Branding</span></a>
     </div>
   </nav>
   <div class="sidebar-foot">
     <span class="agent-dot"></span>
-    <span class="sidebar-foot-text">Semua sistem <b>online</b></span>
+    <span class="sidebar-foot-text" id="sidebar-user">Semua sistem <b>online</b></span>
   </div>
 </aside>
 <div class="main">
@@ -78,9 +87,9 @@
         <i class="fa-solid fa-sun icon-sun-only"></i><i class="fa-solid fa-moon icon-moon-only"></i>
       </button>
       <div class="icon-btn"><i class="fa-solid fa-bell"></i><span class="dot"></span></div>
-      <div class="user-chip">
-        <div class="avatar">JS</div>
-        <div class="user-meta"><div style="font-weight:600;color:var(--text-primary);">Joko S.</div><div class="role">NOC Supervisor</div></div>
+      <div class="user-chip" id="topbar-user-chip">
+        <div class="avatar" id="topbar-avatar">JS</div>
+        <div class="user-meta"><div style="font-weight:600;color:var(--text-primary);" id="topbar-username">Joko S.</div><div class="role" id="topbar-role">NOC Supervisor</div></div>
       </div>
     </div>
   </div>
@@ -148,10 +157,10 @@
           <button title="Port Map" onclick="openPortMap('SW-CORE-01')"><i class="fa-solid fa-ethernet"></i></button>
         </div></td>
       </tr>
-<tr data-site="DC2" data-type="switch" data-status="online" data-tags="production,network-access">
+<tr data-site="DC1" data-type="switch" data-status="online" data-tags="production,network-access">
         <td><div class="strong">SW-ACC-03</div><div class="mono" style="font-size:11px;">SW-CAT-2960-077</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>network-access</span></div></td>
         <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
-        <td>R2-B14 · U21</td>
+        <td>R1-A12 · U21</td>
         <td class="mono">10.10.0.23</td>
         <td>Cisco Catalyst 2960-X</td>
         <td><span class="badge online"><span class="bdot"></span>Online</span></td>
@@ -160,6 +169,76 @@
           <button title="Edit"><i class="fa-solid fa-pen"></i></button>
           <button title="View"><i class="fa-solid fa-eye"></i></button>
           <button title="Port Map" onclick="openPortMap('SW-ACC-03')"><i class="fa-solid fa-ethernet"></i></button>
+        </div></td>
+      </tr>
+<tr data-site="DC1" data-type="switch" data-status="online" data-tags="production,network-mgmt">
+        <td><div class="strong">SW-MGMT-02</div><div class="mono" style="font-size:11px;">SW-CAT-2960-310</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>network-mgmt</span></div></td>
+        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
+        <td>R1-A12 · U37</td>
+        <td class="mono">10.10.99.1</td>
+        <td>Cisco Catalyst 2960-X</td>
+        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
+        <td>Auto-Discovery</td>
+        <td><div class="row-actions">
+          <button title="Edit"><i class="fa-solid fa-pen"></i></button>
+          <button title="View"><i class="fa-solid fa-eye"></i></button>
+          <button title="Port Map" onclick="openPortMap('SW-MGMT-02')"><i class="fa-solid fa-ethernet"></i></button>
+        </div></td>
+      </tr>
+<tr data-site="DC1" data-type="switch" data-status="online" data-tags="production,backup-network">
+        <td><div class="strong">SW-BACKUP-02</div><div class="mono" style="font-size:11px;">SW-CAT-2960-410</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--info) 18%, transparent);color:var(--info)"><span class="tdot"></span>backup-network</span></div></td>
+        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
+        <td>R1-A12 · U38</td>
+        <td class="mono">10.10.0.25</td>
+        <td>Cisco Catalyst 2960-X</td>
+        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
+        <td>Auto-Discovery</td>
+        <td><div class="row-actions">
+          <button title="Edit"><i class="fa-solid fa-pen"></i></button>
+          <button title="View"><i class="fa-solid fa-eye"></i></button>
+          <button title="Port Map" onclick="openPortMap('SW-BACKUP-02')"><i class="fa-solid fa-ethernet"></i></button>
+        </div></td>
+      </tr>
+<tr data-site="DC2" data-type="switch" data-status="online" data-tags="production,network-core">
+        <td><div class="strong">SW-CORE-02</div><div class="mono" style="font-size:11px;">SW-CAT-9300-219</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>network-core</span></div></td>
+        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
+        <td>R2-B14 · U3</td>
+        <td class="mono">10.10.0.2</td>
+        <td>Cisco Catalyst 9300-24P</td>
+        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
+        <td>Auto-Discovery</td>
+        <td><div class="row-actions">
+          <button title="Edit"><i class="fa-solid fa-pen"></i></button>
+          <button title="View"><i class="fa-solid fa-eye"></i></button>
+          <button title="Port Map" onclick="openPortMap('SW-CORE-02')"><i class="fa-solid fa-ethernet"></i></button>
+        </div></td>
+      </tr>
+<tr data-site="DC3" data-type="switch" data-status="online" data-tags="production,network-dist">
+        <td><div class="strong">SW-DIST-02</div><div class="mono" style="font-size:11px;">SW-CAT-9300-330</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>network-dist</span></div></td>
+        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
+        <td>R3-C05 · U1</td>
+        <td class="mono">10.10.0.30</td>
+        <td>Cisco Catalyst 9300-24P</td>
+        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
+        <td>Auto-Discovery</td>
+        <td><div class="row-actions">
+          <button title="Edit"><i class="fa-solid fa-pen"></i></button>
+          <button title="View"><i class="fa-solid fa-eye"></i></button>
+          <button title="Port Map" onclick="openPortMap('SW-DIST-02')"><i class="fa-solid fa-ethernet"></i></button>
+        </div></td>
+      </tr>
+<tr data-site="DC4" data-type="switch" data-status="online" data-tags="lab">
+        <td><div class="strong">SW-LAB-05</div><div class="mono" style="font-size:11px;">SW-CAT-2960-440</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--violet) 18%, transparent);color:var(--violet)"><span class="tdot"></span>lab</span></div></td>
+        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
+        <td>R4-A01 · U1</td>
+        <td class="mono">10.10.0.105</td>
+        <td>Cisco Catalyst 2960-X</td>
+        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
+        <td>Auto-Discovery</td>
+        <td><div class="row-actions">
+          <button title="Edit"><i class="fa-solid fa-pen"></i></button>
+          <button title="View"><i class="fa-solid fa-eye"></i></button>
+          <button title="Port Map" onclick="openPortMap('SW-LAB-05')"><i class="fa-solid fa-ethernet"></i></button>
         </div></td>
       </tr>
           </tbody>
@@ -619,6 +698,7 @@
       <div id="view-body"></div>
       <div class="modal-foot" style="justify-content:flex-end;">
         <button class="btn primary" id="view-pm-btn" style="display:none;"><i class="fa-solid fa-ethernet"></i> Port Map</button>
+        <button class="btn ghost" id="view-pw-btn" style="display:none;"><i class="fa-solid fa-plug"></i> Power Map</button>
       </div>
     </div>
   </div>
@@ -626,6 +706,8 @@
 
     <script src="js/brand.js"></script>
 <script src="js/app.js"></script>
+<script src="js/auth.js"></script>
+<script>if(typeof authGuard==="function") authGuard();</script>
     
 
 <script src="js/keys.js"></script>

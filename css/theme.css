@@ -12,10 +12,12 @@
   --radius: 10px;
   --radius-sm: 8px;
   --radius-lg: 14px;
+  color-scheme: light;
 }
 
 /* ---------- Dark: "Datacenter Night" ---------- */
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg-base: #0A0D13;
   --bg-surface: #10141F;
   --bg-surface-2: #161B29;

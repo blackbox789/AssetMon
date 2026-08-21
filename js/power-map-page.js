@@ -36,8 +36,26 @@ function pwPduRows() {
   return out;
 }
 
+function pwKnownDevices() {
+  const set = new Set();
+  const pduNames = new Set((typeof PDU_DATA !== "undefined" ? PDU_DATA : []).map(p => p.name));
+  if (typeof getServers === "function") {
+    try {
+      getServers().forEach(s => {
+        const n = s.hostname || s.id || "";
+        if (n) set.add(n);
+      });
+    } catch (e) { /* abaikan */ }
+  }
+  Object.keys(typeof PORT_DATA !== "undefined" ? PORT_DATA : {}).forEach(k => {
+    if (!pduNames.has(k)) set.add(k);
+  });
+  return set;
+}
+
 function pwDeviceRows() {
   const map = new Map();
+  pwKnownDevices().forEach(n => map.set(n, { name: n, watt: 0, count: 0, sources: [] }));
   Object.keys(POWER_DATA).forEach(pdu => {
     const d = POWER_DATA[pdu];
     (Array.isArray(d.rows) ? d.rows : []).forEach(r => {

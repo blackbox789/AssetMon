@@ -238,6 +238,19 @@ tbody tr:hover { background: var(--bg-surface-2); }
 .btn.primary:hover { filter: brightness(1.08); }
 .btn.ghost { background: transparent; }
 
+/* ---------- Upload gambar depan/belakang perangkat ---------- */
+.devimg-upload {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px; border: 1px dashed var(--border); border-radius: 10px;
+  background: var(--bg-surface-2);
+}
+.devimg-preview {
+  width: 96px; height: 96px; object-fit: cover; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-surface-3);
+}
+.devimg-upload .btn { margin: 0; }
+[data-devimg-msg] { min-height: 16px; }
+
 /* ---------- Form elements ---------- */
 .form-group { margin-bottom: 16px; }
 .form-label { font-size: 12.5px; font-weight: 500; margin-bottom: 6px; display: block; color: var(--text-secondary); }
@@ -305,6 +318,39 @@ tbody tr:hover { background: var(--bg-surface-2); }
 /* ---------- Ringkasan Identitas Perangkat (server-list & rack-elevation) ---------- */
 .srv-detail-head { margin-bottom: 10px; }
 .srv-meta-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+
+.srv-map-actions { display: flex; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
+.srv-map-action {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-surface-2); color: var(--text-primary);
+  font-size: 12.5px; font-weight: 600; cursor: pointer; text-decoration: none;
+  transition: all .12s;
+}
+.srv-map-action:hover { border-color: var(--accent); color: var(--accent-text); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.srv-map-action i { font-size: 11px; opacity: .9; }
+
+/* ---------- Contextual Action Bar (list server & storage) ---------- */
+.ctx-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 14px; padding: 9px 12px; border-radius: 10px;
+  border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent);
+  animation: ctx-bar-in .16s ease-out;
+}
+@keyframes ctx-bar-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.ctx-bar-info { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); }
+.ctx-bar-info i { color: var(--accent-text); }
+.ctx-bar-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ctx-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 7px; border: 1px solid var(--border);
+  background: var(--bg-surface-2); color: var(--text-primary);
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all .12s;
+}
+.ctx-btn:hover { border-color: var(--accent); color: var(--accent-text); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.ctx-btn.danger:hover { border-color: #ff4d4f; color: #ff4d4f; background: color-mix(in srgb, #ff4d4f 8%, transparent); }
+.ctx-btn:disabled { opacity: .45; cursor: not-allowed; }
+.ctx-btn i { font-size: 11px; }
 
 .kv-group {
   border-bottom: 1px solid var(--border-soft);

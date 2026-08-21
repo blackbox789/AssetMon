@@ -3,9 +3,9 @@
 // Membutuhkan js/port-data.js terlebih dahulu (POWER_DATA).
 
 const PDU_DATA = [
-  { name: "PDU-A",       serial: "PDU-APC-8941-02", type: "vertical",   ports: 24, used: 6, site: "DC1", rack: "R1-A12", pos: "Sisi A", brand: "APC",      model: "AP8941",      ip: "10.10.9.1",  status: "online" },
-  { name: "PDU-B",       serial: "PDU-APC-8941-07", type: "vertical",   ports: 24, used: 3, site: "DC1", rack: "R1-A12", pos: "Sisi B", brand: "APC",      model: "AP8941",      ip: "10.10.9.2",  status: "online" },
-  { name: "PDU-C",       serial: "PDU-RAR-PX2-118", type: "horizontal", ports: 8,  used: 3, site: "DC3", rack: "R3-C05", pos: "U5",     brand: "Raritan",   model: "PX2-1000",     ip: "10.10.9.3",  status: "maintenance" },
+  { name: "PDU-A",       serial: "PDU-APC-8941-02", type: "vertical",   ports: 24, used: 9, site: "DC1", rack: "R1-A12", pos: "Sisi A", brand: "APC",      model: "AP8941",      ip: "10.10.9.1",  status: "online" },
+  { name: "PDU-B",       serial: "PDU-APC-8941-07", type: "vertical",   ports: 24, used: 6, site: "DC1", rack: "R1-A12", pos: "Sisi B", brand: "APC",      model: "AP8941",      ip: "10.10.9.2",  status: "online" },
+  { name: "PDU-C",       serial: "PDU-RAR-PX2-118", type: "horizontal", ports: 8,  used: 3, site: "DC3", rack: "R3-C05", pos: "U5",     brand: "Raritan",   model: "PX2-1000",     ip: "10.10.9.3",  status: "online" },
   { name: "PDU-R2B-S01", serial: "PDU-VRT-GC-2201", type: "vertical",   ports: 36, used: 6, site: "DC2", rack: "R2-B14", pos: "Sisi A", brand: "Vertiv",     model: "Geist",       ip: "10.10.9.21", status: "online" },
   { name: "PDU-R2B-U01", serial: "PDU-APC-BAS-440", type: "horizontal", ports: 8,  used: 2, site: "DC2", rack: "R2-B14", pos: "U4",     brand: "APC",       model: "Basic PDU",   ip: "10.10.9.22", status: "online" },
   { name: "PDU-DC4-E01", serial: "PDU-APC-8858-19", type: "vertical",   ports: 12, used: 4, site: "DC4", rack: "R4-A01", pos: "Sisi B", brand: "APC",      model: "AP8858",      ip: "10.10.9.41", status: "offline" },
@@ -30,8 +30,8 @@ POWER_DATA["PDU-R2B-U01"] = { ports: 8, rows: [
   { outlet: 2, device: "FW-EDGE-04", psu: "Single PSU", watt: 70, label: "CBL-4011" },
 ]};
 POWER_DATA["PDU-DC4-E01"] = { ports: 12, rows: [
-  { outlet: 1, device: "SRV-TEST-01", psu: "PSU-A", watt: 180, label: "CBL-5001" },
-  { outlet: 2, device: "SRV-TEST-01", psu: "PSU-B", watt: 180, label: "CBL-5002" },
+  { outlet: 1, device: "SRV-TEST-01-01", psu: "PSU-A", watt: 180, label: "CBL-5001" },
+  { outlet: 2, device: "SRV-TEST-01-01", psu: "PSU-B", watt: 180, label: "CBL-5002" },
   { outlet: 3, device: "SW-LAB-05", psu: "Single PSU", watt: 60, label: "CBL-5003" },
   { outlet: 4, device: "SRV-LAB-02", psu: "Single PSU", watt: 220, label: "CBL-5004" },
 ]};
@@ -45,3 +45,24 @@ POWER_DATA["PDU-R1A-U42"] = { ports: 8, rows: [
   { outlet: 7, device: "SRV-BACKUP-01", psu: "PSU-B", watt: 300, label: "CBL-2016" },
   { outlet: 8, device: "SW-MGMT-02", psu: "Single PSU", watt: 45, label: "CBL-2017" },
 ]};
+
+// ---- Sinkronisasi detail PDU ke tabel devices (sekali per browser) ----
+// Push PDU_DATA (serial, ports, used, status, dst.) ke data JSON devices
+// supaya SQLite menyimpan detail PDU & statusnya (tidak hanya hardcode JS).
+function syncPduToDb() {
+  const GUARD_KEY = "rv_pdu_synced_v1";
+  try { if (localStorage.getItem(GUARD_KEY)) return; } catch (e) {}
+  if (typeof apiSaveDevice !== "function") return;
+  let ok = true;
+  PDU_DATA.forEach(p => {
+    if (!p || !p.name) return;
+    const data = {
+      serial: p.serial, ports: p.ports, used: p.used,
+      site: p.site, rackId: p.rack, pos: p.pos,
+      brand: p.brand, model: p.model, ip: p.ip, status: p.status,
+    };
+    if (!apiSaveDevice({ deviceKey: p.name, type: "pdu", name: p.name, data })) ok = false;
+  });
+  if (ok) try { localStorage.setItem(GUARD_KEY, "1"); } catch (e) {}
+}
+try { syncPduToDb(); } catch (e) { /* abaikan */ }

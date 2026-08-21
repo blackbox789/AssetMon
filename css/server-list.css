@@ -21,10 +21,6 @@ tbody tr.row-selected { background: var(--accent-dim); }
 tbody tr.row-selected td { color: var(--text-primary); }
 tbody tr.row-selected .strong { color: var(--accent-text); }
 
-.row-actions { display: flex; gap: 6px; }
-.row-actions button { width: 28px; height: 28px; border: 1px solid var(--border); background: var(--bg-surface-2); color: var(--text-muted); border-radius: 7px; cursor: pointer; }
-.row-actions button:hover { color: var(--accent-text); border-color: var(--accent); }
-
 .srv-warn-badge {
   display: inline-flex;
   align-items: center;

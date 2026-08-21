@@ -31,7 +31,7 @@ const DEFAULT_SERVERS = [
     raid: "Ya", raidTypes: ["RAID 1", "RAID 10"],
     lanRj45: "4", lanSfp: "2", lanQsfp: "0", speed: "10G", mgmtPort: "iDRAC",
     pcieCount: "3", pcieGen: "Gen4", psuCount: "2", psuWatt: "750 W", powerRedundancy: "Redundant",
-    site: "DC1", siteName: "DC1 — Cilandak", rack: "R1-A12", posisiU: "U27–U30",
+    site: "DC1", siteName: "DC1 — Cilandak", rack: "R1-A12", posisiU: "U01–U02",
     vlan: "VLAN 100 — Database", cableManagement: "PP-01-A · P1–P4",
     hypervisor: "Linux", fungsi: ["Database"], monitoring: ["SNMP", "IPMI"],
     kondisi: "Active", assetTag: "ASET-RV-000101", tags: ["production", "database"]
@@ -158,28 +158,41 @@ function readLocalServers() {
   }
 }
 
+// ID server yang dihapus user (tombstone) supaya tidak muncul lagi
+// dari DEFAULT_SERVERS / SQLite setelah tombol Hapus dipakai.
+function getDeletedServerIds() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(DELETED_SERVERS_KEY) || "[]");
+    return Array.isArray(arr) ? arr : [];
+  } catch {
+    return [];
+  }
+}
+
 function getServers() {
+  const deleted = new Set(getDeletedServerIds());
+  const notDeleted = arr => (Array.isArray(arr) ? arr : []).filter(s => !deleted.has(s.id));
   let list;
   if (typeof apiGetServers === "function") {
-    const db = apiGetServers();
+    const db = notDeleted(apiGetServers());
     if (db) {
-      const ls = readLocalServers();
+      const ls = notDeleted(readLocalServers());
       const dbIds = new Set(db.map(s => s.id));
       if (!db.length && ls.length && typeof apiSaveServer === "function") {
         ls.forEach(s => apiSaveServer(s));
-        list = [...ls, ...DEFAULT_SERVERS.filter(d => !ls.some(s => s.id === d.id))];
+        list = [...ls, ...DEFAULT_SERVERS.filter(d => !deleted.has(d.id) && !ls.some(s => s.id === d.id))];
       } else {
         list = [
           ...db,
           ...ls.filter(s => !dbIds.has(s.id)),
-          ...DEFAULT_SERVERS.filter(d => !dbIds.has(d.id) && !ls.some(s => s.id === d.id))
+          ...DEFAULT_SERVERS.filter(d => !deleted.has(d.id) && !dbIds.has(d.id) && !ls.some(s => s.id === d.id))
         ];
       }
     }
   }
   if (!list) {
-    const ls = readLocalServers();
-    list = [...ls, ...DEFAULT_SERVERS.filter(d => !ls.some(s => s.id === d.id))];
+    const ls = notDeleted(readLocalServers());
+    list = [...ls, ...DEFAULT_SERVERS.filter(d => !deleted.has(d.id) && !ls.some(s => s.id === d.id))];
   }
   if (typeof buildRackServers === "function") {
     const seen = new Set(list.map(s => String(s.hostname || "").toLowerCase()));

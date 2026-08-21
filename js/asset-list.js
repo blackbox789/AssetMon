@@ -1,9 +1,31 @@
 
 const overlay = document.getElementById("modal-overlay");
-document.getElementById("open-add-asset").addEventListener("click", () => overlay.classList.add("open"));
-document.getElementById("close-add-asset").addEventListener("click", () => { overlay.classList.remove("open"); resetAddModal(); });
-document.getElementById("cancel-add-asset").addEventListener("click", () => { overlay.classList.remove("open"); resetAddModal(); });
-overlay.addEventListener("click", e => { if (e.target === overlay) { overlay.classList.remove("open"); resetAddModal(); } });
+
+// Tabel asset = tbody PERTAMA yang TIDAK punya id (halaman asset/firewall/router/dll).
+// Halaman dengan tabel khusus (mis. #storage-tbody di storage-list.html) dilewati,
+// supaya baris/listener asset tidak nyasar ke tabel storage.
+function assetTableBody() {
+  const all = document.querySelectorAll("tbody");
+  for (const t of all) {
+    if (t.id) continue;
+    if (t.hasAttribute("data-node-tbody") || t.hasAttribute("data-ctl-tbody")) continue;
+    if (t.closest(".modal, .modal-overlay")) continue;
+    return t;
+  }
+  return null;
+}
+const openAddAssetBtn = document.getElementById("open-add-asset");
+if (openAddAssetBtn) {
+  openAddAssetBtn.addEventListener("click", () => {
+    if (openAddAssetBtn.dataset.storageAdd != null) return;
+    overlay.classList.add("open");
+  });
+}
+const closeAddAssetBtn = document.getElementById("close-add-asset");
+if (closeAddAssetBtn) closeAddAssetBtn.addEventListener("click", () => { overlay.classList.remove("open"); resetAddModal(); });
+const cancelAddAssetBtn = document.getElementById("cancel-add-asset");
+if (cancelAddAssetBtn) cancelAddAssetBtn.addEventListener("click", () => { overlay.classList.remove("open"); resetAddModal(); });
+if (overlay) overlay.addEventListener("click", e => { if (e.target === overlay) { overlay.classList.remove("open"); resetAddModal(); } });
 const tagPickerEl = document.getElementById("tag-picker");
 if (tagPickerEl) {
   tagPickerEl.addEventListener("click", e => {
@@ -85,6 +107,7 @@ const NF_LABELS = {
   psuCount: "PSU", psuWatt: "Watt", powerRedundancy: "Power Redundancy",
   tahunPembelian: "Tahun Pembelian", warranty: "Warranty", monitoring: "Monitoring",
 };
+const ASSET_PORT_MAP_TYPES = ["switch", "server", "firewall", "router", "patch", "ups", "storage"];
 const networkSection = document.getElementById("network-section");
 
 function toggleNetworkSection() {
@@ -244,12 +267,13 @@ function switchRowHTML(sw) {
       <button title="Edit"><i class="fa-solid fa-pen"></i></button>
       <button title="View"><i class="fa-solid fa-eye"></i></button>
       <button title="Port Map" data-open-pm="${escA(sw.name)}"><i class="fa-solid fa-ethernet"></i></button>
+      <button title="Power Map" data-open-pw="${escA(sw.name)}"><i class="fa-solid fa-plug"></i></button>
       <button title="Hapus"><i class="fa-solid fa-trash"></i></button>
     </div></td>`;
 }
 
 function addSwitchRow(sw) {
-  const tbody = document.querySelector("tbody");
+  const tbody = assetTableBody();
   if (!tbody) return;
   const tr = document.createElement("tr");
   tr.setAttribute("data-site", sw.site || "DC1");
@@ -333,7 +357,9 @@ function saveLocalAccessory(a) {
 function accessoryRowHTML(a) {
   const brandModel = [a.brand, a.model].filter(Boolean).join(" ") || "—";
   const isPdu = a.type === "pdu";
-  const hasMap = a.type === "patch" || isPdu || a.type === "ups";
+  const mapBtns =
+    `<button title="Power Map" data-open-pw="${escA(a.name)}"><i class="fa-solid fa-plug"></i></button>` +
+    (isPdu ? "" : `<button title="Port Map" data-open-pm="${escA(a.name)}"><i class="fa-solid fa-ethernet"></i></button>`);
   return `
     <td><div class="strong">${escA(a.name)}</div><div class="mono" style="font-size:11px;">${escA(a.serial || "—")}</div><div style="margin-top:4px;">${switchTagChips(a.tags)}</div></td>
     <td><span class="type-chip ${escA(a.type)}"><span class="dot"></span>${escA(TYPE_LABELS[a.type] || a.type)}</span></td>
@@ -346,13 +372,13 @@ function accessoryRowHTML(a) {
     <td><div class="row-actions">
       <button title="Edit"><i class="fa-solid fa-pen"></i></button>
       <button title="View"><i class="fa-solid fa-eye"></i></button>
-      ${hasMap ? `<button title="${isPdu ? "Power Map" : "Port Map"}" data-open-pm="${escA(a.name)}"><i class="fa-solid ${isPdu ? "fa-plug" : "fa-ethernet"}"></i></button>` : ""}
+      ${mapBtns}
       <button title="Hapus"><i class="fa-solid fa-trash"></i></button>
     </div></td>`;
 }
 
 function addAccessoryRow(a) {
-  const tbody = document.querySelector("tbody");
+  const tbody = assetTableBody();
   if (!tbody) return;
   const tr = document.createElement("tr");
   tr.setAttribute("data-site", a.site || "DC1");
@@ -427,6 +453,7 @@ function renderSavedAccessories() {
 // ---- View / Edit asset dari tabel "Semua Asset" ----
 const viewOverlay = document.getElementById("view-overlay");
 const viewPmBtn = document.getElementById("view-pm-btn");
+const viewPwBtn = document.getElementById("view-pw-btn");
 let viewPmName = null;
 let viewPmType = null;
 
@@ -476,6 +503,15 @@ function deleteAssetRow(tr) {
   tr.remove();
   const i = allRows.indexOf(tr);
   if (i >= 0) allRows.splice(i, 1);
+  try {
+    const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+    fetch(base + "/audit/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "device.delete", target: a.name, detail: "Dihapus dari tabel asset (type: " + type + ")" })
+    });
+  } catch (e) { /* abaikan */ }
+  if (typeof showToast === "function") showToast("Asset " + a.name + " berhasil dihapus.", "success");
   if (selectedAssetRow === tr) clearAssetDetail();
   applyFilters();
 }
@@ -492,11 +528,13 @@ function openViewAsset(tr) {
   viewPmType = a.type;
   document.getElementById("view-title").textContent = a.name;
   document.getElementById("view-sub").textContent = `${TYPE_LABELS[a.type] || a.type || "Asset"} · ${a.brandModel || "—"}`;
-  const pmVisible = ["switch", "server", "firewall", "router", "patch", "ups", "pdu"].includes(a.type);
-  viewPmBtn.style.display = pmVisible ? "" : "none";
-  viewPmBtn.innerHTML = a.type === "pdu"
-    ? '<i class="fa-solid fa-plug"></i> Power Map'
-    : '<i class="fa-solid fa-ethernet"></i> Port Map';
+  const isPdu = a.type === "pdu";
+  viewPmBtn.style.display = !isPdu && ASSET_PORT_MAP_TYPES.includes(a.type) ? "" : "none";
+  viewPmBtn.innerHTML = '<i class="fa-solid fa-ethernet"></i> Port Map';
+  if (viewPwBtn) {
+    viewPwBtn.style.display = "";
+    viewPwBtn.innerHTML = '<i class="fa-solid fa-plug"></i> Power Map';
+  }
   const netItems = Object.keys(NF_LABELS)
     .map(f => ({ f, v: rec ? rec[f] : null }))
     .filter(x => x.v != null && String(x.v) !== "");
@@ -530,8 +568,12 @@ viewPmBtn.addEventListener("click", () => {
   const n = viewPmName, t = viewPmType;
   closeView();
   if (!n) return;
-  if (t === "pdu") { if (typeof openPowerMap === "function") openPowerMap(n); }
-  else if (typeof openPortMap === "function") openPortMap(n, false, 0, { type: t || "server", formFactor: "" });
+  if (typeof openPortMap === "function") openPortMap(n, false, 0, { type: t || "server", formFactor: "" });
+});
+if (viewPwBtn) viewPwBtn.addEventListener("click", () => {
+  const n = viewPmName;
+  closeView();
+  if (n && typeof openPowerMap === "function") openPowerMap(n);
 });
 
 // ---- Ringkasan Identitas Perangkat: panel detail di bawah tabel (ala server-list.html) ----
@@ -557,17 +599,29 @@ function assetSummaryChip(text, accent) {
 function assetSummaryMapLink(rec, type) {
   const name = (rec && rec.name) || "";
   if (!name) return "";
-  if (type === "pdu" && typeof openPowerMap === "function") {
+  const buttons = [];
+  if (typeof openPowerMap === "function") {
     const psu = Math.max(1, parseInt(rec.psuCount, 10) || 2);
-    return `<button type="button" class="srv-map-link" onclick="openPowerMap('${escA(name)}', false, ${psu});return false;">Buka Power Map <i class="fa-solid fa-arrow-up-right-from-square"></i></button>`;
+    buttons.push(`<button type="button" class="srv-map-link" onclick="openPowerMap('${escA(name)}', false, ${psu});return false;">Buka Power Map <i class="fa-solid fa-plug"></i></button>`);
   }
-  if (["switch", "server", "firewall", "router", "patch", "ups", "storage"].includes(type) && typeof openPortMap === "function") {
-    return `<button type="button" class="srv-map-link" onclick="openPortMap('${escA(name)}', false, 0, { type: '${escA(type)}', formFactor: '' });return false;">Buka Port Map <i class="fa-solid fa-arrow-up-right-from-square"></i></button>`;
+  if (ASSET_PORT_MAP_TYPES.includes(type) && typeof openPortMap === "function") {
+    buttons.push(`<button type="button" class="srv-map-link" onclick="openPortMap('${escA(name)}', false, 0, { type: '${escA(type)}', formFactor: '' });return false;">Buka Port Map <i class="fa-solid fa-ethernet"></i></button>`);
   }
-  return "";
+  return buttons.join("");
 }
 
 const PURCHASE_FIELDS = ["tahunPembelian", "warranty", "monitoring"];
+
+function assetLivePowerData(name) {
+  const out = [];
+  if (!name || typeof POWER_DATA === "undefined") return out;
+  Object.keys(POWER_DATA).forEach(k => {
+    (POWER_DATA[k].rows || []).forEach(r => {
+      if (r && r.device === name) out.push({ pdu: k, psu: r.psu, watt: r.watt, label: r.label });
+    });
+  });
+  return out;
+}
 
 function buildAssetSummaryHTML(rec, tr) {
   const rowInfo = tr ? readAssetRow(tr) : {};
@@ -592,11 +646,20 @@ function buildAssetSummaryHTML(rec, tr) {
     assetSummaryKvRow("IP Address", src.ip) +
     assetSummaryKvRow("Serial Number", src.serial) +
     assetSummaryKvRow("Site", src.site);
+  const livePower = assetLivePowerData(name);
   const netRows = Object.keys(NF_LABELS)
     .filter(f => !PURCHASE_FIELDS.includes(f))
-    .map(f => ({ f, v: src[f] }))
-    .filter(x => x.v != null && String(x.v) !== "")
-    .map(x => assetSummaryKvRow(NF_LABELS[x.f], x.v))
+    .map(f => {
+      if (f === "psuCount" && livePower.length) return assetSummaryKvRow("PSU", String(livePower.length));
+      if (f === "psuWatt" && livePower.length) {
+        const parts = livePower.map(r => `${r.psu} ${r.watt} W`);
+        const total = livePower.reduce((s, r) => s + r.watt, 0);
+        return assetSummaryKvRow("Watt", parts.join(" · ") + ` · Total ${total} W`);
+      }
+      const v = src[f];
+      if (v == null || String(v) === "") return "";
+      return assetSummaryKvRow(NF_LABELS[f], v);
+    })
     .join("");
   const purchaseRows = PURCHASE_FIELDS
     .map(f => ({ f, v: src[f] }))
@@ -630,6 +693,24 @@ function renderAssetDetail(tr) {
   if (panel) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
+function refreshAssetRow(deviceKey) {
+  if (!deviceKey) return;
+  const tb = assetTableBody();
+  if (!tb) return;
+  tb.querySelectorAll("tr").forEach(tr => {
+    const name = (tr.querySelector(".strong")?.textContent || "").trim();
+    if (name !== deviceKey) return;
+    const type = tr.dataset.type || "";
+    const rec = type === "switch"
+      ? (typeof readLocalSwitches === "function" ? readLocalSwitches().find(s => s.name === deviceKey) : null)
+      : (typeof readLocalAccessories === "function" ? readLocalAccessories().find(x => x.name === deviceKey) : null);
+    if (!rec) return;
+    tr.innerHTML = type === "switch" ? switchRowHTML(rec) : accessoryRowHTML(rec);
+    if (selectedAssetRow === tr && typeof renderAssetDetail === "function") renderAssetDetail(tr);
+  });
+}
+window.reloadAssetRow = refreshAssetRow;
+
 function clearAssetDetail() {
   if (selectedAssetRow) { selectedAssetRow.classList.remove("row-selected"); selectedAssetRow = null; }
   const body = document.getElementById("asset-detail-body");
@@ -646,6 +727,7 @@ function refreshSelectedAssetDetail() {
 
 function initAssetDetailPanel() {
   if (document.getElementById("asset-detail")) return;
+  if (document.getElementById("storage-detail") || document.getElementById("server-detail")) return;
   const assetTable = Array.from(document.querySelectorAll(".content table"))
     .find(t => (t.querySelector("thead th")?.textContent || "").trim() === "Asset");
   const anchor = assetTable ? assetTable.closest(".card") : null;
@@ -700,6 +782,7 @@ function resetAddModal() {
         : "";
     });
   }
+  if (typeof DEVIMG !== "undefined") DEVIMG.reset(document.getElementById("modal-overlay"));
 }
 
 function openEditAsset(tr) {
@@ -746,6 +829,7 @@ function openEditAsset(tr) {
     const chip = [...document.querySelectorAll("#tag-picker .chip")].find(c => c.textContent.trim() === t);
     if (chip) chip.classList.add("active");
   });
+  if (typeof DEVIMG !== "undefined") DEVIMG.loadExisting({ hostname: a.name, image: rec && rec.image });
   overlay.classList.add("open");
 }
 
@@ -898,7 +982,8 @@ const filterType = document.getElementById("filter-type");
 const filterStatus = document.getElementById("filter-status");
 const filterTag = document.getElementById("filter-tag");
 const filterCount = document.getElementById("filter-count");
-const allRows = Array.from(document.querySelectorAll("tbody tr[data-site]"));
+const assetTb = assetTableBody();
+const allRows = assetTb ? Array.from(assetTb.querySelectorAll("tr[data-site]")) : [];
 const totalRowCount = allRows.length;
 
 const ASSET_PAGE_SIZES = [10, 20, 30, 40, 50];
@@ -937,6 +1022,7 @@ function applyFilters() {
 }
 
 function renderRows() {
+  if (!assetTableBody()) return;
   const total = assetVisibleRows.length;
   const pg = assetPaging(total, assetCurrentPage, getAssetPageSize());
   assetCurrentPage = pg.page;
@@ -1022,7 +1108,8 @@ if (typeParam) {
   }
 }
 
-document.querySelector("tbody").addEventListener("click", e => {
+const assetTbody = assetTableBody();
+assetTbody && assetTbody.addEventListener("click", e => {
   const btn = e.target.closest("button");
   const tr = btn ? btn.closest("tr") : e.target.closest("tr");
   if (!tr) return;
@@ -1037,9 +1124,18 @@ document.querySelector("tbody").addEventListener("click", e => {
     }
     if (btn.title === "Hapus") {
       const nm = (tr.querySelector(".strong")?.textContent || "").trim();
-      if (confirm(`Hapus ${nm}? Record asset, Port/Power Map, dan registri perangkat ikut dihapus.`)) {
+      const doubleOk = typeof window.confirmDoubleDelete === "function"
+        ? window.confirmDoubleDelete(nm)
+        : (confirm(`Hapus ${nm}?`) && confirm("Yakin ingin menghapus permanen? Data yang dihapus tidak dapat dikembalikan."));
+      if (doubleOk) {
         deleteAssetRow(tr);
       }
+      return;
+    }
+    const pw = btn.hasAttribute("data-open-pw") ? btn : e.target.closest("[data-open-pw]");
+    if (pw) {
+      const name = pw.dataset.openPw;
+      if (typeof openPowerMap === "function") openPowerMap(name);
       return;
     }
     const pm = btn.hasAttribute("data-open-pm") ? btn : e.target.closest("[data-open-pm]");
@@ -1059,7 +1155,9 @@ document.querySelector("tbody").addEventListener("click", e => {
 
 // ---- Kolom Spesifikasi: baris statis (HTML lama) diberi sel spesifikasi ----
 function normalizeSpecCells() {
-  document.querySelectorAll("tbody tr[data-site]").forEach(tr => {
+  const tb = assetTableBody();
+  if (!tb) return;
+  tb.querySelectorAll("tr[data-site]").forEach(tr => {
     const cells = tr.querySelectorAll("td");
     if (cells.length !== 8) return;
     const td = document.createElement("td");
