@@ -5,6 +5,8 @@ const typeMeta = {
   switch:   { label: "Network Switch",      badgeBg: "var(--info-dim)",    badgeColor: "var(--info)" },
   pdu:      { label: "Rack PDU",         badgeBg: "var(--violet-dim)",  badgeColor: "var(--violet)" },
   firewall: { label: "Firewall",    badgeBg: "var(--warning-dim)", badgeColor: "var(--warning)" },
+  ids:      { label: "IDS/IPS",     badgeBg: "rgba(236,72,153,0.14)", badgeColor: "#EC4899" },
+  lb:       { label: "Load Balancer", badgeBg: "rgba(20,184,166,0.14)", badgeColor: "#14B8A6" },
   patch:    { label: "Patch Panel", badgeBg: "var(--bg-surface-3)",badgeColor: "var(--text-secondary)" },
 };
 
@@ -207,7 +209,127 @@ function loadRack(rackId) {
   refreshRackMaintenance();
   renderRackUnits();
   rebuildPduStrips(rack);
-  document.getElementById("detail-panel").innerHTML = '<div class="detail-empty"><i class="fa-solid fa-arrow-pointer" style="font-size:22px;display:block;margin-bottom:10px;opacity:.5;"></i>Klik salah satu unit di rack untuk melihat detail asset.</div>';
+  refreshIssueDots();
+  document.getElementById("detail-panel").innerHTML = '<div class="detail-empty"><i class="fa-solid fa-arrow-pointer" style="font-size:22px;display:block;margin-bottom:10px;opacity:.5;"></i>Klik salah satu unit di rack untuk melihat detail asset, atau klik <b>Riwayat Rak</b> untuk melihat riwayat level rak.</div>';
+}
+
+// ---- Titik merah: perangkat dengan insiden aktif (open / in_progress) ----
+let issueKeys = new Set();
+async function refreshIssueDots() {
+  try {
+    const inc = await window.RackOps.loadIncidents();
+    issueKeys = new Set((inc || [])
+      .filter(r => ["open", "in_progress"].includes(String(r.status || "")))
+      .map(r => (typeof canonKey === "function" ? canonKey(r.asset || "") : String(r.asset || "").toUpperCase()))
+      .filter(Boolean));
+  } catch (e) { issueKeys = new Set(); }
+  applyIssueDots();
+}
+function applyIssueDots() {
+  devBgMap.forEach((bg, d) => {
+    if (!d || d.type === "blank") return;
+    const k = typeof canonKey === "function" ? canonKey(d.name) : String(d.name).toUpperCase();
+    let dot = bg.querySelector(".dev-issue-dot");
+    if (issueKeys.has(k)) {
+      if (!dot) {
+        dot = document.createElement("span");
+        dot.className = "dev-issue-dot";
+        dot.title = "Ada insiden aktif pada perangkat ini";
+        bg.appendChild(dot);
+      }
+    } else if (dot) dot.remove();
+  });
+}
+
+// ---- Panel Riwayat Rack (terpisah dari history per perangkat) ----
+function openRackHistoryPane() {
+  clearDeviceSelectionVisual();
+  const panel = document.getElementById("detail-panel");
+  panel.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;">
+      <h2 class="detail-title" style="margin:0;"><i class="fa-solid fa-clock-rotate-left" style="color:var(--accent);margin-right:8px;"></i>Riwayat Rack ${esc(currentRack.rackId)}</h2>
+    </div>
+    <div class="form-hint" style="margin-bottom:12px;">Gabungan incident, maintenance, kunjungan site &amp; catatan manual untuk <b>seluruh rack</b> ini.</div>
+    <div id="rack-history-pane"><div class="form-hint">Memuat riwayat…</div></div>
+    <div class="hw-sec" style="margin-top:14px;border-top:1px solid var(--border-soft);padding-top:12px;">
+      <div class="form-label" style="margin-bottom:8px;"><i class="fa-solid fa-pen-to-square"></i> Tambah Catatan Rack</div>
+      <select id="rack-note-sev" class="form-input" style="margin-bottom:8px;">
+        <option value="info">Info / Catatan</option><option value="low">Low issue</option><option value="medium">Medium issue</option><option value="high">High issue</option><option value="critical">Critical issue</option>
+      </select>
+      <textarea id="rack-note-detail" class="form-input" rows="3" placeholder="Catatan kondisi rak, label, sisa kapasitas…" style="margin-bottom:8px;"></textarea>
+      <button type="button" class="btn primary btn-sm" id="rack-note-save" style="width:100%;"><i class="fa-solid fa-paper-plane"></i> Simpan Catatan Rack</button>
+    </div>`;
+  fillRackHistoryPane();
+}
+
+function clearDeviceSelectionVisual() {
+  document.querySelectorAll(".u-body.selected, .u-body.sel-start, .u-body.sel-end").forEach(el => el.classList.remove("selected", "sel-start", "sel-end"));
+}
+
+async function fillRackHistoryPane() {
+  const el = document.getElementById("rack-history-pane");
+  if (!el) return;
+  const rackId = currentRack.rackId;
+  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+  let items = [];
+  let offline = false;
+  try {
+    const res = await fetch(base + "/history/rack/" + encodeURIComponent(rackId));
+    if (!res.ok) throw new Error(res.status);
+    const j = await res.json();
+    items = (j.items || []).map(it => ({
+      source: it.source,
+      icon: HIST_ICON[it.source] || HIST_ICON.manual,
+      no: it.refNo || "", title: it.title || "", detail: it.detail || "",
+      when: it.at || "", status: it.status || "",
+      sevTxt: SEV_TAG[it.severity] || (it.severity && it.severity !== "info" ? it.severity : ""),
+      link: it.link || "", deletable: !!it.deletable, id: it.id || "",
+    }));
+  } catch (e) {
+    offline = true;
+    try {
+      const hist = await window.RackOps.rackHistory(rackId);
+      (hist.incidents || []).forEach(r => items.push({ source: "incident", icon: HIST_ICON.incident, no: r.no || "", title: r.title || "", detail: r.description || "", when: r.occurred_at || r.created_at || "", status: r.status || "", sevTxt: SEV_TAG[r.sev || r.severity] || "", link: r.no ? "incident-report.html?q=" + encodeURIComponent(r.no) : "", deletable: false, id: "" }));
+      (hist.maintenance || []).forEach(r => items.push({ source: "maintenance", icon: HIST_ICON.maintenance, no: r.no || "", title: r.title || "", detail: "", when: r.scheduled_at || "", status: r.status || "", sevTxt: "", link: r.no ? "maintenance.html?q=" + encodeURIComponent(r.no) : "", deletable: false, id: "" }));
+      items.sort((a, b) => String(b.when).localeCompare(String(a.when)));
+    } catch (e2) { /* kosong */ }
+  }
+  renderHistoryItems(el, items, offline);
+  el.querySelectorAll("[data-del-note]").forEach(btn => {
+    btn.addEventListener("click", async ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      if (!confirm("Hapus catatan ini?")) return;
+      try {
+        const r = await fetch(base + "/notes/" + encodeURIComponent(btn.dataset.delNote), { method: "DELETE" });
+        if (!r.ok) throw new Error(r.status);
+        fillRackHistoryPane();
+      } catch (err) { alert("Gagal menghapus catatan."); }
+    });
+  });
+  const saveBtn = document.getElementById("rack-note-save");
+  if (saveBtn) {
+    saveBtn.onclick = async () => {
+      const detailEl = document.getElementById("rack-note-detail");
+      const sevEl = document.getElementById("rack-note-sev");
+      const detail = (detailEl.value || "").trim();
+      if (!detail) { detailEl.focus(); return; }
+      saveBtn.disabled = true;
+      try {
+        const r = await fetch(base + "/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entityType: "rack", entityKey: rackId, severity: sevEl.value, detail }),
+        });
+        if (!r.ok) throw new Error(r.status);
+        detailEl.value = "";
+        sevEl.value = "info";
+        fillRackHistoryPane();
+      } catch (err) {
+        alert("Backend tidak aktif — catatan manual membutuhkan server.");
+        saveBtn.disabled = false;
+      }
+    };
+  }
 }
 
 function updateRackMeta() {
@@ -294,7 +416,7 @@ function renderUnitCell(u, slot, d, spanFull) {
   return el;
 }
 
-const TYPE_TINTS = { server: "#8fbfea", switch: "#85d8cf", pdu: "#b7a3e3", firewall: "#f5c78c", patch: "#a5aebd", tower: "#a8d5a5" };
+const TYPE_TINTS = { server: "#8fbfea", switch: "#85d8cf", pdu: "#b7a3e3", firewall: "#f5c78c", ids: "#f2a9c4", lb: "#a8dcc8", patch: "#a5aebd", tower: "#a8d5a5" };
 
 function deviceTint(d) {
   const custom = deviceCustomColor(d);
@@ -482,59 +604,118 @@ function buildHardwarePane(d) {
     + `<div class="hw-sec" style="padding-top:4px;"><div class="form-hint">Spesifikasi detail perangkat ini belum tersedia di basis data server — gunakan menu Server untuk melihat ringkasan lengkap.</div></div>`;
 }
 
+// ---- Tab History (per perangkat): proyeksi /api/history + catatan manual ----
+// Sumber: notes(manual) + incidents + maintenance + visits — digabung di server.
+const HIST_ICON = {
+  incident:    { icon: "fa-triangle-exclamation", cls: "inc" },
+  maintenance: { icon: "fa-screwdriver-wrench", cls: "maint" },
+  visit:       { icon: "fa-user-clock", cls: "visit" },
+  manual:      { icon: "fa-pen-to-square", cls: "note" },
+};
+const SEV_TAG = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
+
 function buildHistoryPane(d) {
-  return `<div class="form-hint" style="margin-bottom:14px;">Riwayat incident &amp; maintenance rack ini (dari modul Incident Report &amp; Maintenance).</div>`
-    + hwRow("Perangkat terdaftar di", `${esc(d.name)} — ${esc(currentRack.rackId)}`)
-    + `<div id="rack-history-fill"><div class="form-hint" style="padding:10px 0;">Memuat riwayat…</div></div>`;
+  return `<div class="form-hint" style="margin-bottom:12px;">Riwayat perangkat <b>${esc(d.name)}</b> — insiden, maintenance, kunjungan site &amp; catatan manual.</div>`
+    + `<div id="device-history-fill"><div class="form-hint" style="padding:10px 0;">Memuat riwayat…</div></div>`
+    + `<div class="hw-sec" style="margin-top:14px;border-top:1px solid var(--border-soft);padding-top:12px;">`
+    +   `<div class="form-label" style="margin-bottom:8px;"><i class="fa-solid fa-pen-to-square"></i> Tambah Catatan Manual</div>`
+    +   `<select id="dev-note-sev" class="form-input" style="margin-bottom:8px;">`
+    +     `<option value="info">Info / Catatan</option><option value="low">Low issue</option><option value="medium">Medium issue</option><option value="high">High issue</option><option value="critical">Critical issue</option>`
+    +   `</select>`
+    +   `<textarea id="dev-note-detail" class="form-input" rows="3" placeholder="Tulis catatan / keterangan perangkat…" style="margin-bottom:8px;"></textarea>`
+    +   `<button type="button" class="btn primary btn-sm" id="dev-note-save" style="width:100%;"><i class="fa-solid fa-paper-plane"></i> Simpan Catatan</button>`
+    + `</div>`;
 }
 
-// Isi panel Riwayat dengan record incident + maintenance sungguhan dari OPS.
-async function fillRackHistory() {
-  const el = document.getElementById("rack-history-fill");
-  if (!el || !window.RackOps) return;
-  try {
-    const hist = await RackOps.rackHistory(currentRack.rackId);
-    const items = [];
-    (hist.incidents || []).forEach(r => {
-      const sev = r.sev || r.severity || "";
-      const sevTxt = { critical: "Critical", high: "High", medium: "Medium", low: "Low" }[sev] || sev || "Incident";
-      items.push({
-        icon: "fa-bug", cls: "inc", kind: "Incident",
-        no: r.no || r.id || "—",
-        title: r.title || r.description || "",
-        when: r.occurred_at || r.created_at || "",
-        status: r.status || "",
-        link: "incident-report.html?q=" + encodeURIComponent(r.no || r.id || ""),
-        tag: sevTxt,
-      });
-    });
-    (hist.maintenance || []).forEach(r => {
-      items.push({
-        icon: "fa-screwdriver-wrench", cls: "maint", kind: "Maintenance",
-        no: r.no || r.id || "—",
-        title: r.title || "",
-        when: r.scheduled_at || "",
-        status: r.status || "",
-        link: "maintenance.html?q=" + encodeURIComponent(r.no || r.id || ""),
-        tag: "",
-      });
-    });
-    items.sort((a, b) => String(b.when).localeCompare(String(a.when)));
-    if (!items.length) {
-      el.innerHTML = `<div class="form-hint" style="padding:10px 0;">Belum ada catatan incident atau maintenance untuk rack <b>${esc(currentRack.rackId)}</b>. Gunakan tombol <i>Lapor Trouble</i> untuk membuat catatan insiden, atau modul Maintenance untuk jadwal kerja.</div>`;
-      return;
-    }
-    el.innerHTML = `<div class="rack-history-list">` + items.map(it => `
-      <a class="rack-history-item ${it.cls}" href="${it.link}" title="Buka di modul ${it.kind}">
-        <div class="rh-icon"><i class="fa-solid ${it.icon}"></i></div>
+function renderHistoryItems(el, items, offline) {
+  if (!items.length) {
+    el.innerHTML = `<div class="form-hint" style="padding:6px 0;">Belum ada riwayat untuk perangkat ini.${offline ? " <b>(mode offline — hanya incident &amp; maintenance lokal)</b>" : ""} Tambahkan catatan manual di bawah.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="rack-history-list">` + items.map(it => {
+    const del = it.deletable ? `<button type="button" class="rh-del" data-del-note="${esc(it.id)}" title="Hapus catatan manual">&times;</button>` : "";
+    const inner = `
+        <div class="rh-icon"><i class="fa-solid ${it.icon.icon}"></i></div>
         <div class="rh-body">
-          <div class="rh-head"><span class="mono">${it.no}</span>${it.tag ? '<span class="rh-tag">' + esc(it.tag) + '</span>' : ""}<span class="rh-when">${esc((it.when || "").slice(0, 16).replace("T", " "))}</span></div>
+          <div class="rh-head">${it.no ? '<span class="mono">' + esc(it.no) + "</span>" : ""}${it.sevTxt ? '<span class="rh-tag">' + esc(it.sevTxt) + "</span>" : ""}<span class="rh-when">${esc(String(it.when || "").slice(0, 16))}</span></div>
           <div class="rh-title">${esc(it.title)}</div>
-          <div class="rh-status">${esc(it.status || "")}</div>
-        </div>
-      </a>`).join("") + `</div>`;
+          ${it.detail ? `<div class="rh-status">${esc(it.detail)}</div>` : ""}
+        </div>${del}`;
+    return it.link
+      ? `<a class="rack-history-item ${it.icon.cls}" href="${it.link}" title="Buka di modul terkait">${inner}</a>`
+      : `<div class="rack-history-item ${it.icon.cls}">${inner}</div>`;
+  }).join("") + `</div>`;
+}
+
+async function fillDeviceHistory(d) {
+  const el = document.getElementById("device-history-fill");
+  if (!el) return;
+  const key = typeof canonKey === "function" ? canonKey(d.name) : String(d.name).toUpperCase();
+  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+  let items = [];
+  let offline = false;
+  try {
+    const res = await fetch(base + "/history/device/" + encodeURIComponent(key));
+    if (!res.ok) throw new Error(res.status);
+    const j = await res.json();
+    items = (j.items || []).map(it => ({
+      source: it.source,
+      icon: HIST_ICON[it.source] || HIST_ICON.manual,
+      no: it.refNo || "", title: it.title || "", detail: it.detail || "",
+      when: it.at || "", status: it.status || "",
+      sevTxt: SEV_TAG[it.severity] || (it.severity && it.severity !== "info" ? it.severity : ""),
+      link: it.link || "", deletable: !!it.deletable, id: it.id || "",
+    }));
   } catch (e) {
-    el.innerHTML = `<div class="form-hint" style="padding:10px 0;">Gagal memuat riwayat.</div>`;
+    offline = true;
+    try {
+      const [inc, mnt] = await Promise.all([window.RackOps.loadIncidents(), window.RackOps.loadMaintenance()]);
+      (inc || []).forEach(r => {
+        if ((typeof canonKey === "function" ? canonKey(r.asset || "") : r.asset) !== key) return;
+        items.push({ source: "incident", icon: HIST_ICON.incident, no: r.no || "", title: (r.no ? r.no + " — " : "") + (r.title || ""), detail: r.description || "", when: r.occurred_at || r.created_at || "", status: r.status || "", sevTxt: SEV_TAG[r.severity] || r.severity || "", link: r.no ? "incident-report.html?q=" + encodeURIComponent(r.no) : "", deletable: false, id: "" });
+      });
+      (mnt || []).forEach(r => {
+        if ((typeof canonKey === "function" ? canonKey(r.asset || "") : r.asset) !== key) return;
+        items.push({ source: "maintenance", icon: HIST_ICON.maintenance, no: r.no || "", title: (r.no ? r.no + " — " : "") + "Maintenance", detail: [r.hasil, r.temuan].filter(Boolean).join(" · "), when: r.mulai || r.scheduled_at || "", status: r.status || "", sevTxt: "", link: r.no ? "maintenance.html?q=" + encodeURIComponent(r.no) : "", deletable: false, id: "" });
+      });
+      items.sort((a, b) => String(b.when).localeCompare(String(a.when)));
+    } catch (e2) { /* biarkan kosong */ }
+  }
+  renderHistoryItems(el, items, offline);
+  el.querySelectorAll("[data-del-note]").forEach(btn => {
+    btn.addEventListener("click", async ev => {
+      ev.preventDefault(); ev.stopPropagation();
+      if (!confirm("Hapus catatan ini?")) return;
+      try {
+        const r = await fetch(base + "/notes/" + encodeURIComponent(btn.dataset.delNote), { method: "DELETE" });
+        if (!r.ok) throw new Error(r.status);
+        fillDeviceHistory(d);
+      } catch (err) { alert("Gagal menghapus catatan."); }
+    });
+  });
+  const saveBtn = document.getElementById("dev-note-save");
+  if (saveBtn) {
+    saveBtn.onclick = async () => {
+      const detailEl = document.getElementById("dev-note-detail");
+      const sevEl = document.getElementById("dev-note-sev");
+      const detail = (detailEl.value || "").trim();
+      if (!detail) { detailEl.focus(); return; }
+      saveBtn.disabled = true;
+      try {
+        const r = await fetch(base + "/notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ entityType: "device", entityKey: d.name, severity: sevEl.value, detail }),
+        });
+        if (!r.ok) throw new Error(r.status);
+        detailEl.value = "";
+        sevEl.value = "info";
+        fillDeviceHistory(d);
+      } catch (err) {
+        alert("Backend tidak aktif — catatan manual membutuhkan server.");
+        saveBtn.disabled = false;
+      }
+    };
   }
 }
 
@@ -642,7 +823,7 @@ function selectDevice(d) {
     </div>
     <div class="tab-pane" data-pane="hardware" style="display:none;">${buildHardwarePane(d)}</div>
     <div class="tab-pane" data-pane="history" style="display:none;">${buildHistoryPane(d)}</div>`;
-  fillRackHistory();
+  fillDeviceHistory(d);
 }
 
 document.getElementById("detail-panel").addEventListener("click", e => {
@@ -698,6 +879,13 @@ siteSelect.addEventListener("change", () => {
   loadRack(rackSelect.value);
 });
 rackSelect.addEventListener("change", () => loadRack(rackSelect.value));
+
+// ---- Tombol Riwayat Rak (panel level rack, terpisah dari history perangkat) ----
+const rackHistoryBtn = document.getElementById("rack-history-btn");
+if (rackHistoryBtn) rackHistoryBtn.addEventListener("click", e => {
+  e.preventDefault();
+  openRackHistoryPane();
+});
 
 renderRackTable();
 const qs = new URLSearchParams(window.location.search);

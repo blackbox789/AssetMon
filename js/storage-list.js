@@ -338,11 +338,67 @@ function editStorage(id) {
   }
 }
 
+// ---- Hydrate storage dari SQLite (DB = sumber utama) ----
+// Sumber: GET /api/devices/storage (tabel devices, type='storage', data JSON
+// hasil saveStorage). Cache lokal (rv_storage + rv_accessories) ditimpa dengan
+// versi DB; record lokal yang dibuat saat offline tetap ditampilkan.
+async function hydrateStoragesFromDb() {
+  if (typeof fetch !== "function") return;
+  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+  let json;
+  try {
+    const res = await fetch(base + "/devices/storage");
+    if (!res.ok || !res.json) return; // offline — biarkan localStorage
+    json = await res.json();
+  } catch (e) { return; }
+  const list = json && Array.isArray(json.devices) ? json.devices : [];
+  if (!list.length) return;
+
+  let fromForm = [];
+  try {
+    fromForm = typeof readLocalStorages === "function" ? readLocalStorages()
+      : JSON.parse(localStorage.getItem(STORAGE_STORAGE_KEY) || "[]");
+  } catch (e) { fromForm = []; }
+  if (!Array.isArray(fromForm)) fromForm = [];
+  let accs = [];
+  try { accs = JSON.parse(localStorage.getItem(ACC_STORAGE_KEY) || "[]"); } catch (e) { accs = []; }
+  if (!Array.isArray(accs)) accs = [];
+
+  for (const d of list) {
+    const key = String(d.deviceKey || "").trim().toUpperCase();
+    if (!key) continue;
+    const data = { ...d };
+    delete data.deviceKey;
+    delete data.ok;
+    const hasContent = Object.keys(data).length > 0;
+    if (!hasContent) continue;
+    const rec = { ...data, hostname: key, deviceKey: key };
+    // rv_storage: timpa entri dengan hostname sama, kalau tidak ada → tambah
+    const i = fromForm.findIndex(x => String(x.hostname || x.deviceKey || "").toUpperCase() === key);
+    if (i >= 0) rec.id = fromForm[i].id || rec.id || ("stg-" + Date.now().toString(36));
+    else rec.id = rec.id || ("stg-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 6));
+    if (i >= 0) fromForm[i] = rec; else fromForm.unshift(rec);
+    // rv_accessories: singkronkan juga mirror type storage/custom
+    const j = accs.findIndex(x => (x.type === "storage" || x.type === "custom") && String(x.name || "").toUpperCase() === key);
+    if (j >= 0) accs[j] = { ...rec, name: key, type: accs[j].type };
+    else accs.unshift({ ...rec, name: key, type: "storage" });
+  }
+
+  try {
+    localStorage.setItem(STORAGE_STORAGE_KEY, JSON.stringify(fromForm));
+    localStorage.setItem(ACC_STORAGE_KEY, JSON.stringify(accs));
+  } catch (e) { /* storage tidak tersedia */ }
+  renderStorageList();
+}
+
 // Inisialisasi: jalankan render saat halaman dimuat
 // dan pasang event listener untuk tombol "Tambah Storage"
 (function initStorageList() {
   // Render tabel storage list
   renderStorageList();
+
+  // DB = sumber utama: tarik record dari SQLite lalu render ulang
+  hydrateStoragesFromDb();
 
   // Pasang click listener ke tombol "Tambah Storage"
   const openAddBtn = document.getElementById("open-add-asset");

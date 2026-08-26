@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Network Switch</title>
+<title>IDS/IPS</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -42,9 +42,9 @@
         <div class="nav-submenu2 open" id="submenu-asset-net">
           <a href="router-list.html" class="nav-subitem2" data-type="router"><i class="fa-solid fa-tower-broadcast"></i><span>Router</span></a>
           <a href="firewall-list.html" class="nav-subitem2" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
-          <a href="ids-ips-list.html" class="nav-subitem2" data-type="ids"><i class="fa-solid fa-shield-virus"></i><span>IDS/IPS</span></a>
+          <a href="ids-ips-list.html" class="nav-subitem2 active" data-type="ids"><i class="fa-solid fa-shield-virus"></i><span>IDS/IPS</span></a>
           <a href="loadbalancer-list.html" class="nav-subitem2" data-type="lb"><i class="fa-solid fa-scale-balanced"></i><span>Load Balancer</span></a>
-          <a href="network-device-list.html" class="nav-subitem2 active" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Switch</span></a>
+          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Switch</span></a>
         </div>
         <a href="ups-list.html" class="nav-subitem" data-type="ups"><i class="fa-solid fa-plug-circle-bolt"></i><span>UPS</span></a>
         <a href="accessories-list.html" class="nav-subitem" data-type="accessories"><i class="fa-solid fa-sliders"></i><span>Accessories</span></a>
@@ -98,8 +98,8 @@
   <div class="content">
 
       <div class="card-head">
-        <div><div class="card-title" style="font-size:15px;">Network Switch</div></div>
-        <button class="btn primary" id="open-add-asset"><i class="fa-solid fa-plus"></i> Tambah Switch</button>
+        <div><div class="card-title" style="font-size:15px;">IDS/IPS</div></div>
+        <button class="btn primary" id="open-add-asset"><i class="fa-solid fa-plus"></i>Add Asset</button>
       </div>
 
       <div class="filter-toolbar">
@@ -110,10 +110,10 @@
           <option value="server">Server</option>
           <option value="storage">Storage</option>
           <option value="kvm-switch">KVM Switch</option>
-          <option value="switch" selected>Network Switch</option>
+          <option value="switch">Network Switch</option>
           <option value="firewall">Firewall</option>
           <option value="router">Router</option>
-          <option value="ids">IDS/IPS</option>
+          <option value="ids" selected>IDS/IPS</option>
           <option value="lb">Load Balancer</option>
           <option value="patch">Patch Panel</option>
           <option value="pdu">Rack PDU</option>
@@ -147,70 +147,7 @@
         <table>
           <thead><tr><th>Asset</th><th>Tipe</th><th>Rack / Posisi</th><th>IP Address</th><th>Brand / Model</th><th>Spesifikasi</th><th>Status</th><th>Discovery Source</th></tr></thead>
           <tbody>
-<tr data-site="DC1" data-type="switch" data-status="online" data-tags="production,network-core">
-        <td><div class="strong">SW-CORE-01</div><div class="mono" style="font-size:11px;">SW-CAT-9300-118</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>network-core</span></div></td>
-        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
-        <td>R1-A12 · U4</td>
-        <td class="mono">10.10.0.1</td>
-        <td>Cisco Catalyst 9300</td>
-        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
-        <td>Auto-Discovery</td>
-        </tr>
-<tr data-site="DC1" data-type="switch" data-status="online" data-tags="production,network-access">
-        <td><div class="strong">SW-ACC-03</div><div class="mono" style="font-size:11px;">SW-CAT-2960-077</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>network-access</span></div></td>
-        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
-        <td>R1-A12 · U21</td>
-        <td class="mono">10.10.0.23</td>
-        <td>Cisco Catalyst 2960-X</td>
-        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
-        <td>Auto-Discovery</td>
-        </tr>
-<tr data-site="DC1" data-type="switch" data-status="online" data-tags="production,network-mgmt">
-        <td><div class="strong">SW-MGMT-02</div><div class="mono" style="font-size:11px;">SW-CAT-2960-310</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>network-mgmt</span></div></td>
-        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
-        <td>R1-A12 · U37</td>
-        <td class="mono">10.10.99.1</td>
-        <td>Cisco Catalyst 2960-X</td>
-        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
-        <td>Auto-Discovery</td>
-        </tr>
-<tr data-site="DC1" data-type="switch" data-status="online" data-tags="production,backup-network">
-        <td><div class="strong">SW-BACKUP-02</div><div class="mono" style="font-size:11px;">SW-CAT-2960-410</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--info) 18%, transparent);color:var(--info)"><span class="tdot"></span>backup-network</span></div></td>
-        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
-        <td>R1-A12 · U38</td>
-        <td class="mono">10.10.0.25</td>
-        <td>Cisco Catalyst 2960-X</td>
-        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
-        <td>Auto-Discovery</td>
-        </tr>
-<tr data-site="DC2" data-type="switch" data-status="online" data-tags="production,network-core">
-        <td><div class="strong">SW-CORE-02</div><div class="mono" style="font-size:11px;">SW-CAT-9300-219</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>network-core</span></div></td>
-        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
-        <td>R2-B14 · U3</td>
-        <td class="mono">10.10.0.2</td>
-        <td>Cisco Catalyst 9300-24P</td>
-        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
-        <td>Auto-Discovery</td>
-        </tr>
-<tr data-site="DC3" data-type="switch" data-status="online" data-tags="production,network-dist">
-        <td><div class="strong">SW-DIST-02</div><div class="mono" style="font-size:11px;">SW-CAT-9300-330</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--accent) 18%, transparent);color:var(--accent)"><span class="tdot"></span>network-dist</span></div></td>
-        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
-        <td>R3-C05 · U1</td>
-        <td class="mono">10.10.0.30</td>
-        <td>Cisco Catalyst 9300-24P</td>
-        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
-        <td>Auto-Discovery</td>
-        </tr>
-<tr data-site="DC4" data-type="switch" data-status="online" data-tags="lab">
-        <td><div class="strong">SW-LAB-05</div><div class="mono" style="font-size:11px;">SW-CAT-2960-440</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--violet) 18%, transparent);color:var(--violet)"><span class="tdot"></span>lab</span></div></td>
-        <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
-        <td>R4-A01 · U1</td>
-        <td class="mono">10.10.0.105</td>
-        <td>Cisco Catalyst 2960-X</td>
-        <td><span class="badge online"><span class="bdot"></span>Online</span></td>
-        <td>Auto-Discovery</td>
-        </tr>
-          </tbody>
+</tbody>
         </table>
         <div class="table-footer">
           <span>Halaman 1 dari 161</span>
@@ -331,10 +268,8 @@
         <div class="form-row">
           <div class="m-field"><label class="form-label">Peran / Segmentasi</label><select class="form-input" data-nf="role">
             <option value="">— Pilih peran —</option>
-            <option>Core</option>
-            <option>Distribution</option>
-            <option>Access</option>
-            <option>Management</option>
+            <option>Edge</option>
+            <option>Internal</option>
           </select></div>
           <div class="m-field"><label class="form-label">Network VLAN / Segment</label><input class="form-input" type="text" placeholder="mis. VLAN 100 — Server Farm" data-nf="vlan"></div>
         </div>

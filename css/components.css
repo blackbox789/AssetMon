@@ -209,6 +209,9 @@
 .type-chip.firewall { color: var(--warning); background: var(--warning-dim); }
 .type-chip.patch { color: var(--text-muted); background: var(--bg-surface-3); }
 .type-chip.router { color: var(--text-muted); background: var(--bg-surface-3); }
+.type-chip.ids { color: #EC4899; background: rgba(236,72,153,0.14); }
+.type-chip.lb { color: #14B8A6; background: rgba(20,184,166,0.14); }
+#asset-type-select option:disabled, select.form-input option:disabled { color: var(--text-muted); font-style: italic; }
 .type-chip.storage { color: #F97316; background: rgba(249,115,22,0.14); }
 .type-chip.kvm-switch { color: #06B6D4; background: rgba(6,182,212,0.14); }
 .type-chip.ups { color: #EAB308; background: rgba(234,179,8,0.14); }

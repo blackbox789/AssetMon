@@ -98,12 +98,6 @@ function renderTable() {
       <td class="mono">${p.ip}</td>
       <td>${p.brand} ${p.model}</td>
       <td>${statusBadge(p.status)}</td>
-      <td><div class="row-actions">
-        <button title="Edit"><i class="fa-solid fa-pen"></i></button>
-        <button title="View"><i class="fa-solid fa-eye"></i></button>
-        <button title="Port Map"><i class="fa-solid fa-ethernet"></i></button>
-        <button title="Power Map"><i class="fa-solid fa-plug"></i></button>
-      </div></td>
     </tr>`).join("");
 
   countEl.innerHTML = rows.length === 0
@@ -133,7 +127,7 @@ let editingPdu = null;
 let viewPduName = null;
 
 function setAddTitle(mode) {
-  document.getElementById("add-pdu-title").textContent = mode === "edit" ? "Edit PDU" : "Add PDU";
+  document.getElementById("add-pdu-title").textContent = mode === "edit" ? "Edit PDU" : "Tambah PDU";
   document.getElementById("add-pdu-sub").textContent = mode === "edit"
     ? "Ubah data Power Distribution Unit ini."
     : "Tambahkan Power Distribution Unit baru ke inventory";
@@ -185,6 +179,10 @@ function openEdit(name) {
   document.getElementById("pdu-model").value = p.model || "";
   document.getElementById("pdu-ip").value = p.ip || "";
   document.getElementById("pdu-status").value = p.status;
+  const rI = document.getElementById("pdu-rating"); if (rI) rI.value = p.rating || "";
+  const pI = document.getElementById("pdu-plug"); if (pI) pI.value = p.plug || "";
+  const vI = document.getElementById("pdu-volt"); if (vI) vI.value = p.volt || "";
+  const mI = document.getElementById("pdu-metering"); if (mI) mI.value = p.metering || "";
   setAddTitle("edit");
   addModal.classList.add("open");
 }
@@ -250,12 +248,14 @@ function resetForm() {
   portPicker.forEach(c => { if (c.dataset.outlet === "36") c.classList.add("active"); });
   customPortInput.style.display = "none";
   customPortInput.value = "";
-  ["pdu-name", "pdu-model", "pdu-ip", "pdu-u", "pdu-serial"].forEach(id => document.getElementById(id).value = "");
+  ["pdu-name", "pdu-model", "pdu-ip", "pdu-u", "pdu-serial", "pdu-rating", "pdu-plug", "pdu-volt"].forEach(id => document.getElementById(id).value = "");
   document.getElementById("pdu-site").value = "DC1";
   document.getElementById("pdu-rack").value = "R1-A12";
   document.getElementById("pdu-side").value = "Sisi A";
   document.getElementById("pdu-brand").value = "APC";
   document.getElementById("pdu-status").value = "online";
+  const mtr = document.getElementById("pdu-metering");
+  if (mtr) mtr.value = "";
 }
 
 // ---- Save (Add / Edit) ----
@@ -282,6 +282,10 @@ document.getElementById("save-add-pdu").addEventListener("click", () => {
     model: document.getElementById("pdu-model").value.trim(),
     ip: document.getElementById("pdu-ip").value.trim(),
     status: document.getElementById("pdu-status").value,
+    rating: document.getElementById("pdu-rating") ? document.getElementById("pdu-rating").value.trim() : "",
+    plug: document.getElementById("pdu-plug") ? document.getElementById("pdu-plug").value.trim() : "",
+    volt: document.getElementById("pdu-volt") ? document.getElementById("pdu-volt").value.trim() : "",
+    metering: document.getElementById("pdu-metering") ? document.getElementById("pdu-metering").value : "",
   };
   if (editingPdu) {
     const idx = PDU_DATA.findIndex(x => x.name === editingPdu);
@@ -298,14 +302,29 @@ document.getElementById("save-add-pdu").addEventListener("click", () => {
       }
       if (POWER_DATA[name]) POWER_DATA[name].ports = ports;
       else POWER_DATA[name] = { ports, rows: [] };
+      upsertPduOverride(entry);
     }
     editingPdu = null;
   } else {
     PDU_DATA.unshift(entry);
     POWER_DATA[name] = { ports, rows: [] };
+    upsertPduOverride(entry);
   }
-  if (typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: name, type: "pdu", name });
+  // Skeleton Port Map PDU (port manajemen) — tersinkron ke SQLite via savePortMap
+  if (typeof PORT_DATA !== "undefined") {
+    const prevPort = PORT_DATA[name];
+    PORT_DATA[name] = {
+      type: "pdu",
+      ports: (prevPort && prevPort.ports) || 1,
+      sfp: (prevPort && prevPort.sfp) || 0,
+      qsfp: (prevPort && prevPort.qsfp) || 0,
+      rows: (prevPort && Array.isArray(prevPort.rows)) ? prevPort.rows : [],
+      specials: prevPort && Array.isArray(prevPort.specials) ? prevPort.specials.map(s => ({ ...s })) : undefined,
+    };
+  }
+  if (typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: name, type: "pdu", name, data: entry });
   if (typeof savePowerMap === "function") savePowerMap(name);
+  if (typeof savePortMap === "function" && typeof PORT_DATA !== "undefined" && PORT_DATA[name]) savePortMap(name);
   setAddTitle("add");
   pduPage = 1;
   renderTable();
@@ -343,17 +362,216 @@ document.getElementById("view-pdu-powermap").addEventListener("click", () => {
   if (viewPduName) openPowerMap(viewPduName);
 });
 
-// ---- Delegasi tombol aksi baris (Edit / View / Power Map) ----
+// ---- Persistensi PDU (overrides lokal) + hydrate dari SQLite (DB = sumber utama) ----
+// PDU_DATA dasar adalah seed konstan; penambahan/edit user disimpan ke
+// rv_pdu_overrides agar tidak hilang saat reload. Saat backend hidup, record
+// type=pdu dari tabel devices (data JSON) menimpa versi lokal yang sama nama.
+const PDU_OVERRIDES_KEY = "rv_pdu_overrides";
+function readPduOverrides() {
+  try { const a = JSON.parse(localStorage.getItem(PDU_OVERRIDES_KEY) || "[]"); return Array.isArray(a) ? a : []; }
+  catch { return []; }
+}
+function writePduOverrides(list) {
+  try { localStorage.setItem(PDU_OVERRIDES_KEY, JSON.stringify(list)); } catch (e) { /* penuh */ }
+}
+function upsertPduOverride(entry) {
+  const list = readPduOverrides();
+  const i = list.findIndex(x => x.name === entry.name);
+  if (i >= 0) list[i] = entry; else list.unshift(entry);
+  writePduOverrides(list);
+}
+function applyPduOverrides() {
+  readPduOverrides().forEach(o => {
+    const i = PDU_DATA.findIndex(x => x.name === o.name);
+    if (i >= 0) PDU_DATA[i] = o; else PDU_DATA.unshift(o);
+  });
+}
+
+async function hydratePduFromDb() {
+  if (typeof fetch !== "function") return;
+  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+  let list;
+  try {
+    const res = await fetch(base + "/devices");
+    if (!res.ok || !res.json) return;
+    list = await res.json();
+  } catch (e) { return; }
+  if (!Array.isArray(list)) return;
+  let changed = false;
+  for (const d of list) {
+    if (String(d.type || "").toLowerCase() !== "pdu") continue;
+    const key = canonKey(d.deviceKey || d.name || "");
+    if (!key) continue;
+    let data = {};
+    try { data = typeof d.data === "string" ? (JSON.parse(d.data) || {}) : (d.data || {}); } catch (e) { data = {}; }
+    delete data.ok;
+    if (!Object.keys(data).length) continue; // record tipis: jangan timpa
+    const rec = { ...data, name: key, type: data.type === "horizontal" ? "horizontal" : "vertical" };
+    const i = PDU_DATA.findIndex(x => x.name === key);
+    if (i >= 0) { PDU_DATA[i] = rec; } else { PDU_DATA.unshift(rec); }
+    upsertPduOverride(rec);
+    changed = true;
+  }
+  if (changed) renderTable();
+}
+
+// ---- Detail panel + contextual bar (paritas menu lain) ----
+let selectedPduRow = null;
+
+function pduKv(label, value) {
+  if (value == null || String(value).trim() === "" || String(value).trim() === "—") return "";
+  return `<div class="kv-row"><span class="kv-label">${escHtml(label)}</span><span class="kv-value">${escHtml(value)}</span></div>`;
+}
+
+function buildPduDetailHTML(p) {
+  const pw = typeof POWER_DATA !== "undefined" ? POWER_DATA[p.name] : null;
+  const used = pw && Array.isArray(pw.rows) ? pw.rows.length : (p.used || 0);
+  const header = `
+    <div class="srv-detail-head">
+      <div class="strong" style="font-size:14px;">${escHtml(p.name)}</div>
+      <div class="srv-meta-row" style="margin-top:6px;">
+        <span class="tag-chip" style="background:color-mix(in srgb, var(--violet) 18%, transparent);color:var(--violet)"><span class="tdot"></span>${p.type === "vertical" ? "Vertikal (0U)" : "Horizontal (1U)"}</span>
+        ${p.brand ? `<span class="tag-chip" style="background:var(--bg-surface-3);color:var(--text-secondary)"><span class="tdot"></span>${escHtml([p.brand, p.model].filter(Boolean).join(" "))}</span>` : ""}
+      </div>
+    </div>`;
+  return header +
+    `<div class="kv-group"><div class="kv-group-title">Identitas</div>` +
+      pduKv("Brand / Model", [p.brand, p.model].filter(Boolean).join(" ")) +
+      pduKv("Serial Number", p.serial) +
+      pduKv("IP Address", p.ip) +
+      pduKv("Site", p.site) +
+      pduKv("Rack / Posisi", [p.rack, p.pos].filter(Boolean).join(" · ")) +
+      pduKv("Status", p.status) +
+    `</div>` +
+    `<div class="kv-group"><div class="kv-group-title">Daya</div>` +
+      pduKv("Outlet Terpakai", `${used}/${p.ports}`) +
+      pduKv("Rating Input", p.rating) +
+      pduKv("Tipe Plug", p.plug) +
+      pduKv("Voltase", p.volt) +
+      pduKv("Metering per-Outlet", p.metering) +
+    `</div>`;
+}
+
+function clearPduDetail() {
+  if (selectedPduRow) { selectedPduRow.classList.remove("row-selected"); selectedPduRow = null; }
+  const body = document.getElementById("pdu-detail-body");
+  if (body) body.innerHTML = '<div class="form-hint">Klik baris pada tabel untuk melihat ringkasan identitas perangkat.</div>';
+  const closeBtn = document.getElementById("pdu-detail-close");
+  if (closeBtn) closeBtn.style.display = "none";
+  const bar = document.getElementById("pdu-ctx-bar");
+  if (bar) bar.hidden = true;
+}
+
+function renderPduDetail(tr) {
+  if (selectedPduRow) selectedPduRow.classList.remove("row-selected");
+  selectedPduRow = tr;
+  tr.classList.add("row-selected");
+  const name = tr.dataset.pduName;
+  const p = PDU_DATA.find(x => x.name === name);
+  const body = document.getElementById("pdu-detail-body");
+  if (body && p) body.innerHTML = buildPduDetailHTML(p);
+  const closeBtn = document.getElementById("pdu-detail-close");
+  if (closeBtn) closeBtn.style.display = "";
+  updatePduCtxBar(name);
+}
+
+function pduGoLocation(name, rack) {
+  if (!rack) return;
+  window.location.href = "rack-elevation.html?rack=" + encodeURIComponent(rack) + "&device=" + encodeURIComponent(name);
+}
+
+function updatePduCtxBar(name) {
+  const bar = document.getElementById("pdu-ctx-bar");
+  if (!bar) return;
+  const p = name ? PDU_DATA.find(x => x.name === name) : null;
+  if (!p) { bar.hidden = true; bar.innerHTML = ""; return; }
+  bar.hidden = false;
+  bar.innerHTML = `<div class="ctx-bar-info"><i class="fa-solid fa-caret-right"></i> <b>${escHtml(p.name)}</b></div>
+    <div class="ctx-bar-actions">
+      <button type="button" class="ctx-btn" title="Lihat ringkasan" data-act="view"><i class="fa-solid fa-eye"></i> Lihat</button>
+      <button type="button" class="ctx-btn" title="Edit PDU" data-act="edit"><i class="fa-solid fa-pen"></i> Edit</button>
+      <button type="button" class="ctx-btn" title="Buka Port Map" data-act="port"><i class="fa-solid fa-ethernet"></i> Port Map</button>
+      <button type="button" class="ctx-btn" title="Buka Power Map" data-act="power"><i class="fa-solid fa-plug"></i> Power Map</button>
+      ${p.rack ? `<button type="button" class="ctx-btn" title="Lokasi di Rack Elevation" data-act="loc"><i class="fa-solid fa-location-dot"></i> Lokasi</button>` : ""}
+      <button type="button" class="ctx-btn danger" title="Hapus PDU" data-act="delete"><i class="fa-solid fa-trash"></i> Hapus</button>
+      <button type="button" class="ctx-btn" title="Tutup" data-act="close"><i class="fa-solid fa-xmark"></i></button>
+    </div>`;
+  bar.onclick = e => {
+    const btn = e.target.closest("[data-act]");
+    if (!btn) return;
+    const act = btn.dataset.act;
+    if (act === "close") { clearPduDetail(); return; }
+    if (act === "view") { openView(name); return; }
+    if (act === "edit") { openEdit(name); return; }
+    if (act === "port") { openPortMap(name, false, 0, { type: "pdu" }); return; }
+    if (act === "power") { openPowerMap(name); return; }
+    if (act === "loc") { const p = PDU_DATA.find(x => x.name === name); if (p) pduGoLocation(name, p.rack); return; }
+    if (act === "delete") { deletePduRecord(name); return; }
+  };
+}
+
+function deletePduRecord(name) {
+  const doubleOk = typeof window.confirmDoubleDelete === "function"
+    ? window.confirmDoubleDelete(name)
+    : (confirm(`Hapus ${name}?`) && confirm("Yakin ingin menghapus permanen? Data yang dihapus tidak dapat dikembalikan."));
+  if (!doubleOk) return;
+  try { if (typeof apiDeleteDevice === "function") apiDeleteDevice(name); } catch (e) { /* offline */ }
+  // bersihkan map lokal + storage
+  [PORT_STORAGE_KEY, POWER_STORAGE_KEY].forEach(sk => {
+    try {
+      const obj = JSON.parse(localStorage.getItem(sk) || "{}") || {};
+      if (Object.prototype.hasOwnProperty.call(obj, name)) {
+        delete obj[name];
+        localStorage.setItem(sk, JSON.stringify(obj));
+      }
+    } catch (e) { /* abaikan */ }
+  });
+  if (typeof PORT_DATA !== "undefined") delete PORT_DATA[name];
+  if (typeof POWER_DATA !== "undefined") delete POWER_DATA[name];
+  const i = PDU_DATA.findIndex(x => x.name === name);
+  if (i >= 0) PDU_DATA.splice(i, 1);
+  writePduOverrides(readPduOverrides().filter(x => x.name !== name));
+  try {
+    const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+    fetch(base + "/audit/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "device.delete", target: name, detail: "Dihapus dari Daftar PDU (type: pdu)" })
+    });
+  } catch (e) { /* abaikan */ }
+  if (typeof showToast === "function") showToast("PDU " + name + " berhasil dihapus.", "success");
+  clearPduDetail();
+  renderTable();
+}
+
+
+
+// ---- Delegasi baris: klik tombol aksi / klik baris / double-click lokasi ----
 tbody.addEventListener("click", e => {
   const btn = e.target.closest("button");
-  if (!btn) return;
+  const row = (btn ? btn.closest("tr") : e.target.closest("tr[data-pdu-name]"));
+  if (!row || !row.dataset.pduName) return;
+  const name = row.dataset.pduName;
+  if (btn) {
+    if (btn.title === "Edit") openEdit(name);
+    else if (btn.title === "View") openView(name);
+    else if (btn.title === "Port Map") openPortMap(name, false, 0, { type: "pdu" });
+    else if (btn.title === "Power Map") openPowerMap(name);
+    return;
+  }
+  renderPduDetail(row);
+});
+tbody.addEventListener("dblclick", e => {
+  if (e.target.closest("button, a")) return;
   const row = e.target.closest("tr[data-pdu-name]");
   if (!row) return;
-  const name = row.dataset.pduName;
-  if (btn.title === "Edit") openEdit(name);
-  else if (btn.title === "View") openView(name);
-  else if (btn.title === "Port Map") openPortMap(name, false, 0, { type: "pdu" });
-  else if (btn.title === "Power Map") openPowerMap(name);
+  const p = PDU_DATA.find(x => x.name === row.dataset.pduName);
+  if (p) pduGoLocation(p.name, p.rack);
 });
+const pduDetailCloseBtn = document.getElementById("pdu-detail-close");
+if (pduDetailCloseBtn) pduDetailCloseBtn.addEventListener("click", clearPduDetail);
 
+// ---- Init: overrides lokal lalu render; DB otoritatif menyusul (async) ----
+applyPduOverrides();
 renderTable();
+hydratePduFromDb();

@@ -125,6 +125,20 @@ CREATE TABLE IF NOT EXISTS maintenance (
   data      TEXT NOT NULL,
   createdAt TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS notes (
+  id          TEXT PRIMARY KEY,
+  entityType  TEXT NOT NULL CHECK(entityType IN ('device','rack')),
+  entityKey   TEXT NOT NULL,
+  source      TEXT NOT NULL DEFAULT 'manual',
+  refKind     TEXT,
+  refId       TEXT,
+  title       TEXT,
+  detail      TEXT,
+  severity    TEXT,
+  createdBy   TEXT,
+  createdAt   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_notes_entity ON notes(entityType, entityKey, createdAt);
 CREATE INDEX IF NOT EXISTS idx_devices_type ON devices(type);
 CREATE INDEX IF NOT EXISTS idx_maps_device_key ON maps(deviceKey);
 CREATE INDEX IF NOT EXISTS idx_maps_kind_created ON maps(kind, createdAt);
@@ -752,7 +766,7 @@ app.delete("/api/servers/:id", (req, res) => {
 
 app.get("/api/devices", (req, res) => {
   const rows = db.prepare(`
-    SELECT d.deviceKey, d.type, d.name, d.site, d.rackId, s.name AS siteName
+    SELECT d.deviceKey, d.type, d.name, d.site, d.rackId, s.name AS siteName, d.data
     FROM devices d LEFT JOIN sites s ON s.siteId = d.site
     ORDER BY d.deviceKey
   `).all();
@@ -1116,6 +1130,109 @@ app.delete("/api/attachments/:id", (req, res) => {
   if (!id) return res.status(400).json({ error: "id required" });
   db.prepare("DELETE FROM attachments WHERE id = ?").run(id);
   res.json({ ok: true });
+});
+
+// ---- History & Notes: timeline per entitas (device/rack) ----
+// Prinsip: record OPS (incident/maintenance/visit) TIDAK diduplikasi —
+// endpoint history hanyalah proyeksi baca yang menggabungkan sumber.
+// Hanya catatan manual yang disimpan di tabel `notes`.
+app.post("/api/notes", express.json({ limit: "256kb" }), (req, res) => {
+  const b = req.body || {};
+  const entityType = b.entityType === "rack" ? "rack" : "device";
+  const entityKey = canonKey(b.entityKey || "");
+  const detail = String(b.detail || "").trim();
+  if (!entityKey) return res.status(400).json({ error: "entityKey wajib" });
+  if (!detail) return res.status(400).json({ error: "detail wajib diisi" });
+  const id = genId("note");
+  db.prepare("INSERT INTO notes (id, entityType, entityKey, source, title, detail, severity, createdBy, createdAt) VALUES (?,?,?,?,?,?,?,?,datetime('now','localtime'))")
+    .run(id, entityType, entityKey, "manual", String(b.title || "").trim() || null, detail,
+      ["critical", "high", "medium", "low", "info"].includes(b.severity) ? b.severity : "info",
+      currentUserId(req) || "anon");
+  auditLog(req, currentUserId(req), "note.create", entityType + "/" + entityKey, detail.slice(0, 60));
+  const row = db.prepare("SELECT * FROM notes WHERE id = ?").get(id);
+  res.json({ ok: true, note: row });
+});
+
+app.delete("/api/notes/:id", (req, res) => {
+  const row = db.prepare("SELECT * FROM notes WHERE id = ?").get(req.params.id);
+  if (!row) return res.status(404).json({ error: "note tidak ditemukan" });
+  if (row.source !== "manual") return res.status(400).json({ error: "hanya catatan manual yang bisa dihapus" });
+  db.prepare("DELETE FROM notes WHERE id = ?").run(row.id);
+  auditLog(req, currentUserId(req), "note.delete", row.entityType + "/" + row.entityKey, (row.title || row.detail || "").slice(0, 60));
+  res.json({ ok: true });
+});
+
+app.get("/api/history/:entityType/:entityKey", (req, res) => {
+  const entityType = req.params.entityType === "rack" ? "rack" : "device";
+  const key = canonKey(req.params.entityKey || "");
+  if (!key) return res.status(400).json({ error: "entityKey wajib" });
+  const limit = Math.min(parseInt(req.query.limit, 10) || 200, 500);
+  const normAt = v => String(v || "").replace("T", " ").replace(/\.\d+$/, "");
+  const items = [];
+
+  db.prepare("SELECT * FROM notes WHERE entityType = ? AND entityKey = ? ORDER BY createdAt DESC LIMIT ?")
+    .all(entityType, key, limit)
+    .forEach(n => items.push({
+      source: "manual", refNo: "", id: n.id, deletable: true,
+      title: n.title || "Catatan manual", detail: n.detail,
+      severity: n.severity || "info", at: n.createdAt, by: n.createdBy || "",
+    }));
+
+  const opsRows = kind => db.prepare("SELECT data FROM " + kind).all().map(r => { try { return JSON.parse(r.data); } catch { return null; } }).filter(Boolean);
+
+  if (entityType === "device") {
+    opsRows("incidents").forEach(r => {
+      if (canonKey(r.asset || "") !== key) return;
+      items.push({
+        source: "incident", refNo: r.no || "", status: r.status || "",
+        title: (r.no ? r.no + " — " : "") + (r.title || r.problem || "Insiden"),
+        detail: r.resolution || r.description || "",
+        severity: r.severity || "", at: normAt(r.occurred_at || r.created_at), by: r.assignee || r.created_by || "",
+        link: r.no ? "incident-report.html?q=" + encodeURIComponent(r.no) : "",
+      });
+    });
+    opsRows("maintenance").forEach(r => {
+      if (canonKey(r.asset || "") !== key) return;
+      const trans = Array.isArray(r.status_history) && r.status_history.length
+        ? r.status_history[r.status_history.length - 1]
+        : null;
+      items.push({
+        source: "maintenance", refNo: r.no || "", status: r.status || "",
+        title: (r.no ? r.no + " — " : "") + "Maintenance" + (r.type ? " (" + r.type + ")" : ""),
+        detail: [r.hasil, r.temuan].filter(Boolean).join(" · "),
+        severity: "", at: normAt((trans && trans.at) || r.mulai || r.created_at), by: (trans && trans.by) || r.created_by || "",
+        link: r.no ? "maintenance.html?q=" + encodeURIComponent(r.no) : "",
+      });
+    });
+    opsRows("visits").forEach(r => {
+      const assets = String(r.assets || "").toUpperCase();
+      if (!assets.includes(key)) return;
+      items.push({
+        source: "visit", refNo: r.no || "", status: r.status || "",
+        title: (r.no ? r.no + " — " : "") + "Kunjungan site" + (r.tujuan ? " (" + r.tujuan + ")" : ""),
+        detail: [r.hasil, r.temuan].filter(Boolean).join(" · ") || (r.assets || ""),
+        severity: "", at: normAt(r.tanggal ? r.tanggal + " " + (r.jam_realisasi || r.jam_rencana || "") : r.created_at),
+        by: r.tim || r.created_by || "",
+        link: r.no ? "kunjungan-site.html?q=" + encodeURIComponent(r.no) : "",
+      });
+    });
+  } else {
+    opsRows("incidents").forEach(r => {
+      if (canonKey(r.rack || "") !== key) return;
+      items.push({ source: "incident", refNo: r.no || "", status: r.status || "", title: (r.no ? r.no + " — " : "") + (r.title || "Insiden"), detail: r.description || "", severity: r.severity || "", at: normAt(r.occurred_at || r.created_at), by: r.assignee || "", link: r.no ? "incident-report.html?q=" + encodeURIComponent(r.no) : "" });
+    });
+    opsRows("maintenance").forEach(r => {
+      if (canonKey(r.rack || "") !== key) return;
+      items.push({ source: "maintenance", refNo: r.no || "", status: r.status || "", title: (r.no ? r.no + " — " : "") + "Maintenance" + (r.type ? " (" + r.type + ")" : ""), detail: [r.hasil, r.temuan].filter(Boolean).join(" · "), severity: "", at: normAt(r.mulai || r.created_at), by: r.created_by || "", link: r.no ? "maintenance.html?q=" + encodeURIComponent(r.no) : "" });
+    });
+    opsRows("visits").forEach(r => {
+      if (canonKey(r.rack || "") !== key && !String(r.assets || "").toUpperCase().includes(key)) return;
+      items.push({ source: "visit", refNo: r.no || "", status: r.status || "", title: (r.no ? r.no + " — " : "") + "Kunjungan site", detail: [r.hasil, r.temuan].filter(Boolean).join(" · "), severity: "", at: normAt(r.tanggal || r.created_at), by: r.tim || "", link: r.no ? "kunjungan-site.html?q=" + encodeURIComponent(r.no) : "" });
+    });
+  }
+
+  items.sort((a, b) => String(b.at || "").localeCompare(String(a.at || "")));
+  res.json({ ok: true, entityType, entityKey: key, count: items.length, items: items.slice(0, limit) });
 });
 
 app.get("/api/:kind", (req, res) => {

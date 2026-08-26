@@ -182,6 +182,15 @@ const SPECIAL_PORT_DEFS = {
     { key: "CON",  label: "Console",   media: "Console", hint: "Port console / serial" },
     { key: "WAN",  label: "WAN",       media: "LC SM", hint: "Koneksi WAN / ISP" },
   ],
+  ids: [
+    { key: "MGMT", label: "Manajemen", media: "Cat6", hint: "Port manajemen sensor IDS/IPS" },
+    { key: "CON",  label: "Console",   media: "Console", hint: "Port console / serial" },
+    { key: "MON",  label: "Monitor",   media: "Cat6", hint: "Port monitor/tap untuk trafik yang diinspeksi (SPAN/mirror)" },
+  ],
+  lb: [
+    { key: "MGMT", label: "Manajemen", media: "Cat6", hint: "Port manajemen load balancer" },
+    { key: "CON",  label: "Console",   media: "Console", hint: "Port console / serial" },
+  ],
   server: [
     { key: "MGMT", label: "Manajemen", media: "Cat6", hint: "BMC — iDRAC / iLO / IPMI (bukan port data)" },
   ],
@@ -203,7 +212,7 @@ const SPECIAL_PORT_DEFS = {
 const SPECIAL_PORT_COLORS = {
   MGMT: "#3B82F6", CON: "#F97316", CONSOLE: "#F97316",
   WAN: "#0EA5E9", HA: "#A855F7", UPLINK: "#22C55E",
-  AUX: "#94A3B8", PSU: "#8B5CF6", DATA: "#2FB5C8",
+  MON: "#14B8A6", AUX: "#94A3B8", PSU: "#8B5CF6", DATA: "#2FB5C8",
 };
 
 function specialPortColor(key) {

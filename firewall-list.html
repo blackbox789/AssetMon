@@ -40,9 +40,11 @@
         <a href="storage-list.html" class="nav-subitem" data-type="storage"><i class="fa-solid fa-hard-drive"></i><span>Storage</span></a>
         <a href="asset-list.html" class="nav-subitem nav-parent2 open" data-submenu2="submenu-asset-net"><i class="fa-solid fa-network-wired"></i><span>Network Device</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
         <div class="nav-submenu2 open" id="submenu-asset-net">
-          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Switch</span></a>
-          <a href="firewall-list.html" class="nav-subitem2 active" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
           <a href="router-list.html" class="nav-subitem2" data-type="router"><i class="fa-solid fa-tower-broadcast"></i><span>Router</span></a>
+          <a href="firewall-list.html" class="nav-subitem2 active" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
+          <a href="ids-ips-list.html" class="nav-subitem2" data-type="ids"><i class="fa-solid fa-shield-virus"></i><span>IDS/IPS</span></a>
+          <a href="loadbalancer-list.html" class="nav-subitem2" data-type="lb"><i class="fa-solid fa-scale-balanced"></i><span>Load Balancer</span></a>
+          <a href="network-device-list.html" class="nav-subitem2" data-type="switch"><i class="fa-solid fa-network-wired"></i><span>Switch</span></a>
         </div>
         <a href="ups-list.html" class="nav-subitem" data-type="ups"><i class="fa-solid fa-plug-circle-bolt"></i><span>UPS</span></a>
         <a href="accessories-list.html" class="nav-subitem" data-type="accessories"><i class="fa-solid fa-sliders"></i><span>Accessories</span></a>
@@ -111,6 +113,8 @@
           <option value="switch">Network Switch</option>
           <option value="firewall" selected>Firewall</option>
           <option value="router">Router</option>
+          <option value="ids">IDS/IPS</option>
+          <option value="lb">Load Balancer</option>
           <option value="patch">Patch Panel</option>
           <option value="pdu">Rack PDU</option>
           <option value="ups">UPS</option>
@@ -141,7 +145,7 @@
 
       <div class="card">
         <table>
-          <thead><tr><th>Asset</th><th>Tipe</th><th>Rack / Posisi</th><th>IP Address</th><th>Brand / Model</th><th>Spesifikasi</th><th>Status</th><th>Discovery Source</th><th></th></tr></thead>
+          <thead><tr><th>Asset</th><th>Tipe</th><th>Rack / Posisi</th><th>IP Address</th><th>Brand / Model</th><th>Spesifikasi</th><th>Status</th><th>Discovery Source</th></tr></thead>
           <tbody>
 <tr data-site="DC1" data-type="firewall" data-status="maintenance" data-tags="production,security">
         <td><div class="strong">FW-EDGE-02</div><div class="mono" style="font-size:11px;">FGT-200F-9931</div><div style="margin-top:4px;"><span class="tag-chip" style="background:color-mix(in srgb, var(--danger) 18%, transparent);color:var(--danger)"><span class="tdot"></span>production</span><span class="tag-chip" style="background:color-mix(in srgb, var(--warning) 18%, transparent);color:var(--warning)"><span class="tdot"></span>security</span></div></td>
@@ -151,12 +155,7 @@
         <td>Fortinet FortiGate 200F</td>
         <td><span class="badge maintenance"><span class="bdot"></span>Maintenance</span></td>
         <td>Import CSV</td>
-        <td><div class="row-actions">
-          <button title="Edit"><i class="fa-solid fa-pen"></i></button>
-          <button title="View"><i class="fa-solid fa-eye"></i></button>
-          <button title="Port Map" onclick="openPortMap('FW-EDGE-02')"><i class="fa-solid fa-ethernet"></i></button>
-        </div></td>
-      </tr>
+        </tr>
           </tbody>
         </table>
         <div class="table-footer">
@@ -184,6 +183,8 @@
           <option value="Switch">Network Switch</option>
           <option value="Firewall">Firewall</option>
           <option value="Router">Router</option>
+          <option value="IDS/IPS">IDS/IPS</option>
+          <option value="Load Balancer">Load Balancer</option>
           <option value="Patch Panel">Patch Panel</option>
           <option value="PDU">Rack PDU</option>
           <option value="UPS">UPS</option>
@@ -223,6 +224,29 @@
         <div class="form-hint">Jenis switch menentukan template Port Map yang dibuat otomatis (jumlah & tipe port).</div>
       </div>
 
+
+      <div id="ups-section" style="display:none;border-top:1px solid var(--border-soft);padding-top:16px;margin-top:6px;">
+        <div style="font-size:11.5px;font-weight:600;color:var(--accent-text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;"><i class="fa-solid fa-plug-circle-bolt"></i> UPS — Spesifikasi Daya</div>
+        <div class="form-row">
+          <div class="m-field"><label class="form-label">Kapasitas VA</label><input class="form-input" type="text" placeholder="mis. 3000 VA" data-nf="upsVA"></div>
+          <div class="m-field"><label class="form-label">Kapasitas Watt</label><input class="form-input" type="text" placeholder="mis. 2700 W" data-nf="upsWatt"></div>
+        </div>
+        <div class="form-row">
+          <div class="m-field"><label class="form-label">Topologi</label>
+            <select class="form-input" data-nf="upsTopology"><option value="">—</option><option>Online Double Conversion</option><option>Line-Interactive</option><option>Standby / Offline</option></select>
+          </div>
+          <div class="m-field"><label class="form-label">Jumlah / Tipe Outlet</label><input class="form-input" type="text" placeholder="mis. 8x C13 + 2x C19" data-nf="upsOutlets"></div>
+        </div>
+        <div class="form-row">
+          <div class="m-field"><label class="form-label">Runtime</label><input class="form-input" type="text" placeholder="mis. 12 menit @ 50% beban" data-nf="upsRuntime"></div>
+          <div class="m-field"><label class="form-label">Baterai Terakhir Diganti</label><input class="form-input" type="text" placeholder="mis. 2025-01" data-nf="batteryReplaced"></div>
+        </div>
+        <div class="form-row">
+          <div class="m-field"><label class="form-label">Kartu Manajemen</label><input class="form-input" type="text" placeholder="mis. APC AP9631 NMC3 (SNMP)" data-nf="mgmtCard"></div>
+        </div>
+        <div class="form-hint">Jumlah outlet otomatis dipakai untuk membuat Power Map (UPS sebagai sumber daya).</div>
+      </div>
+
             <div id="network-section" style="display:none;border-top:1px solid var(--border-soft);padding-top:16px;margin-top:6px;">
         <div style="font-size:11.5px;font-weight:600;color:var(--accent-text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;"><i class="fa-solid fa-diagram-project"></i> Network Device — Identitas Perangkat</div>
 
@@ -233,7 +257,7 @@
             <input class="form-input" type="text" placeholder="SFP, mis. 4" data-nf="lanSfp">
             <input class="form-input" type="text" placeholder="QSFP, mis. 2" data-nf="lanQsfp">
           </div>
-          <div class="form-hint">Port Map dibuat otomatis: total port = RJ-45 + SFP + (QSFP × 4).</div>
+          <div class="form-hint">Port Map dibuat otomatis: total port = RJ-45 + SFP + (QSFP × 4). Port spesial (Manajemen, Console) juga dibuat otomatis sesuai tipe — isi koneksinya lewat tombol Port Map.</div>
         </div>
 
         <div class="form-row">
@@ -251,7 +275,13 @@
         </div>
 
         <div class="form-row">
-          <div class="m-field"><label class="form-label">Peran / Segmentasi</label><input class="form-input" type="text" placeholder="mis. Core / Access / Edge / Internal" data-nf="role"></div>
+          <div class="m-field"><label class="form-label">Peran / Segmentasi</label><select class="form-input" data-nf="role">
+            <option value="">— Pilih peran —</option>
+            <option>Edge</option>
+            <option>Internal</option>
+            <option>HA-Primary</option>
+            <option>HA-Secondary</option>
+          </select></div>
           <div class="m-field"><label class="form-label">Network VLAN / Segment</label><input class="form-input" type="text" placeholder="mis. VLAN 100 — Server Farm" data-nf="vlan"></div>
         </div>
 
@@ -274,10 +304,69 @@
             <select class="form-input" data-nf="haMode"><option>Standalone</option><option>Active-Passive</option><option>Active-Active</option><option>Cluster</option></select>
           </div>
         </div>
+        <div class="form-row" data-nf-fw-only>
+          <div class="m-field"><label class="form-label">Lisensi / Langganan</label><input class="form-input" type="text" placeholder="mis. FortiGuard UTM Bundle" data-nf="license"></div>
+          <div class="m-field"><label class="form-label">Lisensi s.d.</label><input class="form-input" type="text" placeholder="mis. 2027-06" data-nf="licenseExpiry"></div>
+        </div>
+        <div class="form-row" data-nf-fw-only>
+          <div class="m-field"><label class="form-label">Peer HA</label><input class="form-input" type="text" placeholder="mis. FW-EDGE-04" data-nf="haPeer"></div>
+        </div>
+        <div class="form-row" data-nf-ids-only>
+          <div class="m-field"><label class="form-label">Mode Deteksi</label>
+            <select class="form-input" data-nf="idsMode"><option value="">—</option><option>IPS (Inline / Prevention)</option><option>IDS (Passive / Detection)</option><option>Hybrid</option></select>
+          </div>
+          <div class="m-field"><label class="form-label">Metode Deploy</label>
+            <select class="form-input" data-nf="deployMode"><option value="">—</option><option>Inline</option><option>SPAN / Mirror</option><option>TAP</option></select>
+          </div>
+        </div>
+        <div class="form-row" data-nf-ids-only>
+          <div class="m-field"><label class="form-label">Throughput Inspeksi</label><input class="form-input" type="text" placeholder="mis. 10 Gbps" data-nf="throughput"></div>
+          <div class="m-field"><label class="form-label">Fail-Safe</label>
+            <select class="form-input" data-nf="failOpen"><option value="">—</option><option>Fail-Open</option><option>Fail-Closed</option></select>
+          </div>
+        </div>
+        <div class="form-row" data-nf-ids-only>
+          <div class="m-field"><label class="form-label">Ruleset / Signature Feed</label><input class="form-input" type="text" placeholder="mis. Snort ET Pro / Cisco FirePOWER Rules" data-nf="ruleset"></div>
+          <div class="m-field"><label class="form-label">Lisensi s.d.</label><input class="form-input" type="text" placeholder="mis. 2027-06" data-nf="licenseExpiry"></div>
+        </div>
+        <div class="form-row" data-nf-lb-only>
+          <div class="m-field"><label class="form-label">Mode Operasi</label>
+            <select class="form-input" data-nf="lbMode"><option value="">—</option><option>L4 (TCP/UDP)</option><option>L7 (HTTP/HTTPS)</option><option>L4 &amp; L7</option></select>
+          </div>
+          <div class="m-field"><label class="form-label">Algoritma Balancing</label>
+            <select class="form-input" data-nf="lbAlgorithm"><option value="">—</option><option>Round Robin</option><option>Weighted Round Robin</option><option>Least Connections</option><option>Source IP Hash</option><option>Response Time</option></select>
+          </div>
+        </div>
+        <div class="form-row" data-nf-lb-only>
+          <div class="m-field"><label class="form-label">Throughput</label><input class="form-input" type="text" placeholder="mis. 10 Gbps" data-nf="throughput"></div>
+          <div class="m-field"><label class="form-label">Max Concurrent Sessions</label><input class="form-input" type="text" placeholder="mis. 1,000,000" data-nf="maxConnections"></div>
+        </div>
+        <div class="form-row" data-nf-lb-only>
+          <div class="m-field"><label class="form-label">High Availability</label>
+            <select class="form-input" data-nf="haMode"><option>Standalone</option><option>Active-Passive</option><option>Active-Active</option><option>Cluster</option></select>
+          </div>
+          <div class="m-field"><label class="form-label">SSL Offload</label>
+            <select class="form-input" data-nf="sslOffload"><option value="">—</option><option>Ya (terminasi di LB)</option><option>Tidak (passthrough)</option></select>
+          </div>
+        </div>
+        <div class="form-row" data-nf-lb-only>
+          <div class="m-field"><label class="form-label">Session Persistence</label>
+            <select class="form-input" data-nf="persistence"><option value="">—</option><option>Cookie Insert</option><option>Source IP</option><option>SSL Session ID</option></select>
+          </div>
+        </div>
 
         <div class="form-row" data-nf-router-only>
           <div class="m-field"><label class="form-label">Routing Protocol</label><input class="form-input" type="text" placeholder="mis. OSPF, BGP, Static" data-nf="routingProtocol"></div>
           <div class="m-field"><label class="form-label">WAN Port</label><input class="form-input" type="text" placeholder="mis. 2" data-nf="wanPorts"></div>
+        </div>
+        <div class="form-row" data-nf-router-only>
+          <div class="m-field"><label class="form-label">Throughput</label><input class="form-input" type="text" placeholder="mis. 20 Gbps" data-nf="throughput"></div>
+          <div class="m-field"><label class="form-label">VPN Tunnels</label><input class="form-input" type="text" placeholder="mis. 1000 (IPsec / DMVPN)" data-nf="vpnTunnels"></div>
+        </div>
+        <div class="form-row" data-nf-router-only>
+          <div class="m-field"><label class="form-label">Redundansi Gateway</label>
+            <select class="form-input" data-nf="gwRedundancy"><option value="">—</option><option>HSRP</option><option>VRRP</option><option>GLBP</option></select>
+          </div>
         </div>
 
         <div class="form-row">
@@ -579,6 +668,25 @@
           <button class="btn ghost btn-sm" type="button" data-add-cancel title="Batal"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="form-hint">Klik untuk pilih tag (bisa lebih dari satu) — membantu filter & pencarian nanti.</div>
+      </div>
+
+      <div class="m-field">
+        <label class="form-label">Gambar Perangkat (Rack Elevation)</label>
+        <div class="devimg-upload" style="margin-bottom:6px;">
+          <img class="devimg-preview" data-devimg-preview="front" alt="Depan" style="display:none;">
+          <button type="button" class="btn ghost" data-devimg-pick="front"><i class="fa-solid fa-upload"></i> Upload Depan</button>
+          <button type="button" class="btn ghost" data-devimg-clear="front" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+          <input type="file" accept="image/png,image/jpeg,image/webp" data-devimg-file="front" style="display:none;">
+        </div>
+        <div class="devimg-upload">
+          <img class="devimg-preview" data-devimg-preview="back" alt="Belakang" style="display:none;">
+          <button type="button" class="btn ghost" data-devimg-pick="back"><i class="fa-solid fa-upload"></i> Upload Belakang</button>
+          <button type="button" class="btn ghost" data-devimg-clear="back" style="display:none;"><i class="fa-solid fa-xmark"></i></button>
+          <input type="file" accept="image/png,image/jpeg,image/webp" data-devimg-file="back" style="display:none;">
+        </div>
+        <div class="form-hint" data-devimg-msg="front"></div>
+        <div class="form-hint" data-devimg-msg="back"></div>
+        <div class="form-hint">Foto tampil di Rack Elevation sesuai tinggi U perangkat (tinggi = span U × 25px, lebar penuh).</div>
       </div>
 
       <div class="modal-foot">

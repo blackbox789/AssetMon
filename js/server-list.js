@@ -267,7 +267,10 @@ function deleteServerRecord(id) {
   const doubleOk = typeof window.confirmDoubleDelete === "function"
     ? window.confirmDoubleDelete(name)
     : (confirm("Hapus " + name + "?") && confirm("Yakin ingin menghapus permanen? Data yang dihapus tidak dapat dikembalikan."));
-  if (!doubleOk) return;
+    if (!doubleOk) return;
+  try {
+    if (typeof apiDeleteServer === "function") apiDeleteServer(id);
+  } catch (e) { /* offline — tombstone lokal tetap ditulis */ }
   try {
     localStorage.setItem(SERVER_STORAGE_KEY, JSON.stringify(readLocalServers().filter(x => x.id !== id)));
   } catch (e) { /* abaikan */ }

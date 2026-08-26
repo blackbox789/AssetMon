@@ -299,4 +299,30 @@ Setiap transisi disimpan ke `status_history` array dalam record:
 - Persistensi manual layer: **`topoLayers`** (localStorage) prioritas atas deteksi otomatis. `deviceLayer(n)` = manual → `detectAutoLayer(n)` (heuristik nama) → leaf (9).
 - Smoke test: `C:\Users\anggo\AppData\Local\Temp\opencode\topo-smoke.cjs` (DOM stub + `vm.runInContext` concat keys/rack-data/port-data/pdu-data/network-topology.js). Terakhir PASS untuk 9 baris + scoping (`R1-A12` → 4/7 switch).
 
+### PENDING — Auto-layer dari field `role` (JANGAN LUPA saat deploy)
+- Field **Peran / Segmentasi** di form network device sekarang dropdown `Core | Distribution | Access | Management` (`data-nf="role"`, tersimpan di record + tabel `devices.data`) — nilainya SENGAJA disamakan dengan baris layer switch di Network Topology.
+- **Belum dikerjakan**: `detectAutoLayer()` di `js/network-topology.js` masih menebak layer dari pola NAMA hostname (SW-CORE-/SW-DIST-/SW-ACC-/MGMT). Perlu ditambah: bila node punya `data.role`/record devices dengan role tersebut, pakai itu sebagai prioritas deteksi otomatis (lebih andal daripada nama), baru fallback heuristik nama.
+- Manfaatnya: switch baru yang di-add via form dengan role terpilih otomatis masuk baris Core/Distribution/Access/Management yang benar di mode Logis tanpa assign manual.
+
+---
+
+## History & Notes per Entitas (device/rack) — Checkpoint
+
+Timeline riwayat untuk device & rack di Rack Elevation. Prinsip: **record OPS TIDAK diduplikasi** — endpoint history adalah *read-model projection* yang menggabungkan sumber saat dibaca; hanya catatan manual yang disimpan.
+
+### Backend (`server.js`)
+- Tabel **`notes`**: `id · entityType('device'|'rack') · entityKey(canonKey/rackId) · source('manual') · title · detail · severity(info|low|medium|high|critical) · createdBy · createdAt` + INDEX `(entityType, entityKey, createdAt)`.
+- **`GET /api/history/:entityType/:entityKey`** → proyeksi gabungan desc: notes(manual) + incidents(asset/rack=key) + maintenance(asset/rack=key, transisi terakhir) + visits(assets LIKE key / rack=key). Item: `{source, refNo, title, detail, severity, at, by, link(deep-link ?q=magicKey), deletable}`. Limit max 500.
+- **`POST /api/notes`** (manual; audit `note.create`) · **`DELETE /api/notes/:id`** (hanya source='manual'; audit `note.delete`). Route spesifik DIDAHULUKAN dari route generik `/api/:kind`.
+- **audit_log ≠ domain history**: audit = aktivitas sistem; history = konten domain. Terpisah.
+
+### Frontend (`rack-elevation.js`)
+- Tab **History pada panel device** = timeline PER PERANGKAT (bukan rack): ikon per sumber (incident 🔴/maintenance 🔧/visit 👁/manual 📝) + badge severity + deep-link; form inline "Tambah Catatan Manual"; hapus hanya untuk catatan manual. Offline fallback: gabungan lokal via RackOps dengan label "(mode offline)".
+- **Panel "Riwayat Rak" terpisah** (tombol `#rack-history-btn` di header rack) → entity_type=rack, termasuk form Catatan Rack.
+- **Dot merah `.dev-issue-dot`** di overlay device yang punya incident open/in_progress (via `RackOps.loadIncidents()`, key=canonKey asset); hilang saat resolved/closed; refresh tiap loadRack.
+
+### Konvensi wajib
+- Join/pencocokan memakai **canonKey** (asset → deviceKey).
+- Timeline immutable: transisi status datang dari `status_history` record OPS, bukan tabel notes.
+
 

@@ -95,6 +95,7 @@ if (typeof POWER_DATA !== "undefined") {
 const typeColor = {
   server: "var(--accent)", switch: "var(--info)", pdu: "var(--violet)",
   firewall: "var(--warning)", router: "var(--text-muted)", patch: "#a5aebd",
+  ids: "#EC4899", lb: "#14B8A6",
   tower: "var(--accent)", storage: "var(--accent)", external: "#8a8f98"
 };
 const typeMeta = {
@@ -103,6 +104,8 @@ const typeMeta = {
   pdu:      { label: "Rack PDU",      badgeBg: "var(--violet-dim)",   badgeColor: "var(--violet)" },
   firewall: { label: "Firewall",      badgeBg: "var(--warning-dim)",  badgeColor: "var(--warning)" },
   router:   { label: "Router / WAN",  badgeBg: "var(--bg-surface-3)", badgeColor: "var(--text-secondary)" },
+  ids:      { label: "IDS/IPS",       badgeBg: "rgba(236,72,153,0.14)", badgeColor: "#EC4899" },
+  lb:       { label: "Load Balancer", badgeBg: "rgba(20,184,166,0.14)", badgeColor: "#14B8A6" },
   patch:    { label: "Patch Panel",   badgeBg: "var(--bg-surface-3)", badgeColor: "var(--text-secondary)" },
   tower:    { label: "Tower Server",  badgeBg: "var(--accent-dim)",   badgeColor: "var(--accent-text)" },
   storage:  { label: "Storage",       badgeBg: "var(--accent-dim)",   badgeColor: "var(--accent-text)" },
@@ -127,8 +130,8 @@ function detectAutoLayer(n) {
   const name = String(n.name || "").toUpperCase();
   const t = n.type || "";
   if (name.startsWith("FW-") || t === "firewall") return 2;
-  if (/IDS|IPS/.test(name)) return 3;
-  if (/^LB-|LOAD\s*BAL/.test(name)) return 4;
+  if (/IDS|IPS/.test(name) || t === "ids") return 3;
+  if (/^LB-|LOAD\s*BAL/.test(name) || t === "lb") return 4;
   if (/^SW[- ]/.test(name) || t === "switch") {
     if (/CORE/.test(name)) return 5;
     if (/DIST/.test(name)) return 6;
@@ -892,7 +895,7 @@ const TOPO_LAYER_TYPES = {
   vlan22:       ["server", "storage", "tower", "patch"],
   vlan33:       ["server", "storage", "tower", "patch"]
 };
-const TOPO_DEV_GROUPS = { switch: "Switch", firewall: "Firewall", server: "Server", storage: "Storage", pdu: "Rack PDU", external: "Eksternal", other: "Lainnya" };
+const TOPO_DEV_GROUPS = { switch: "Switch", firewall: "Firewall", router: "Router", ids: "IDS/IPS", lb: "Load Balancer", server: "Server", storage: "Storage", pdu: "Rack PDU", external: "Eksternal", other: "Lainnya" };
 let editMode = false;
 let activeLayerKey = "core";
 const editbar = document.getElementById("topo-editbar");

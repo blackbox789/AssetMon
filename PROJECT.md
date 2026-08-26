@@ -83,7 +83,7 @@ AssetMon/
 | --- | --- | --- |
 | `sites.html` | Kartu site + form Tambah Rack | `sites.js` |
 | `site-racks.html` | Daftar rack per site | `site-racks.js` |
-| `rack-elevation.html` | Diagram rack per-U (25px/U), foto device, deep-link `?rack=&device=` | `rack-elevation.js`, `rack-ops.js` |
+| `rack-elevation.html` | Diagram rack per-U (25px/U), foto device, deep-link `?rack=&device=`; tab History per perangkat + panel Riwayat Rack (timeline incident/maintenance/visit/catatan manual) | `rack-elevation.js`, `rack-ops.js` |
 | `network-topology.html` | Topologi fisik (kotak rack + edge data/power) & logis (tree 9 layer + VLAN 11/22/33) + "Atur Layer" inline | `network-topology.js` |
 | `port-map.html` | Direktori port per perangkat | `port-map-page.js`, `port-map.js` |
 | `power-map.html` | Pemetaan daya (PDU ↔ konsumen) | `power-map-page.js`, `port-map.js` |
@@ -95,8 +95,9 @@ AssetMon/
 | `server-form.html` / `server-list.html` | Form identitas server (conditional fields, upload foto depan/belakang) + list dengan panel ringkasan | `server-form.js`, `server-list.js`, `server-summary.js` |
 | `storage-form.html` / `storage-list.html` | Form + list storage (form juga dipakai modal) | `storage-form.js`, `storage-list.js`, `storage-summary.js` |
 | `asset-list.html` | Tabel asset gabungan + kolom Spesifikasi + hapus tersinkron | `asset-list.js` |
-| `network-device-list.html` | Switch/firewall/router (record lengkap: interface, power, warranty) | `asset-list.js` |
-| `firewall-list.html` / `router-list.html` / `accessories-list.html` / `ups-list.html` / `pdu-list.html` | List per tipe (mesin render sama) | `asset-list.js`, `pdu-data.js`, `pdu-list.js` |
+| `network-device-list.html` | Switch (urutan sub-menu mengikuti layer topologi: Router→Firewall→IDS/IPS→LB→Switch) | `asset-list.js` |
+| `firewall-list.html` / `router-list.html` / `ids-ips-list.html` / `loadbalancer-list.html` | List per tipe network device + field khas per tipe (fw: lisensi/HA peer; router: throughput/VPN/gw-redundancy; ids: mode deteksi/deploy/ruleset; lb: L4-L7/algoritma/SSL offload) | `asset-list.js` |
+| `accessories-list.html` | Aksesoris rack murni (KVM, patch panel, cable mgmt, cooling fan, blanking panel, monitoring sensor) — scope tipe via `window.ASSET_TYPES_SCOPE`, opsi di luar scope disabled di modal | `asset-list.js` |
 
 ### Operasional (OPS)
 | Halaman | Fungsi | JS terkait |
@@ -159,8 +160,8 @@ AssetMon/
 
 Satu file berisi semua: schema SQLite, helper (`canonKey`, `normalizeMapKeys`, `upsertDevice`, `pruneOrphanDevices`, `backfillDeviceLocation`, `syncDeviceSiteFromRack`, `requireRole`, `auditLog`), route API, static file serving.
 
-### Tabel (13)
-`sites`, `racks`, `devices` (registri master, PK `deviceKey` uppercase), `servers` (detail JSON di kolom `data`), `maps` (Port/Power Map, PK `(kind, deviceKey)`), `users`, `audit_logs`, `brand`, `attachments`, `refs` (master data dropdown), `visits`, `incidents`, `maintenance`. Index sesuai konvensi di AGENTS.md.
+### Tabel (14)
+`sites`, `racks`, `devices` (registri master, PK `deviceKey` uppercase), `servers` (detail JSON di kolom `data`), `maps` (Port/Power Map, PK `(kind, deviceKey)`), `notes` (catatan manual per entitas device/rack untuk timeline history), `users`, `audit_logs`, `brand`, `attachments`, `refs` (master data dropdown), `visits`, `incidents`, `maintenance`. Index sesuai konvensi di AGENTS.md.
 
 ### Endpoint (ringkas)
 | Domain | Endpoint |
@@ -177,6 +178,7 @@ Satu file berisi semua: schema SQLite, helper (`canonKey`, `normalizeMapKeys`, `
 | Brand | `GET/POST /api/brand`, `POST /api/brand/logo` |
 | Lampiran | `GET/DELETE /api/attachments...`, `POST /api/uploads/:kind/:ref` (raw PDF ≤20MB, magic `%PDF-`) |
 | Foto device | `POST/DELETE /api/device-image/:deviceKey/:view` (png/jpg/webp ≤20MB) |
+| History & Notes | `GET /api/history/:entityType/:entityKey` (proyeksi gabungan notes+incidents+maintenance+visits), `POST /api/notes`, `DELETE /api/notes/:id` |
 | OPS generik | `GET/POST /api/:kind`, `DELETE /api/:kind/:id` untuk `visits|incidents|maintenance` |
 
 Lain-lain: `app.db` **diblokir dari static** (403); `/` redirect ke `dashboard.html`.
@@ -193,12 +195,29 @@ Lain-lain: `app.db` **diblokir dari static** (403); `/` redirect ke `dashboard.h
 | Skrip | Fungsi |
 | --- | --- |
 | `seed-ops.cjs` | Seed produksi OPS via API (idempoten; `--force` timpa) |
+| `seed-network-devices.cjs` | Seed spesifikasi 9 network device inti ke `devices.data` (idempoten; `--force`) |
+| `seed-maps.cjs` | Seed Port/Power Map dasar dari `DEFAULT_*` + skeleton per perangkat ber-spesifikasi (idempoten; `--force`) |
 | `seed-storage-demo.cjs` | Demo data storage |
 | `verify-portmap.cjs` | 44 test: canonKey, normalisasi runtime, build/save map |
 | `verify-asset-list.cjs` | Verifikasi asset list |
 | `check-db.js` | Inspeksi isi DB cepat |
 
-## 11. Catatan Keamanan (status saat ini)
+## 11. Arsitektur Data — SQLite sebagai Sumber Utama (DB-first)
+
+Sejak refactor bertahap, **SQLite adalah sumber kebenaran**; localStorage hanya cache/fallback offline:
+
+| Data | Sumber utama | Mekanisme |
+| --- | --- | --- |
+| Network device + UPS (record & spesifikasi) | `devices.data` | Form → `apiSaveDevice`; list di-hydrate DB-authoritative (`hydrateDevicesFromDb` menimpa cache stale; record tipis tidak menimpa cache kaya) |
+| Port/Power Map (termasuk port spesial) | tabel `maps` | Baca sync-XHR `/api/maps/:kind`; simpan via `savePortMap/savePowerMap` |
+| Server | tabel `servers` (upsert by id) | `getServers()` baca DB dulu; hapus via `apiDeleteServer(id)` |
+| Storage | `devices` type=storage | `hydrateStoragesFromDb` timpa cache by hostname |
+| PDU | `devices` type=pdu + overrides lokal `rv_pdu_overrides` | `hydratePduFromDb`; skeleton port map saat simpan |
+| History/Notes device & rack | tabel `notes` + proyeksi OPS | Lihat AGENTS.md §History & Notes |
+
+Konvensi: `canonKey` untuk join; OPS records tidak diduplikasi ke history; localStorage tetap dipakai untuk tombstone hapus server, preferensi UI, layer manual topologi (`rv_topo_layers`), dan fallback offline.
+
+## 12. Catatan Keamanan (status saat ini)
 
 - Password user masih **base64** (bukan hash) — jangan dipakai production (roadmap: bcrypt/argon2, MFA, session expiry — lihat AGENTS.md).
 - Token auth permanen; auth guard belum dipasang di semua halaman.

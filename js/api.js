@@ -46,6 +46,10 @@ function apiSaveServer(server) {
   return apiRequest("POST", "/servers", server);
 }
 
+function apiDeleteServer(id) {
+  return apiRequest("DELETE", "/servers/" + encodeURIComponent(id));
+}
+
 // ---- Master sites (site.id = masterKey; picklist OPS & referensi racks) ----
 function apiGetSites() {
   const r = apiRequest("GET", "/sites");

@@ -15,9 +15,24 @@ function assetTableBody() {
   return null;
 }
 const openAddAssetBtn = document.getElementById("open-add-asset");
+// Preselect tipe asset sesuai halaman (filter-type): menu Switch -> Network Switch, dst.
+function preselectAssetTypeFromFilter() {
+  const title = document.querySelector("#modal-overlay .modal-title");
+  if (!assetTypeSelect || !filterType) { if (title) title.textContent = pageTypeScope() ? "Tambah Aksesoris" : "Add Asset"; return; }
+  const typeKey = String(filterType.value || "").toLowerCase();
+  const opt = TYPE_TO_OPTION[typeKey];
+  if (!opt) {
+    if (title) title.textContent = pageTypeScope() ? "Tambah Aksesoris" : "Add Asset";
+    return;
+  }
+  assetTypeSelect.value = opt;
+  assetTypeSelect.dispatchEvent(new Event("change"));
+  if (title) title.textContent = "Tambah " + opt;
+}
 if (openAddAssetBtn) {
   openAddAssetBtn.addEventListener("click", () => {
     if (openAddAssetBtn.dataset.storageAdd != null) return;
+    preselectAssetTypeFromFilter();
     overlay.classList.add("open");
   });
 }
@@ -61,7 +76,7 @@ toggleServerSection();
 // ---- Network Switch: brand/model manual + Jenis Switch saat Tipe Asset = Switch ----
 const TYPE_TO_OPTION = {
   server: "Server", switch: "Switch", pdu: "PDU", firewall: "Firewall",
-  router: "Router", patch: "Patch Panel", ups: "UPS", storage: "Storage",
+  router: "Router", ids: "IDS/IPS", lb: "Load Balancer", patch: "Patch Panel", ups: "UPS", storage: "Storage",
   "kvm-switch": "KVM Switch", "cable-management": "Cable Management",
   "cooling-fan": "Cooling Fan", "blanking-panel": "Blanking Panel",
   "monitoring-sensor": "Monitoring Sensor", custom: "Custom"
@@ -69,7 +84,7 @@ const TYPE_TO_OPTION = {
 const OPTION_TO_TYPE = Object.fromEntries(Object.entries(TYPE_TO_OPTION).map(([k, v]) => [v, k]));
 const TYPE_LABELS = {
   server: "Server", switch: "Network Switch", pdu: "Rack PDU", firewall: "Firewall",
-  router: "Router", patch: "Patch Panel", ups: "UPS", storage: "Storage",
+  router: "Router", ids: "IDS/IPS", lb: "Load Balancer", patch: "Patch Panel", ups: "UPS", storage: "Storage",
   "kvm-switch": "KVM Switch", "cable-management": "Cable Management",
   "cooling-fan": "Cooling Fan", "blanking-panel": "Blanking Panel",
   "monitoring-sensor": "Monitoring Sensor", custom: "Custom"
@@ -95,43 +110,97 @@ function toggleSwitchFields() {
 assetTypeSelect.addEventListener("change", toggleSwitchFields);
 toggleSwitchFields();
 
-// ---- Network Device (Switch/Firewall/Router): field record + bagian form ----
-const NETWORK_TYPES = ["switch", "firewall", "router"];
+// ---- Network Device (Switch/Firewall/Router/IDS-IPS/LB): field record + bagian form ----
+const NETWORK_TYPES = ["switch", "firewall", "router", "ids", "lb"];
 const NF_SELECT_DEFAULTS = { speed: "10G", stacking: "Tidak", powerRedundancy: "Redundant", haMode: "Standalone", stackRole: "" };
 const NF_LABELS = {
   lanRj45: "Port RJ-45", lanSfp: "Port SFP", lanQsfp: "Port QSFP",
   speed: "Kecepatan Port", os: "Firmware / OS", role: "Peran / Segmentasi",
   vlan: "VLAN / Segment", throughput: "Throughput", maxConnections: "Max Sessions",
-  vpnTunnels: "VPN Tunnels", haMode: "High Availability", routingProtocol: "Routing Protocol",
+  vpnTunnels: "VPN Tunnels", gwRedundancy: "Redundansi Gateway", haMode: "High Availability", routingProtocol: "Routing Protocol",
+  license: "Lisensi / Langganan", licenseExpiry: "Lisensi s.d.", haPeer: "Peer HA",
+  idsMode: "Mode Deteksi", deployMode: "Metode Deploy", failOpen: "Fail-Safe", ruleset: "Ruleset / Signature",
+  lbMode: "Mode Operasi", lbAlgorithm: "Algoritma Balancing", sslOffload: "SSL Offload", persistence: "Session Persistence",
+  upsVA: "Kapasitas VA", upsWatt: "Kapasitas Watt", upsTopology: "Topologi", upsOutlets: "Jumlah / Tipe Outlet",
+  upsRuntime: "Runtime", batteryReplaced: "Baterai Diganti", mgmtCard: "Kartu Manajemen",
   wanPorts: "WAN Port", stacking: "Stacking", stackRole: "Stack Role",
   psuCount: "PSU", psuWatt: "Watt", powerRedundancy: "Power Redundancy",
   tahunPembelian: "Tahun Pembelian", warranty: "Warranty", monitoring: "Monitoring",
 };
-const ASSET_PORT_MAP_TYPES = ["switch", "server", "firewall", "router", "patch", "ups", "storage"];
+const ASSET_PORT_MAP_TYPES = ["switch", "server", "firewall", "router", "ids", "lb", "patch", "ups", "storage"];
+// Opsi Peran/Segmentasi per tipe (selaras baris layer Network Topology utk switch)
+const ROLE_OPTIONS = {
+  switch: ["Core", "Distribution", "Access", "Management"],
+  router: ["WAN", "Gateway", "Core", "Branch", "Internal"],
+  firewall: ["Edge", "Internal", "HA-Primary", "HA-Secondary"],
+  ids: ["Edge", "Internal"],
+  lb: ["Edge", "Internal"]
+};
 const networkSection = document.getElementById("network-section");
+const upsSection = document.getElementById("ups-section");
+function nfContainers() { return [networkSection, upsSection].filter(Boolean); }
 
 function toggleNetworkSection() {
   const typeKey = OPTION_TO_TYPE[assetTypeSelect.value] || "";
   const isNet = NETWORK_TYPES.includes(typeKey);
   if (networkSection) networkSection.style.display = isNet ? "" : "none";
+  if (upsSection) upsSection.style.display = typeKey === "ups" ? "" : "none";
   document.querySelectorAll("[data-nf-switch-only]").forEach(el => { el.style.display = typeKey === "switch" ? "" : "none"; });
   document.querySelectorAll("[data-nf-fw-only]").forEach(el => { el.style.display = typeKey === "firewall" ? "" : "none"; });
   document.querySelectorAll("[data-nf-router-only]").forEach(el => { el.style.display = typeKey === "router" ? "" : "none"; });
+  document.querySelectorAll("[data-nf-ids-only]").forEach(el => { el.style.display = typeKey === "ids" ? "" : "none"; });
+  document.querySelectorAll("[data-nf-lb-only]").forEach(el => { el.style.display = typeKey === "lb" ? "" : "none"; });
+  // rebuild opsi Peran sesuai tipe; nilai non-standar yang sedang terpilih dipertahankan sbg opsi ekstra
+  const roleSel = networkSection ? networkSection.querySelector('[data-nf="role"]') : null;
+  if (roleSel && ROLE_OPTIONS[typeKey]) {
+    const std = ROLE_OPTIONS[typeKey];
+    const prev = roleSel.value;
+    const extras = [...roleSel.options].map(o => o.value).filter(v => v && !std.includes(v));
+    roleSel.innerHTML = '<option value="">— Pilih peran —</option>'
+      + std.map(o => `<option>${o}</option>`).join("")
+      + extras.map(e => `<option value="${escA(e)}">${escA(e)}</option>`).join("");
+    if ([...roleSel.options].some(o => o.value === prev)) roleSel.value = prev;
+  }
   if (isNet && networkSection) networkSection.scrollIntoView({ behavior: "smooth", block: "center" });
 }
 assetTypeSelect.addEventListener("change", toggleNetworkSection);
 toggleNetworkSection();
 
+// ---- Scope tipe per halaman (window.ASSET_TYPES_SCOPE) ----
+// Halaman yang mendeklarasikan scope hanya menampilkan/menerima tipe di dalamnya;
+// opsi di luar scope dinonaktifkan (abu-abu) di dropdown Tipe Asset.
+function pageTypeScope() {
+  const s = window.ASSET_TYPES_SCOPE;
+  return Array.isArray(s) && s.length ? s.map(x => String(x).toLowerCase()) : null;
+}
+function applyModalTypeScope() {
+  const scope = pageTypeScope();
+  if (!scope || !assetTypeSelect) return;
+  [...assetTypeSelect.options].forEach(o => {
+    const key = OPTION_TO_TYPE[o.value] || "";
+    o.disabled = Boolean(key) && !scope.includes(key); // Custom tanpa key selalu boleh
+  });
+  const sel = assetTypeSelect.selectedOptions && assetTypeSelect.selectedOptions[0];
+  if (sel && sel.disabled) {
+    const firstEnabled = [...assetTypeSelect.options].find(o => !o.disabled);
+    if (firstEnabled) {
+      assetTypeSelect.value = firstEnabled.value;
+      assetTypeSelect.dispatchEvent(new Event("change"));
+    }
+  }
+}
+applyModalTypeScope();
+
 function collectNetworkFields() {
   const typeKey = OPTION_TO_TYPE[assetTypeSelect.value] || "";
-  if (!NETWORK_TYPES.includes(typeKey)) return {};
+  if (!NETWORK_TYPES.includes(typeKey) && typeKey !== "ups") return {};
   const out = {};
-  if (networkSection) {
-    networkSection.querySelectorAll("[data-nf]").forEach(el => {
+  nfContainers().forEach(sec => {
+    sec.querySelectorAll("[data-nf]").forEach(el => {
       const v = (el.value || "").trim();
       if (v) out[el.dataset.nf] = v;
     });
-  }
+  });
   return out;
 }
 
@@ -147,6 +216,43 @@ function hasNetworkPorts(f) {
   return Boolean(f && (f.lanRj45 || f.lanSfp || f.lanQsfp));
 }
 
+// Pertahankan port spesial kustom saat Port Data ditulis ulang (save/edit),
+// supaya definisi tambahan user (mis. UPLINK/AUX) tidak ter-reset ke default.
+function preserveSpecialPorts(name) {
+  const prev = typeof PORT_DATA !== "undefined" ? PORT_DATA[name] : null;
+  return prev && Array.isArray(prev.specials) ? prev.specials.map(s => ({ ...s })) : undefined;
+}
+
+// ---- Foto perangkat (Rack Elevation) di Ringkasan Identitas ----
+// Rantai kandidat sama dengan rack-elevation: image record -> data/uploads -> img/devices.
+const ASSET_IMG_EXT = ["png", "jpg", "jpeg", "webp"];
+function assetDevImgCandidates(name, type, image, view) {
+  const cands = [];
+  if (image && image[view]) cands.push(image[view]);
+  const slug = String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  if (slug) ASSET_IMG_EXT.forEach(e => {
+    cands.push(`data/uploads/devices/${slug}-${view}.${e}`);
+    cands.push(`img/devices/${slug}-${view}.${e}`);
+  });
+  const t = String(type || "").toLowerCase();
+  if (t) ASSET_IMG_EXT.forEach(e => cands.push(`img/devices/${t}-${view}.${e}`));
+  return [...new Set(cands)];
+}
+function assetDevImgProbe(imgEl, name, type, image, view) {
+  const cands = assetDevImgCandidates(name, type, image, view);
+  let i = 0;
+  imgEl.onerror = () => { if (i < cands.length) imgEl.src = cands[i++]; };
+  imgEl.onload = () => {
+    imgEl.style.display = "";
+    imgEl.style.cursor = "zoom-in";
+    imgEl.title = "Klik untuk perbesar";
+    imgEl.onclick = () => window.open(imgEl.src, "_blank", "noopener");
+    const cap = document.querySelector(`[data-devsum-cap="${view}"]`);
+    if (cap) cap.textContent = "Tampak " + (view === "front" ? "depan" : "belakang");
+  };
+  if (cands.length) imgEl.src = cands[i++];
+}
+
 function networkSpecSummary(rec) {
   if (!rec) return "—";
   const n = x => parseInt(x, 10) || 0;
@@ -159,6 +265,13 @@ function networkSpecSummary(rec) {
   if (rec.speed) parts.push(rec.speed);
   if (rec.throughput) parts.push(rec.throughput);
   if (rec.routingProtocol) parts.push(rec.routingProtocol);
+  if (n(rec.vpnTunnels)) parts.push(n(rec.vpnTunnels) + " VPN");
+  if (rec.gwRedundancy) parts.push(rec.gwRedundancy);
+  if (rec.licenseExpiry) parts.push("Lic " + rec.licenseExpiry);
+  if (rec.idsMode) parts.push(rec.idsMode.split(" ")[0]);
+  if (rec.lbMode) parts.push("LB-" + rec.lbMode.split(" ")[0]);
+  if (rec.upsVA) parts.push(rec.upsVA);
+  if (rec.upsTopology) parts.push(rec.upsTopology.split(" ")[0]);
   if (rec.role) parts.push(rec.role);
   if (rec.stacking === "Ya") parts.push("Stack");
   if (rec.haMode && rec.haMode !== "Standalone") parts.push(rec.haMode);
@@ -237,7 +350,8 @@ function readLocalSwitches() {
 function saveLocalSwitch(sw) {
   try {
     const list = readLocalSwitches();
-    list.unshift(sw);
+    const i = list.findIndex(s => canonKey(s.name) === canonKey(sw.name));
+    if (i >= 0) list[i] = sw; else list.unshift(sw);
     localStorage.setItem(SWITCH_STORAGE_KEY, JSON.stringify(list));
     return true;
   } catch { return false; }
@@ -253,23 +367,16 @@ function switchTagChips(tags) {
 }
 
 function switchRowHTML(sw) {
-  const brandModel = [sw.brand, sw.model].filter(Boolean).join(" ") || "—";
+  const brandModel = [sw.brand, sw.model].filter(Boolean).join(" ") || "-";
   return `
-    <td><div class="strong">${escA(sw.name)}</div><div class="mono" style="font-size:11px;">${escA(sw.serial || "—")}</div><div style="margin-top:4px;">${switchTagChips(sw.tags)}</div></td>
+    <td><div class="strong">${escA(sw.name)}</div><div class="mono" style="font-size:11px;">${escA(sw.serial || "-")}</div><div style="margin-top:4px;">${switchTagChips(sw.tags)}</div></td>
     <td><span class="type-chip switch"><span class="dot"></span>Network Switch</span></td>
-    <td>${escA(sw.rack || "—")}${sw.posisiU ? " · " + escA(sw.posisiU) : ""}</td>
-    <td class="mono">${escA(sw.ip || "—")}</td>
+    <td>${escA(sw.rack || "-")}${sw.posisiU ? " · " + escA(sw.posisiU) : ""}</td>
+    <td class="mono">${escA(sw.ip || "-")}</td>
     <td>${escA(brandModel)}</td>
     <td class="mono" style="font-size:11px;color:var(--text-secondary);">${escA(networkSpecSummary(sw))}</td>
     <td><span class="badge online"><span class="bdot"></span>Online</span></td>
-    <td>Manual</td>
-    <td><div class="row-actions">
-      <button title="Edit"><i class="fa-solid fa-pen"></i></button>
-      <button title="View"><i class="fa-solid fa-eye"></i></button>
-      <button title="Port Map" data-open-pm="${escA(sw.name)}"><i class="fa-solid fa-ethernet"></i></button>
-      <button title="Power Map" data-open-pw="${escA(sw.name)}"><i class="fa-solid fa-plug"></i></button>
-      <button title="Hapus"><i class="fa-solid fa-trash"></i></button>
-    </div></td>`;
+    <td>Manual</td>`;
 }
 
 function addSwitchRow(sw) {
@@ -319,6 +426,7 @@ function saveSwitchAsset() {
       ports: hasNetworkPorts(sw) ? networkPortCount(sw) : tpl.ports,
       sfp: hasNetworkPorts(sw) ? networkSfpCount(sw) : tpl.sfp,
       rows: [],
+      specials: preserveSpecialPorts(sw.name),
     };
     if (typeof savePortMap === "function") savePortMap(sw.name);
   }
@@ -335,7 +443,9 @@ function renderSavedSwitches() {
 
 
 // ---- Asset aksesori (KVM Switch, Patch Panel, Cable Management, Cooling Fan, dll) ----
-const ACCESSORY_TYPES = ["kvm-switch", "patch", "cable-management", "cooling-fan", "storage", "ups", "pdu", "firewall", "router", "blanking-panel", "monitoring-sensor", "custom"];
+// Aksesoris rack murni (semantik menu Accessories) vs jalur simpan teknis.
+const RACK_ACCESSORY_TYPES = ["kvm-switch", "patch", "cable-management", "cooling-fan", "blanking-panel", "monitoring-sensor"];
+const ASSET_SAVE_TYPES = [...RACK_ACCESSORY_TYPES, "firewall", "router", "ids", "lb", "ups", "pdu", "storage", "custom"];
 
 function readLocalAccessories() {
   try {
@@ -355,26 +465,16 @@ function saveLocalAccessory(a) {
 }
 
 function accessoryRowHTML(a) {
-  const brandModel = [a.brand, a.model].filter(Boolean).join(" ") || "—";
-  const isPdu = a.type === "pdu";
-  const mapBtns =
-    `<button title="Power Map" data-open-pw="${escA(a.name)}"><i class="fa-solid fa-plug"></i></button>` +
-    (isPdu ? "" : `<button title="Port Map" data-open-pm="${escA(a.name)}"><i class="fa-solid fa-ethernet"></i></button>`);
+  const brandModel = [a.brand, a.model].filter(Boolean).join(" ") || "-";
   return `
-    <td><div class="strong">${escA(a.name)}</div><div class="mono" style="font-size:11px;">${escA(a.serial || "—")}</div><div style="margin-top:4px;">${switchTagChips(a.tags)}</div></td>
+    <td><div class="strong">${escA(a.name)}</div><div class="mono" style="font-size:11px;">${escA(a.serial || "-")}</div><div style="margin-top:4px;">${switchTagChips(a.tags)}</div></td>
     <td><span class="type-chip ${escA(a.type)}"><span class="dot"></span>${escA(TYPE_LABELS[a.type] || a.type)}</span></td>
-    <td>${escA(a.rack || "—")}${a.posisiU ? " · " + escA(a.posisiU) : ""}</td>
-    <td class="mono">${escA(a.ip || "—")}</td>
+    <td>${escA(a.rack || "-")}${a.posisiU ? " · " + escA(a.posisiU) : ""}</td>
+    <td class="mono">${escA(a.ip || "-")}</td>
     <td>${escA(brandModel)}</td>
     <td class="mono" style="font-size:11px;color:var(--text-secondary);">${escA(networkSpecSummary(a))}</td>
     <td><span class="badge online"><span class="bdot"></span>Online</span></td>
-    <td>Manual</td>
-    <td><div class="row-actions">
-      <button title="Edit"><i class="fa-solid fa-pen"></i></button>
-      <button title="View"><i class="fa-solid fa-eye"></i></button>
-      ${mapBtns}
-      <button title="Hapus"><i class="fa-solid fa-trash"></i></button>
-    </div></td>`;
+    <td>Manual</td>`;
 }
 
 function addAccessoryRow(a) {
@@ -418,14 +518,26 @@ function saveAccessoryAsset() {
     return;
   }
   a.name = canonKey(a.name);
-  if (["patch", "firewall", "router"].includes(a.type) && typeof PORT_DATA !== "undefined") {
+  if (["patch", "firewall", "router", "ids", "lb", "ups"].includes(a.type) && typeof PORT_DATA !== "undefined") {
     PORT_DATA[a.name] = {
       type: a.type,
-      ports: hasNetworkPorts(a) ? networkPortCount(a) : 24,
+      ports: hasNetworkPorts(a) ? networkPortCount(a) : (a.type === "ups" ? 2 : 24),
       sfp: hasNetworkPorts(a) ? networkSfpCount(a) : 0,
       rows: [],
+      specials: preserveSpecialPorts(a.name),
     };
     if (typeof savePortMap === "function") savePortMap(a.name);
+  }
+  if (a.type === "ups" && typeof POWER_DATA !== "undefined") {
+    // UPS sebagai sumber daya: buat Power Map skeleton (jumlah outlet dari form)
+    const nOutlet = parseInt(String(a.upsOutlets || "").replace(/[^0-9]/g, " ").trim().split(/\s+/)[0], 10) || 8;
+    const prevPower = POWER_DATA[a.name];
+    POWER_DATA[a.name] = {
+      type: "ups",
+      ports: prevPower && prevPower.ports ? prevPower.ports : nOutlet,
+      rows: (prevPower && Array.isArray(prevPower.rows)) ? prevPower.rows : [],
+    };
+    if (typeof savePowerMap === "function") savePowerMap(a.name);
   }
   if (a.type === "pdu" && typeof POWER_DATA !== "undefined") {
     const active = document.querySelector("#outlet-picker .chip.active");
@@ -435,7 +547,7 @@ function saveAccessoryAsset() {
     if (typeof savePowerMap === "function") savePowerMap(a.name);
   }
   saveLocalAccessory(a);
-  if (["switch", "firewall", "router"].includes(a.type) && typeof apiSaveDevice === "function") {
+  if ((["switch", "firewall", "router", "ids", "lb"].includes(a.type) || a.type === "ups") && typeof apiSaveDevice === "function") {
     apiSaveDevice({ deviceKey: a.name, type: a.type, name: a.name, data: a });
   }
   addAccessoryRow(a);
@@ -446,7 +558,11 @@ function saveAccessoryAsset() {
 }
 
 function renderSavedAccessories() {
-  readLocalAccessories().forEach(a => addAccessoryRow(a));
+  const scope = pageTypeScope();
+  readLocalAccessories().forEach(a => {
+    if (scope && !scope.includes(a.type)) return; // halaman lain yang menampilkan tipe ini
+    addAccessoryRow(a);
+  });
 }
 
 
@@ -494,7 +610,7 @@ function deleteAssetRow(tr) {
   });
   if (typeof PORT_DATA !== "undefined") delete PORT_DATA[a.name];
   if (typeof POWER_DATA !== "undefined") delete POWER_DATA[a.name];
-  if (NETWORK_TYPES.includes(type)) {
+  if (NETWORK_TYPES.includes(type) || type === "ups") {
     if (typeof apiDeleteDevice === "function") apiDeleteDevice(a.name);
   } else {
     if (typeof apiDeleteMap === "function") apiDeleteMap("port", a.name);
@@ -637,6 +753,13 @@ function buildAssetSummaryHTML(rec, tr) {
         ${brandModel ? assetSummaryChip(brandModel) : ""}
         ${(src.tags || []).map(t => assetSummaryChip(t)).join("")}
       </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        ${["front", "back"].map(v => `
+        <figure style="margin:0;flex:1;min-width:0;">
+          <img data-devsum-img="${v}" alt="Tampak ${v === "front" ? "depan" : "belakang"}" style="display:none;width:100%;height:64px;object-fit:cover;border:1px solid var(--border);border-radius:8px;background:var(--bg-surface-3);">
+          <figcaption class="form-hint" data-devsum-cap="${v}" style="margin-top:3px;">Belum ada foto tampak ${v === "front" ? "depan" : "belakang"}</figcaption>
+        </figure>`).join("")}
+      </div>
     </div>`;
   const identityRows =
     assetSummaryKvRow("Tipe", TYPE_LABELS[type] || type || "") +
@@ -666,9 +789,14 @@ function buildAssetSummaryHTML(rec, tr) {
     .filter(x => x.v != null && String(x.v) !== "")
     .map(x => assetSummaryKvRow(NF_LABELS[x.f], x.v))
     .join("");
+  const pmData = typeof PORT_DATA !== "undefined" ? PORT_DATA[name] : null;
+  const specialList = pmData && Array.isArray(pmData.specials) ? pmData.specials.filter(Boolean) : [];
+  const specialRows = specialList.length
+    ? assetSummaryKvRow("Port Spesial", specialList.map(s => s.label || s.key).join(" · "))
+    : "";
   return header +
     assetSummaryGroup("Identitas", identityRows) +
-    assetSummaryGroup("Network & Daya", netRows) +
+    assetSummaryGroup("Network & Daya", netRows + specialRows) +
     assetSummaryGroup("Pembelian", purchaseRows) +
     assetSummaryGroup("Pemetaan", assetSummaryMapLink(src, type));
 }
@@ -687,10 +815,83 @@ function renderAssetDetail(tr) {
   } catch (e) { /* abaikan */ }
   const body = document.getElementById("asset-detail-body");
   if (body) body.innerHTML = buildAssetSummaryHTML(rec, tr);
+  if (body) body.querySelectorAll("[data-devsum-img]").forEach(img => {
+    const view = img.dataset.devsumImg;
+    assetDevImgProbe(img, name, type, rec && rec.image, view);
+  });
   const closeBtn = document.getElementById("asset-detail-close");
   if (closeBtn) closeBtn.style.display = "";
   const panel = document.getElementById("asset-detail");
   if (panel) panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  updateAssetCtxBar(tr);
+}
+
+// ---- Contextual action bar (paritas dengan menu Server & Storage) ----
+function assetCtxGoLocation(name, rack) {
+  if (!rack) return;
+  window.location.href = "rack-elevation.html?rack=" + encodeURIComponent(rack) + "&device=" + encodeURIComponent(name);
+}
+
+function buildAssetCtxBarHTML(a, rec) {
+  const name = escA(a.name || "");
+  const canPort = a.type !== "pdu" && ASSET_PORT_MAP_TYPES.includes(a.type);
+  const locBtn = a.rack
+    ? `<button type="button" class="ctx-btn" title="Lokasi di Rack Elevation" data-ctx-act="loc"><i class="fa-solid fa-location-dot"></i> Lokasi</button>`
+    : `<button type="button" class="ctx-btn" title="Asset belum ditempatkan di rack" data-ctx-act="loc" disabled><i class="fa-solid fa-location-dot"></i> Lokasi</button>`;
+  return `<div class="ctx-bar-info"><i class="fa-solid fa-caret-right"></i> <b>${name}</b></div>
+    <div class="ctx-bar-actions">
+      <button type="button" class="ctx-btn" title="Lihat ringkasan" data-ctx-act="view"><i class="fa-solid fa-eye"></i> Lihat</button>
+      <button type="button" class="ctx-btn" title="Edit asset" data-ctx-act="edit"><i class="fa-solid fa-pen"></i> Edit</button>
+      ${canPort ? `<button type="button" class="ctx-btn" title="Buka Port Map" data-ctx-act="port"><i class="fa-solid fa-ethernet"></i> Port Map</button>` : ""}
+      <button type="button" class="ctx-btn" title="Buka Power Map" data-ctx-act="power"><i class="fa-solid fa-plug"></i> Power Map</button>
+      ${locBtn}
+      <button type="button" class="ctx-btn danger" title="Hapus asset" data-ctx-act="delete"><i class="fa-solid fa-trash"></i> Hapus</button>
+      <button type="button" class="ctx-btn" title="Tutup" data-ctx-act="close"><i class="fa-solid fa-xmark"></i></button>
+    </div>`;
+}
+
+function updateAssetCtxBar(tr) {
+  const bar = document.getElementById("asset-ctx-bar");
+  if (!bar) return;
+  if (!tr || !tr.isConnected) { bar.hidden = true; bar.innerHTML = ""; return; }
+  const a = readAssetRow(tr);
+  let rec = null;
+  try {
+    rec = a.type === "switch"
+      ? readLocalSwitches().find(s => s.name === a.name) || null
+      : readLocalAccessories().find(x => x.name === a.name) || null;
+  } catch (e) { /* abaikan */ }
+  bar.hidden = false;
+  bar.innerHTML = buildAssetCtxBarHTML(a, rec);
+  bar.onclick = e => {
+    const actBtn = e.target.closest("[data-ctx-act]");
+    if (!actBtn) return;
+    const act = actBtn.dataset.ctxAct;
+    const row = selectedAssetRow && selectedAssetRow.isConnected ? selectedAssetRow : null;
+    if (!row) { bar.hidden = true; return; }
+    const info = readAssetRow(row);
+    const psu = Math.max(1, parseInt((rec && rec.psuCount) || info.psuCount, 10) || 2);
+    if (act === "close") { clearAssetDetail(); return; }
+    if (act === "view") { openViewAsset(row); return; }
+    if (act === "edit") { openEditAsset(row); return; }
+    if (act === "port") {
+      if (info.type === "pdu" && typeof openPowerMap === "function") openPowerMap(info.name);
+      else if (typeof openPortMap === "function") openPortMap(info.name, false, 0, { type: info.type, formFactor: "" });
+      return;
+    }
+    if (act === "power") {
+      if (typeof openPowerMap === "function") openPowerMap(info.name, false, psu);
+      return;
+    }
+    if (act === "loc") { assetCtxGoLocation(info.name, info.rack); return; }
+    if (act === "delete") {
+      const doubleOk = typeof window.confirmDoubleDelete === "function"
+        ? window.confirmDoubleDelete(info.name)
+        : (confirm(`Hapus ${info.name}?`) && confirm("Yakin ingin menghapus permanen? Data yang dihapus tidak dapat dikembalikan."));
+      if (doubleOk) deleteAssetRow(row);
+      return;
+    }
+  };
 }
 
 function refreshAssetRow(deviceKey) {
@@ -717,6 +918,7 @@ function clearAssetDetail() {
   if (body) body.innerHTML = '<div class="form-hint">Klik baris pada tabel untuk melihat ringkasan identitas perangkat.</div>';
   const closeBtn = document.getElementById("asset-detail-close");
   if (closeBtn) closeBtn.style.display = "none";
+  updateAssetCtxBar(null);
 }
 
 function refreshSelectedAssetDetail() {
@@ -732,11 +934,16 @@ function initAssetDetailPanel() {
     .find(t => (t.querySelector("thead th")?.textContent || "").trim() === "Asset");
   const anchor = assetTable ? assetTable.closest(".card") : null;
   if (!anchor) return;
+  const ctxBar = document.createElement("div");
+  ctxBar.className = "ctx-bar";
+  ctxBar.id = "asset-ctx-bar";
+  ctxBar.hidden = true;
   const layout = document.createElement("div");
   layout.className = "asset-detail-layout";
   const tableCol = document.createElement("div");
   tableCol.className = "asset-detail-table";
-  anchor.before(layout);
+  anchor.before(ctxBar);
+  ctxBar.after(layout);
   layout.appendChild(tableCol);
   tableCol.appendChild(anchor);
   const wrap = document.createElement("div");
@@ -772,16 +979,16 @@ function resetAddModal() {
   editingAsset = null;
   const t = document.querySelector("#modal-overlay .modal-title");
   const s = document.querySelector("#modal-overlay .modal-sub");
-  if (t) t.textContent = "Add Asset";
+  if (t) t.textContent = pageTypeScope() ? "Tambah Aksesoris" : "Add Asset";
   if (s) s.textContent = "Tambahkan asset baru ke inventory";
   if (modalSaveBtn) modalSaveBtn.innerHTML = "Simpan Asset";
-  if (networkSection) {
-    networkSection.querySelectorAll("[data-nf]").forEach(el => {
+  nfContainers().forEach(sec => {
+    sec.querySelectorAll("[data-nf]").forEach(el => {
       el.value = el.tagName === "SELECT"
         ? (NF_SELECT_DEFAULTS[el.dataset.nf] !== undefined ? NF_SELECT_DEFAULTS[el.dataset.nf] : (el.options[0] && el.options[0].value))
         : "";
     });
-  }
+  });
   if (typeof DEVIMG !== "undefined") DEVIMG.reset(document.getElementById("modal-overlay"));
 }
 
@@ -816,12 +1023,19 @@ function openEditAsset(tr) {
   document.querySelector('[data-sf="posisiU"]').value = a.posisiU;
   document.getElementById("asset-ip").value = a.ip === "—" ? "" : a.ip;
   document.querySelector('[data-sf="serial"]').value = a.serial === "—" ? "" : a.serial;
-  if (networkSection) {
-    networkSection.querySelectorAll("[data-nf]").forEach(el => {
-      const v = rec && rec[el.dataset.nf] != null ? String(rec[el.dataset.nf]) : "";
-      el.value = el.tagName === "SELECT"
-        ? (v || (NF_SELECT_DEFAULTS[el.dataset.nf] !== undefined ? NF_SELECT_DEFAULTS[el.dataset.nf] : (el.options[0] && el.options[0].value)))
-        : v;
+  if (nfContainers().length) {
+    nfContainers().forEach(sec => {
+      sec.querySelectorAll("[data-nf]").forEach(el => {
+        const v = rec && rec[el.dataset.nf] != null ? String(rec[el.dataset.nf]) : "";
+        if (el.tagName === "SELECT" && v && ![...el.options].some(o => o.value === v)) {
+          const opt = document.createElement("option");
+          opt.textContent = v;
+          el.add(opt);
+        }
+        el.value = el.tagName === "SELECT"
+          ? (v || (NF_SELECT_DEFAULTS[el.dataset.nf] !== undefined ? NF_SELECT_DEFAULTS[el.dataset.nf] : (el.options[0] && el.options[0].value)))
+          : v;
+      });
     });
   }
   document.querySelectorAll("#tag-picker .chip").forEach(c => c.classList.remove("active"));
@@ -876,7 +1090,7 @@ function saveEditAsset() {
       }
       const tpl = SWITCH_TEMPLATES[sw.type] || SWITCH_TEMPLATES.ethernet;
       const rows = (PORT_DATA[sw.name] && PORT_DATA[sw.name].rows) || [];
-      PORT_DATA[sw.name] = { type: "switch", switchType: sw.type, ports: hasPorts ? networkPortCount(sw) : tpl.ports, sfp: hasPorts ? networkSfpCount(sw) : tpl.sfp, rows };
+      PORT_DATA[sw.name] = { type: "switch", switchType: sw.type, ports: hasPorts ? networkPortCount(sw) : tpl.ports, sfp: hasPorts ? networkSfpCount(sw) : tpl.sfp, rows, specials: preserveSpecialPorts(sw.name) };
       if (typeof savePortMap === "function") savePortMap(sw.name);
     }
     if (typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: sw.name, type: "switch", name: sw.name, data: sw });
@@ -889,7 +1103,7 @@ function saveEditAsset() {
     const updated = { ...prev, name: nameCanon, type, rack, posisiU, ip, serial, tags, ...collectNetworkFields() };
     if (!updated.site) updated.site = "DC1";
     if (ed.name !== nameCanon) rekeyDeviceMaps(ed.name, nameCanon);
-    if (["patch", "firewall", "router"].includes(type) && typeof PORT_DATA !== "undefined") {
+    if (["patch", "firewall", "router", "ids", "lb", "ups"].includes(type) && typeof PORT_DATA !== "undefined") {
       if (ed.name !== nameCanon && PORT_DATA[ed.name]) {
         PORT_DATA[nameCanon] = PORT_DATA[ed.name];
         delete PORT_DATA[ed.name];
@@ -897,27 +1111,41 @@ function saveEditAsset() {
       const rows = (PORT_DATA[nameCanon] && PORT_DATA[nameCanon].rows) || [];
       PORT_DATA[nameCanon] = {
         type,
-        ports: hasNetworkPorts(updated) ? networkPortCount(updated) : (PORT_DATA[nameCanon] && PORT_DATA[nameCanon].ports) || 24,
+        ports: hasNetworkPorts(updated) ? networkPortCount(updated) : (PORT_DATA[nameCanon] && PORT_DATA[nameCanon].ports) || (type === "ups" ? 2 : 24),
         sfp: hasNetworkPorts(updated) ? networkSfpCount(updated) : (PORT_DATA[nameCanon] && PORT_DATA[nameCanon].sfp) || 0,
         rows,
+        specials: preserveSpecialPorts(nameCanon),
       };
       if (typeof savePortMap === "function") savePortMap(nameCanon);
     }
-    if (isNet && typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: nameCanon, type, name: nameCanon, data: updated });
+    if (type === "ups" && typeof POWER_DATA !== "undefined") {
+      if (ed.name !== nameCanon && POWER_DATA[ed.name]) {
+        POWER_DATA[nameCanon] = POWER_DATA[ed.name];
+        delete POWER_DATA[ed.name];
+      }
+      const nOutlet = parseInt(String(updated.upsOutlets || "").replace(/[^0-9]/g, " ").trim().split(/\s+/)[0], 10);
+      const prevUpdPower = POWER_DATA[nameCanon] || {};
+      POWER_DATA[nameCanon] = {
+        type: "ups",
+        ports: (!prevUpdPower.ports && nOutlet) ? nOutlet : (prevUpdPower.ports || 8),
+        rows: Array.isArray(prevUpdPower.rows) ? prevUpdPower.rows : [],
+      };
+      if (typeof savePowerMap === "function") savePowerMap(nameCanon);
+    }
+    if ((isNet || type === "ups") && typeof apiSaveDevice === "function") apiSaveDevice({ deviceKey: nameCanon, type, name: nameCanon, data: updated });
     saveLocalAccessory(updated);
     const cells = ed.tr.querySelectorAll("td");
     if (cells[0]) {
       cells[0].innerHTML = `<div class="strong">${escA(nameCanon)}</div><div class="mono" style="font-size:11px;">${escA(serial || "—")}</div><div style="margin-top:4px;">${switchTagChips(tags)}</div>`;
     }
     if (cells[1]) {
-      const chipClass = ["server", "switch", "pdu", "firewall", "router", "patch", "storage", "ups", "kvm-switch", "cable-management", "cooling-fan", "blanking-panel", "monitoring-sensor", "custom"].includes(type) ? type : "custom";
+      const chipClass = ["server", "switch", "pdu", "firewall", "router", "ids", "lb", "patch", "storage", "ups", "kvm-switch", "cable-management", "cooling-fan", "blanking-panel", "monitoring-sensor", "custom"].includes(type) ? type : "custom";
       cells[1].innerHTML = `<span class="type-chip ${chipClass}"><span class="dot"></span>${escA(TYPE_LABELS[type] || assetTypeSelect.value)}</span>`;
     }
     if (cells[2]) cells[2].textContent = `${rack}${posisiU ? " · " + posisiU : ""}`;
     if (cells[3]) cells[3].textContent = ip || "—";
     if (cells[4]) cells[4].textContent = brandModel || "—";
     if (cells[5]) cells[5].textContent = networkSpecSummary(updated);
-    if (cells[8]) cells[8].innerHTML = cells[8].innerHTML.replaceAll(ed.name, nameCanon);
     ed.tr.setAttribute("data-type", type);
     ed.tr.setAttribute("data-tags", tags.join(","));
   }
@@ -940,7 +1168,7 @@ if (modalSaveBtn) {
       return;
     }
     const accType = OPTION_TO_TYPE[assetTypeSelect.value];
-    if (accType && ACCESSORY_TYPES.includes(accType)) {
+    if (accType && ASSET_SAVE_TYPES.includes(accType)) {
       saveAccessoryAsset();
       return;
     }
@@ -1012,7 +1240,7 @@ function applyFilters() {
     const rowTags = (row.dataset.tags || "").split(",").filter(Boolean);
     const matchSite = site === "all" || row.dataset.site === site;
     const matchType = type === "all" || (type === "accessories"
-      ? ACCESSORY_TYPES.includes(row.dataset.type)
+      ? RACK_ACCESSORY_TYPES.includes(row.dataset.type)
       : row.dataset.type === type);
     const matchStatus = status === "all" || row.dataset.status === status;
     const matchTag = tag === "all" || rowTags.includes(tag);
@@ -1153,6 +1381,15 @@ assetTbody && assetTbody.addEventListener("click", e => {
   renderAssetDetail(tr);
 });
 
+// Double-click baris → buka lokasi di Rack Elevation (paritas Server/Storage)
+assetTbody && assetTbody.addEventListener("dblclick", e => {
+  const tr = e.target.closest("tr[data-site]");
+  if (!tr) return;
+  if (e.target.closest("button, a")) return;
+  const info = readAssetRow(tr);
+  assetCtxGoLocation(info.name, info.rack);
+});
+
 // ---- Kolom Spesifikasi: baris statis (HTML lama) diberi sel spesifikasi ----
 function normalizeSpecCells() {
   const tb = assetTableBody();
@@ -1225,6 +1462,82 @@ function removeStaticNetworkDuplicates() {
   }
 }
 
+// ---- Hydrate record network device dari SQLite (DB = sumber utama) ----
+// Prioritas: DB otoritatif → cache lokal ditimpa dengan versi DB (anti-stale).
+// localStorage hanya fallback: dipakai untuk record yang dibuat saat offline
+// (belum ada di DB) dan saat backend tidak dapat dihubungi.
+async function hydrateDevicesFromDb() {
+  if (typeof fetch !== "function") return;
+  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+  let list;
+  try {
+    const res = await fetch(base + "/devices");
+    if (!res.ok || !res.json) return; // offline — biarkan render dari localStorage/statis
+    list = await res.json();
+  } catch (e) { return; }
+  if (!Array.isArray(list)) return;
+
+  const dbRecs = [];
+  for (const d of list) {
+    const key = canonKey(d.deviceKey || d.name || "");
+    const type = String(d.type || "").toLowerCase();
+    if (!key || (!NETWORK_TYPES.includes(type) && type !== "ups")) continue;
+    let data = {};
+    try { data = typeof d.data === "string" ? (JSON.parse(d.data) || {}) : (d.data || {}); } catch (e) { data = {}; }
+    const rec = { ...data, name: key, type };
+    if (!rec.site && d.site) rec.site = d.site;
+    if (!rec.rack && d.rackId) rec.rack = d.rackId;
+    dbRecs.push({ key, type, rec, hasContent: Object.keys(data).length > 0 });
+  }
+  if (!dbRecs.length) return;
+
+  // 1) Sinkronkan cache lokal dengan DB (timpa versi lama/berbeda).
+  //    Record DB "tipis" (tanpa data spesifikasi) tidak menimpa cache lokal
+  //    yang lebih kaya; tampilannya justru memakai versi lokal yang kaya.
+  const switches = readLocalSwitches();
+  const accs = readLocalAccessories();
+  for (const x of dbRecs) {
+    if (!x.hasContent) continue;
+    if (x.type === "switch") {
+      const i = switches.findIndex(s => canonKey(s.name) === x.key);
+      if (i >= 0) switches[i] = x.rec; else switches.unshift(x.rec);
+    } else {
+      const i = accs.findIndex(a => canonKey(a.name) === x.key && a.type === x.type);
+      if (i >= 0) accs[i] = x.rec; else accs.unshift(x.rec);
+    }
+  }
+  try {
+    localStorage.setItem(SWITCH_STORAGE_KEY, JSON.stringify(switches));
+    localStorage.setItem(ACC_STORAGE_KEY, JSON.stringify(accs));
+  } catch (e) { /* storage tidak tersedia */ }
+
+  // Untuk record DB tipis: pakai cache lokal yang lebih kaya (kalau ada)
+  for (const x of dbRecs) {
+    if (x.hasContent) continue;
+    const ls = switches.find(s => canonKey(s.name) === x.key);
+    if (ls) { x.rec = { ...ls, name: x.key, type: "switch" }; continue; }
+    const la = accs.find(a => canonKey(a.name) === x.key && a.type === x.type);
+    if (la) x.rec = { ...la };
+  }
+
+  // 2) Bangun ulang seluruh baris network/ups device murni dari hasil sinkronisasi
+  const scope = pageTypeScope();
+  clearAssetDetail();
+  for (let i = allRows.length - 1; i >= 0; i--) {
+    const tr = allRows[i];
+    if (!NETWORK_TYPES.includes(tr.dataset.type) && tr.dataset.type !== "ups") continue;
+    tr.remove();
+    allRows.splice(i, 1);
+  }
+  const dbKeys = new Set(dbRecs.map(x => x.key));
+  const inScope = t => (scope ? scope.includes(t) : true);
+  const localOnlyAccs = accs.filter(a => !dbKeys.has(canonKey(a.name)) && NETWORK_TYPES.includes(a.type) && inScope(a.type));
+  const localOnlySwitches = switches.filter(s => !dbKeys.has(canonKey(s.name)) && inScope("switch"));
+  dbRecs.forEach(x => { if (!scope || scope.includes(x.type)) addAccessoryRow(x.rec); });
+  localOnlyAccs.forEach(a => addAccessoryRow({ ...a }));
+  localOnlySwitches.forEach(s => addAccessoryRow({ ...s, type: "switch" }));
+}
+
 window.addEventListener("load", () => {
   initAssetDetailPanel();
   normalizeSpecCells();
@@ -1233,6 +1546,7 @@ window.addEventListener("load", () => {
   renderSavedSwitches();
   renderSavedAccessories();
   applyFilters();
+  hydrateDevicesFromDb();
 });
     
 
