@@ -9,6 +9,7 @@
 
 const svg = document.getElementById("topo-svg");
 const svgNS = "http://www.w3.org/2000/svg";
+function escA(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
 // ---------- node & edge builder ----------
 const nodeMap = {};    // id -> node
@@ -1427,16 +1428,53 @@ function selectNode(id) {
       }).join("")}</div>`
     : `<div class="section-label">Tidak ada koneksi tercatat</div>`;
 
+  // ISP-specific detail fields (fetched from DB)
+  const ispDetailHtml = n.type === "isp" ? (function() {
+    let data = {};
+    try {
+      const accs = JSON.parse(localStorage.getItem(ACC_STORAGE_KEY) || "[]");
+      data = (Array.isArray(accs) ? accs : []).find(a => canonKey(a.name) === n.id && a.type === "isp") || {};
+    } catch (e) {}
+    const fields = [
+      ["ASN", data.asn], ["Bandwidth", data.bandwidth], ["IP Ranges", data.ipRanges],
+      ["Public IP", data.publicIp], ["Peering", data.peeringLocation],
+      ["Contract", data.contract], ["SLA", data.sla],
+      ["BGP Local ASN", data.bgpLocal], ["Routing", data.routing],
+      ["NOC Phone", data.nocPhone], ["NOC Email", data.nocEmail],
+    ].filter(([k, v]) => v);
+    if (!fields.length) return "";
+    return `<div class="section-label" style="margin-top:14px;"><i class="fa-solid fa-cloud" style="color:#E11D48;"></i> Detail ISP</div>
+      <div class="field-grid">${fields.map(([k, v]) =>
+        `<div class="field-item"><div class="k">${k}</div><div class="v" style="font-size:12px;">${escA(v)}</div></div>`
+      ).join("")}</div>
+      <div style="margin-top:8px;"><a href="isp-list.html?q=${encodeURIComponent(n.name)}" style="font-size:11.5px;color:var(--accent);"><i class="fa-solid fa-arrow-up-right-from-square"></i> Buka di ISP Management</a></div>`;
+  })() : "";
+
+  // WAN link info for ISP-connected nodes
+  const wanHtml = (function() {
+    const ispEdges = conns.filter(c => c.kind === "isp");
+    if (!ispEdges.length) return "";
+    return `<div class="section-label" style="margin-top:10px;"><i class="fa-solid fa-globe" style="color:#E11D48;"></i> ISP Peering</div>
+      <div class="conn-list">${ispEdges.map(({ n: c, e }) => {
+        const bgp = e.bgp || {};
+        const bgpInfo = bgp.localAsn ? `BGP AS${bgp.localAsn}↔AS${bgp.remoteAsn || "?"}` : "";
+        return `<div class="conn-item" style="flex-direction:column;align-items:flex-start;gap:2px;">
+          <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:#E11D48;"></span><b>${escA(c.name)}</b><span class="mono" style="font-size:10px;color:var(--text-muted);">${escA(e.label || "")}</span></span>
+          ${bgpInfo ? `<span class="mono" style="font-size:10.5px;color:var(--text-secondary);margin-left:16px;">${escA(bgpInfo)}</span>` : ""}
+        </div>`;
+      }).join("")}</div>`;
+  })();
+
   panel.innerHTML = `<span class="detail-type-badge" style="background:${meta.badgeBg};color:${meta.badgeColor}">${meta.label}</span>
-    <h2 class="detail-title">${n.name}</h2><p class="detail-sub">${n.model || (n.rack ? "Rack " + n.rack : "Eksternal")}</p>
+    <h2 class="detail-title">${n.name}</h2><p class="detail-sub">${n.model || (n.rack ? "Rack " + n.rack : (n.type === "isp" ? "Internet Service Provider" : "Eksternal"))}</p>
     ${tagsHtml}
     <div class="field-grid">
-      <div class="field-item"><div class="k">Rack</div><div class="v">${n.rack || "—"}</div></div>
-      <div class="field-item"><div class="k">Posisi</div><div class="v">${n.posisiU ? "U" + n.posisiU : "—"}</div></div>
+      ${n.type === "isp" ? "" : `<div class="field-item"><div class="k">Rack</div><div class="v">${n.rack || "—"}</div></div>
+      <div class="field-item"><div class="k">Posisi</div><div class="v">${n.posisiU ? "U" + n.posisiU : "—"}</div></div>`}
       ${n.ip ? `<div class="field-item"><div class="k">IP Address</div><div class="v">${n.ip}</div></div>` : ""}
       ${n.siteName ? `<div class="field-item"><div class="k">Site</div><div class="v">${n.siteName}</div></div>` : ""}
     </div>
-    ${connHtml}${portmapBtn}${powermapBtn}${rackLink}`;
+    ${ispDetailHtml}${connHtml}${wanHtml}${portmapBtn}${powermapBtn}${rackLink}`;
 }
 
 // ---------- path trace (BFS pada edge data) ----------
@@ -1758,6 +1796,95 @@ if (editResetBtn) editResetBtn.addEventListener("click", () => {
   saveTopoLayers();
   render();
 });
+
+// ---------- WAN Link Manager ----------
+function populateWANModalSites() {
+  const sites = topoSiteList();
+  ["wan-from-site", "wan-to-site"].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const val = sel.value;
+    sel.innerHTML = '<option value="">Pilih site…</option>' + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+    if (val) sel.value = val;
+  });
+}
+function populateWANRouterDatalist() {
+  const routers = Object.values(nodeMap).filter(n => n.type === "router" || n.type === "firewall");
+  const items = routers.map(n => `<option value="${n.name}">`).join("");
+  ["wan-router-list", "wan-router-list2"].forEach(id => {
+    const dl = document.getElementById(id);
+    if (dl) dl.innerHTML = items;
+  });
+}
+function renderWANLinkList() {
+  const el = document.getElementById("wan-link-list");
+  if (!el) return;
+  const wanEdges = edges.filter(e => e.kind === "wan");
+  if (!wanEdges.length) {
+    el.innerHTML = '<div style="font-size:12.5px;color:var(--text-muted);padding:12px 0;">Belum ada WAN link tercatat. Tambahkan link baru di bawah.</div>';
+    return;
+  }
+  el.innerHTML = '<table style="width:100%;font-size:12.5px;"><thead><tr><th style="text-align:left;">Dari</th><th style="text-align:left;">Ke Site</th><th style="text-align:left;">Router Src</th><th style="text-align:left;">Router Dst</th><th style="text-align:left;">Label</th><th></th></tr></thead><tbody>'
+    + wanEdges.map(e => {
+      const na = nodeMap[e.a] || {}, nb = nodeMap[e.b] || {};
+      const siteA = na.siteName || na.site || "—", siteB = nb.siteName || nb.site || "—";
+      return `<tr style="border-bottom:1px solid var(--border-soft);">
+        <td style="padding:6px 4px;color:var(--text-muted);">${escA(siteA)}</td>
+        <td style="padding:6px 4px;">${escA(siteB)}</td>
+        <td style="padding:6px 4px;font-family:var(--font-mono);font-size:11.5px;">${escA(na.name)}</td>
+        <td style="padding:6px 4px;font-family:var(--font-mono);font-size:11.5px;">${escA(nb.name)}</td>
+        <td style="padding:6px 4px;font-size:11.5px;">${escA(e.label || "—")}</td>
+        <td style="padding:6px 4px;text-align:right;"><button class="btn ghost wan-del-btn" data-a="${e.a}" data-b="${e.b}" title="Hapus link" style="font-size:10px;padding:2px 6px;color:var(--danger);"><i class="fa-solid fa-trash"></i></button></td>
+      </tr>`;
+    }).join("")
+    + '</tbody></table>';
+  el.querySelectorAll(".wan-del-btn").forEach(btn => btn.addEventListener("click", () => {
+    const a = btn.dataset.a, b = btn.dataset.b;
+    const key = [a, b].sort().join("|") + "::wan";
+    const idx = edges.findIndex(e => [e.a, e.b].sort().join("|") + "::" + e.kind === key);
+    if (idx >= 0) edges.splice(idx, 1);
+    renderWANLinkList();
+    render();
+  }));
+}
+function openWANModal() {
+  const ov = document.getElementById("wan-modal-overlay");
+  if (!ov) return;
+  populateWANModalSites();
+  populateWANRouterDatalist();
+  renderWANLinkList();
+  ov.classList.add("open");
+}
+function saveWANLink() {
+  const fromSite = document.getElementById("wan-from-site").value;
+  const toSite = document.getElementById("wan-to-site").value;
+  const fromRouter = document.getElementById("wan-from-router").value.trim();
+  const toRouter = document.getElementById("wan-to-router").value.trim();
+  const label = document.getElementById("wan-label").value.trim();
+  if (!fromRouter || !toRouter) { alert("Router source dan destination wajib diisi."); return; }
+  ensureNode(fromRouter, { type: "router" });
+  ensureNode(toRouter, { type: "router" });
+  // try to assign sites from selects
+  const rA = nodeMap[slugKey(fromRouter)], rB = nodeMap[slugKey(toRouter)];
+  if (rA && fromSite && !rA.site) { const rk = Array.isArray(RACKS) ? RACKS.find(r => r.site === fromSite) : null; rA.site = fromSite; rA.siteName = rk ? rk.siteName : fromSite; }
+  if (rB && toSite && !rB.site) { const rk = Array.isArray(RACKS) ? RACKS.find(r => r.site === toSite) : null; rB.site = toSite; rB.siteName = rk ? rk.siteName : toSite; }
+  addEdge(fromRouter, toRouter, "wan", { label: label || (fromRouter + " → " + toRouter) });
+  // clear form
+  ["wan-from-site", "wan-to-site", "wan-from-router", "wan-to-router", "wan-label", "wan-bandwidth", "wan-port"].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = "";
+  });
+  renderWANLinkList();
+  render();
+}
+const wanLinksBtn = document.getElementById("wan-links-btn");
+if (wanLinksBtn) wanLinksBtn.addEventListener("click", openWANModal);
+const wanModalClose = document.getElementById("wan-modal-close");
+if (wanModalClose) wanModalClose.addEventListener("click", () => {
+  const ov = document.getElementById("wan-modal-overlay");
+  if (ov) ov.classList.remove("open");
+});
+const wanSaveBtn = document.getElementById("wan-save-btn");
+if (wanSaveBtn) wanSaveBtn.addEventListener("click", saveWANLink);
 
 // ---------- init ----------
 // Dijalankan pada event load agar semua modul data (port-data/pdu-data)
