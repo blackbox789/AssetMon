@@ -131,9 +131,60 @@ if (typeof PORT_DATA !== "undefined") {
     (data.rows || []).forEach(r => {
       if (!r || !r.dest) return;
       addEdge(dev, r.dest, "data", { label: r.label, media: r.media, vlan: r.vlan, fromPort: r.port, toPort: r.destPort });
+      // ISP connection: connectedTo → ISP node
+      if ((r.connType === "isp" || (r.connectedTo || "").startsWith("ISP-")) && r.connectedTo) {
+        ensureNode(r.connectedTo, { type: "isp", rack: null, site: null, ip: "" });
+      }
     });
   });
 }
+
+// ---- ISP + WAN edges dari detectISPEdges / detectWANEdges (port-data.js) ----
+(function buildISPWanEdges() {
+  if (typeof detectISPEdges !== "function") return;
+  detectISPEdges().forEach(e => {
+    ensureNode(e.from, { type: "isp" });
+    ensureNode(e.to);
+    addEdge(e.from, e.to, "isp", { label: e.label, bgp: e.bgp });
+  });
+  if (typeof detectWANEdges !== "function") return;
+  detectWANEdges().forEach(e => {
+    ensureNode(e.from);
+    ensureNode(e.to);
+    addEdge(e.from, e.to, "wan", { label: e.label });
+  });
+})();
+
+// ---- ISP devices dari /api/devices (async) ----
+(async function hydrateISPNodes() {
+  if (typeof fetch !== "function") return;
+  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+  try {
+    const res = await fetch(base + "/devices");
+    if (!res.ok) return;
+    const list = await res.json();
+    if (!Array.isArray(list)) return;
+    let changed = false;
+    list.forEach(d => {
+      const t = String(d.type || "").toLowerCase();
+      if (t !== "isp") return;
+      const key = canonKey(d.deviceKey || d.name || "");
+      if (!key) return;
+      let data = {};
+      try { data = typeof d.data === "string" ? (JSON.parse(d.data) || {}) : (d.data || {}); } catch (e) {}
+      const existing = nodeMap[slugKey(key)];
+      if (existing) {
+        if (!existing.ip && data.ip) { existing.ip = data.ip; changed = true; }
+        if (!existing.model && data.model) { existing.model = data.model; changed = true; }
+        existing.type = "isp";
+      } else {
+        ensureNode(key, { type: "isp", ip: data.ip || "", model: data.model || data.asn || "", rack: null, site: null });
+        changed = true;
+      }
+    });
+    if (changed && typeof render === "function") render();
+  } catch (_) { /* offline */ }
+})();
 
 // ---- edge power dari POWER_DATA ----
 if (typeof POWER_DATA !== "undefined") {
@@ -149,7 +200,7 @@ if (typeof POWER_DATA !== "undefined") {
 const typeColor = {
   server: "var(--accent)", switch: "var(--info)", pdu: "var(--violet)",
   firewall: "var(--warning)", router: "var(--text-muted)", patch: "#a5aebd",
-  ids: "#EC4899", lb: "#14B8A6",
+  ids: "#EC4899", lb: "#14B8A6", isp: "#E11D48",
   tower: "var(--accent)", storage: "var(--accent)", external: "#8a8f98"
 };
 const typeMeta = {
@@ -163,9 +214,10 @@ const typeMeta = {
   patch:    { label: "Patch Panel",   badgeBg: "var(--bg-surface-3)", badgeColor: "var(--text-secondary)" },
   tower:    { label: "Tower Server",  badgeBg: "var(--accent-dim)",   badgeColor: "var(--accent-text)" },
   storage:  { label: "Storage",       badgeBg: "var(--accent-dim)",   badgeColor: "var(--accent-text)" },
+  isp:      { label: "ISP",           badgeBg: "rgba(225,29,72,0.14)", badgeColor: "#E11D48" },
   external: { label: "Eksternal",     badgeBg: "var(--bg-surface-3)", badgeColor: "var(--text-secondary)" }
 };
-const typeOrder = { switch: 0, router: 1, firewall: 2, server: 3, storage: 3, pdu: 4, patch: 5, tower: 6, external: 7 };
+const typeOrder = { switch: 0, router: 1, firewall: 2, server: 3, storage: 3, pdu: 4, patch: 5, tower: 6, isp: 7, external: 8 };
 
 // ---------- model hierarki logis (core → distribution → access) ----------
 const LAYER_LABELS = {
@@ -183,6 +235,7 @@ const LAYER_LABELS = {
 function detectAutoLayer(n) {
   const name = String(n.name || "").toUpperCase();
   const t = n.type || "";
+  if (t === "isp") return 0;
   if (name.startsWith("FW-") || t === "firewall") return 2;
   if (/IDS|IPS/.test(name) || t === "ids") return 3;
   if (/^LB-|LOAD\s*BAL/.test(name) || t === "lb") return 4;
@@ -224,7 +277,7 @@ function deviceLayer(n) {
   if (m === "management") return 8;
   return detectAutoLayer(n);
 }
-const LAYER_TYPE_ORDER = { router: 0, firewall: 1, switch: 2, server: 3, storage: 3, tower: 3, pdu: 4, patch: 5, external: 6 };
+const LAYER_TYPE_ORDER = { router: 0, firewall: 1, switch: 2, server: 3, storage: 3, tower: 3, pdu: 4, patch: 5, isp: 6, external: 7 };
 
 // ---------- tree topologi (mode Logis) — spine 9 layer + VLAN segmentation ----------
 const TREE_CARD_W = 118, TREE_CARD_H = 64, TREE_GAP = 24, TREE_ROW_H = 118;
@@ -277,6 +330,7 @@ function buildTreeLayout() {
     if (!n.rack && !topoIsConceptual(n)) return;
     const L = deviceLayer(n);
     if (n.type === "pdu") byType.pdu.push(n);
+    else if (n.type === "isp") byType.wan.push(n);
     else if (L === 0) byType.wan.push(n);
     else if (L === 1) byType.router.push(n);
     else if (L === 2) byType.fw.push(n);
@@ -388,6 +442,7 @@ function drawNodeIcon(g, type, cx, cy, color) {
   const S = { fill: "none", stroke: color, "stroke-width": 1.7, "stroke-linecap": "round", "stroke-linejoin": "round" };
   switch (type) {
     case "cloud":
+    case "isp":
       shape(g, "ellipse", Object.assign({ cx: cx - 7, cy: cy, rx: 5.5, ry: 4.5, fill: color }, S));
       shape(g, "ellipse", Object.assign({ cx: cx + 7, cy: cy + 1, rx: 5.5, ry: 4.5, fill: color }, S));
       shape(g, "ellipse", Object.assign({ cx: cx, cy: cy - 1, rx: 6.5, ry: 5, fill: color }, S));
@@ -614,7 +669,7 @@ function layoutNodes() {
     if (n.rack) {
       if (currentSite && n.site && n.site !== currentSite) return; // cakupan site
       (rackGroups[n.rack] = rackGroups[n.rack] || []).push(n);
-    } else if (topoIsConceptual(n)) externalNodes.push(n);
+    } else if (topoIsConceptual(n) || n.type === "isp") externalNodes.push(n);
     else unplacedNodes.push(n); // perangkat nyata tanpa penempatan
   });
   Object.values(rackGroups).forEach(list => {
@@ -764,16 +819,17 @@ function render() {
   // Fisik: gambar hanya node yang relevan dengan cakupan — mencegah node
   // lintas site digambar dengan koordinat basi di pojok kiri atas.
   const visible = n => {
-    if (!n.rack) return topoIsConceptual(n);            // referensi WAN saja; unplaced pakai kotak khusus
+    if (!n.rack) return topoIsConceptual(n) || n.type === "isp"; // referensi WAN + ISP; unplaced pakai kotak khusus
     if (currentRack !== "all" && n.rack !== currentRack) return false;
     if (!currentSite || currentSite === "__all__") return true;
     return String(n.site || "").toUpperCase() === String(currentSite).toUpperCase();
   };
 
-  // edges fisik: bundle trunk antar rak + garis langsung ke eksternal
+  // edges fisik: bundle trunk antar rak + garis langsung ke eksternal + ISP/WAN edges
   svgEdges.length = 0;
   const bundles = new Map();
   edges.forEach(e => {
+    if (e.kind === "isp" || e.kind === "wan") return; // digambar terpisah di bawah
     if (e.kind !== "data") return;
     const na = nodeMap[e.a], nb = nodeMap[e.b];
     if (!na || !nb || !visible(na) || !visible(nb)) return;
@@ -795,6 +851,25 @@ function render() {
       svg.appendChild(line);
       svgEdges.push({ el: line, a: e.a, b: e.b, kind: e.kind });
     }
+  });
+  // ISP & WAN edges: garis putus-putus dari router ke ISP cloud / antar site
+  edges.forEach(e => {
+    if (e.kind !== "isp" && e.kind !== "wan") return;
+    const na = nodeMap[e.a], nb = nodeMap[e.b];
+    if (!na || !nb || !visible(na) || !visible(nb)) return;
+    const isISP = e.kind === "isp";
+    const cls = isISP ? "edge edge-isp" : "edge edge-wan";
+    const line = document.createElementNS(svgNS, "line");
+    line.setAttribute("x1", na.x); line.setAttribute("y1", na.y);
+    line.setAttribute("x2", nb.x); line.setAttribute("y2", nb.y);
+    line.setAttribute("class", cls);
+    if (isISP) line.setAttribute("stroke-dasharray", "6 3");
+    else line.setAttribute("stroke-dasharray", "8 4");
+    const tip = document.createElementNS(svgNS, "title");
+    tip.textContent = (isISP ? "ISP Peering" : "WAN Link") + ": " + (e.label || e.a + " → " + e.b);
+    line.appendChild(tip);
+    svg.appendChild(line);
+    svgEdges.push({ el: line, a: e.a, b: e.b, kind: e.kind });
   });
   // kartu rack (hanya mode fisik) — SEMUA rack site, termasuk kosong
   if (currentLayout === "physical") {
@@ -959,6 +1034,29 @@ function render() {
     }
   }
 
+  // ISP cloud icons di band eksternal (fisik mode) — digambar sebagai node bundle
+  if (currentLayout === "physical") {
+    const isps = Object.values(nodeMap).filter(n => n.type === "isp" && n.x > 0 && n.y > 0);
+    isps.forEach(n => {
+      const g = document.createElementNS(svgNS, "g");
+      g.dataset.id = n.id;
+      g.style.cursor = "pointer";
+      const col = typeColor.isp;
+      drawNodeIcon(g, "isp", n.x, n.y, col);
+      // label
+      const nm = shape(g, "text", { x: n.x, y: n.y + 22, class: "phys-dev-name", "text-anchor": "middle" });
+      nm.textContent = n.name.length > 18 ? n.name.slice(0, 17) + "…" : n.name;
+      const sub = shape(g, "text", { x: n.x, y: n.y + 34, class: "phys-dev-meta", "text-anchor": "middle" });
+      sub.textContent = n.model || n.ip || "ISP";
+      const tip = document.createElementNS(svgNS, "title");
+      tip.textContent = (n.model || "ISP Provider") + (n.ip ? "\n" + n.ip : "");
+      g.appendChild(tip);
+      g.addEventListener("click", () => selectNode(n.id));
+      svg.appendChild(g);
+      svgNodes[n.id] = g;
+    });
+  }
+
   // node — hanya mode Logis & Global (Fisik memakai blok per kelompok di kartu)
   if (currentLayout !== "physical") {
   Object.values(nodeMap).forEach(n => {
@@ -1017,7 +1115,7 @@ function render() {
   updateLegend();
 }
 
-const TYPE_LABELS_TOPO = { server: "Server", switch: "Switch", pdu: "PDU", firewall: "Firewall", router: "Router", storage: "Storage", ups: "UPS", patch: "Patch Panel" };
+const TYPE_LABELS_TOPO = { server: "Server", switch: "Switch", pdu: "PDU", firewall: "Firewall", router: "Router", storage: "Storage", ups: "UPS", patch: "Patch Panel", isp: "ISP" };
 function svgViewBoxH() {
   const vb = (svg.getAttribute("viewBox") || "0 0 0 400").split(/\s+/);
   return parseFloat(vb[3]) || 400;
@@ -1041,7 +1139,9 @@ function updateLegend() {
   if (currentLayout === "logical" && currentSite === "__all__") {
     items = [
       { color: "var(--text-muted)", label: "Cloud WAN / Internet" },
+      { color: "#E11D48", label: "ISP Provider" },
       { fill: "var(--accent-dim)", color: "var(--accent)", label: "Kartu Site (klik untuk buka)" },
+      { color: "#E11D48", line: true, dashed: true, label: "ISP Peering" },
       { color: "var(--violet)", line: true, label: "Uplink site ke WAN" },
     ];
   } else if (currentLayout === "logical") {
@@ -1053,6 +1153,7 @@ function updateLegend() {
       { color: "var(--violet)", label: "Rack PDU / Power lane" },
       { color: "var(--warning)", label: "Firewall" },
       { color: "var(--text-muted)", label: "Router / Eksternal" },
+      { color: "#E11D48", label: "ISP" },
       { outline: true, label: "Node referensi (belum ada di data)" },
     ];
   } else {
@@ -1062,7 +1163,10 @@ function updateLegend() {
       { color: "var(--violet)", label: "Rack PDU" },
       { color: "var(--warning)", label: "Firewall" },
       { color: "var(--text-muted)", label: "Router / Eksternal" },
+      { color: "#E11D48", label: "ISP" },
       { color: "var(--accent)", line: true, label: "Link Data (antar perangkat)" },
+      { color: "#E11D48", line: true, dashed: true, label: "ISP Peering" },
+      { color: "var(--violet)", line: true, label: "WAN Link (antar site)" },
       { color: "var(--accent)", line: true, label: "Trunk antar rak (tebal = banyak link)" },
       { outline: true, label: "Rak kosong" },
     ];
@@ -1075,6 +1179,7 @@ const GLOBAL_CARD_W = 280, GLOBAL_CARD_H = 168, GLOBAL_GAP = 44;
 
 function renderGlobalView() {
   const sites = topoSiteList();
+  const isps = Object.values(nodeMap).filter(n => n.type === "isp");
   const stats = sites.map(s => {
     const devs = Object.values(nodeMap).filter(n => n.site === s.id && n.rack);
     const racks = [...new Set(devs.map(n => n.rack))];
@@ -1097,7 +1202,7 @@ function renderGlobalView() {
 
   const margin = 70;
   const totalW = Math.max(720, margin * 2 + stats.length * GLOBAL_CARD_W + Math.max(0, stats.length - 1) * GLOBAL_GAP);
-  const totalH = 380;
+  const totalH = isps.length ? 440 : 380;
   svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);
   svg.innerHTML = "";
   svgNodesClear();
@@ -1115,8 +1220,82 @@ function renderGlobalView() {
   gCloud.appendChild(t1); gCloud.appendChild(t2);
   svg.appendChild(gCloud);
 
-  // kartu site
+  // ISP clouds — positioned between Internet cloud and site cards
   const startY = 210;
+  const ispY = 150;
+  if (isps.length) {
+    const ispGap = Math.min(140, (totalW - margin * 2) / isps.length);
+    const ispStartX = cx - ((isps.length - 1) * ispGap) / 2;
+    isps.forEach((n, i) => {
+      const ix = ispStartX + i * ispGap;
+      // edge from Internet cloud to ISP
+      const lnCI = document.createElementNS(svgNS, "line");
+      lnCI.setAttribute("x1", cx); lnCI.setAttribute("y1", cy + ry);
+      lnCI.setAttribute("x2", ix); lnCI.setAttribute("y2", ispY - 14);
+      lnCI.setAttribute("class", "edge edge-isp");
+      lnCI.setAttribute("stroke-dasharray", "6 3");
+      svg.appendChild(lnCI);
+
+      const gISP = document.createElementNS(svgNS, "g");
+      gISP.style.cursor = "pointer";
+      gISP.dataset.id = n.id;
+      drawNodeIcon(gISP, "isp", ix, ispY, typeColor.isp);
+      const nm = shape(gISP, "text", { x: ix, y: ispY + 22, class: "tree-name", "text-anchor": "middle" });
+      nm.textContent = n.name.length > 20 ? n.name.slice(0, 19) + "…" : n.name;
+      const sub = shape(gISP, "text", { x: ix, y: ispY + 35, class: "tree-sub", "text-anchor": "middle" });
+      sub.textContent = n.model || n.ip || "ISP";
+      gISP.addEventListener("click", () => selectNode(n.id));
+      svg.appendChild(gISP);
+      svgNodes[n.id] = gISP;
+
+      // edge from ISP to each site card
+      stats.forEach((s, si) => {
+        const w = GLOBAL_CARD_W;
+        const x = margin + si * (w + GLOBAL_GAP) + Math.max(0, (totalW - margin * 2 - stats.length * w - (stats.length - 1) * GLOBAL_GAP) / 2);
+        const ccx = x + w / 2;
+        const ln = document.createElementNS(svgNS, "line");
+        ln.setAttribute("x1", ix); ln.setAttribute("y1", ispY + 14);
+        ln.setAttribute("x2", ccx); ln.setAttribute("y2", startY);
+        ln.setAttribute("class", "edge edge-isp");
+        ln.setAttribute("stroke-dasharray", "5 3");
+        ln.setAttribute("stroke-width", "1.5");
+        const tip = document.createElementNS(svgNS, "title");
+        tip.textContent = n.name + " → " + s.name;
+        ln.appendChild(tip);
+        svg.appendChild(ln);
+      });
+    });
+  }
+
+  // WAN edges between sites (dashed, colored violet)
+  const wanEdges = edges.filter(e => e.kind === "wan");
+  if (wanEdges.length) {
+    wanEdges.forEach(e => {
+      const na = nodeMap[e.a], nb = nodeMap[e.b];
+      if (!na || !nb) return;
+      // find which sites these devices belong to
+      const siteA = na.site, siteB = nb.site;
+      if (!siteA || !siteB || siteA === siteB) return;
+      const siA = stats.findIndex(s => s.id === siteA);
+      const siB = stats.findIndex(s => s.id === siteB);
+      if (siA < 0 || siB < 0) return;
+      const w = GLOBAL_CARD_W;
+      const xA = margin + siA * (w + GLOBAL_GAP) + Math.max(0, (totalW - margin * 2 - stats.length * w - (stats.length - 1) * GLOBAL_GAP) / 2);
+      const xB = margin + siB * (w + GLOBAL_GAP) + Math.max(0, (totalW - margin * 2 - stats.length * w - (stats.length - 1) * GLOBAL_GAP) / 2);
+      const ln = document.createElementNS(svgNS, "line");
+      ln.setAttribute("x1", xA + w / 2); ln.setAttribute("y1", startY + GLOBAL_CARD_H);
+      ln.setAttribute("x2", xB + w / 2); ln.setAttribute("y2", startY + GLOBAL_CARD_H);
+      ln.setAttribute("class", "edge edge-wan");
+      ln.setAttribute("stroke-dasharray", "8 4");
+      ln.setAttribute("stroke-width", "2");
+      const tip = document.createElementNS(svgNS, "title");
+      tip.textContent = "WAN: " + (e.label || e.a + " → " + e.b);
+      ln.appendChild(tip);
+      svg.appendChild(ln);
+    });
+  }
+
+  // kartu site
   stats.forEach((s, i) => {
     const w = GLOBAL_CARD_W, h = GLOBAL_CARD_H;
     const x = margin + i * (w + GLOBAL_GAP) + Math.max(0, (totalW - margin * 2 - stats.length * w - (stats.length - 1) * GLOBAL_GAP) / 2);
@@ -1200,7 +1379,12 @@ function updateInfo() {
   const rackCount = new Set(Object.values(nodeMap).map(n => n.rack).filter(Boolean)).size;
   const dataEdges = edges.filter(e => e.kind === "data").length;
   const powerEdges = edges.filter(e => e.kind === "power").length;
-  info.textContent = totalNodes + " device · " + rackCount + " rack · " + dataEdges + " link data · " + powerEdges + " link power";
+  const ispEdges = edges.filter(e => e.kind === "isp").length;
+  const wanEdges = edges.filter(e => e.kind === "wan").length;
+  const parts = [totalNodes + " device", rackCount + " rack", dataEdges + " link data", powerEdges + " link power"];
+  if (ispEdges) parts.push(ispEdges + " ISP peering");
+  if (wanEdges) parts.push(wanEdges + " WAN link");
+  info.textContent = parts.join(" · ");
 }
 
 // ---------- detail node ----------
@@ -1236,8 +1420,11 @@ function selectNode(id) {
   }
   const tagsHtml = (n.tags && n.tags.length) ? `<div class="tag-row">${n.tags.map(t => `<span class="tag-chip" style="background:color-mix(in srgb, ${tagColor(t)} 18%, transparent);color:${tagColor(t)}"><span class="tdot"></span>${t}</span>`).join("")}</div>` : "";
   const connHtml = conns.length
-    ? `<div class="section-label">Terhubung ke (${conns.length})</div><div class="conn-list">${conns.map(({ n: c, kind }) =>
-        `<div class="conn-item"><span class="dot" style="background:${typeColor[c.type] || typeColor.external}"></span>${c.name}<span class="mono" style="margin-left:auto;font-size:10px;color:${kind === "power" ? "var(--violet)" : "var(--text-muted)"};">${kind === "power" ? "⚡" : "⇄"}</span></div>`).join("")}</div>`
+    ? `<div class="section-label">Terhubung ke (${conns.length})</div><div class="conn-list">${conns.map(({ n: c, kind }) => {
+        const icon = kind === "power" ? "⚡" : kind === "isp" ? "☁" : kind === "wan" ? "🌍" : "⇄";
+        const color = kind === "power" ? "var(--violet)" : kind === "isp" ? "#E11D48" : kind === "wan" ? "var(--violet)" : "var(--text-muted)";
+        return `<div class="conn-item"><span class="dot" style="background:${typeColor[c.type] || typeColor.external}"></span>${c.name}<span class="mono" style="margin-left:auto;font-size:10px;color:${color};">${icon}</span></div>`;
+      }).join("")}</div>`
     : `<div class="section-label">Tidak ada koneksi tercatat</div>`;
 
   panel.innerHTML = `<span class="detail-type-badge" style="background:${meta.badgeBg};color:${meta.badgeColor}">${meta.label}</span>
