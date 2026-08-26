@@ -3,13 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ISP</title>
+<title>ISP — Internet Service Provider</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/theme.css">
 <link rel="stylesheet" href="css/components.css">
-<link rel="stylesheet" href="css/asset-list.css">
+<link rel="stylesheet" href="css/server-list.css">
+<link rel="stylesheet" href="css/isp-list.css">
 </head>
 <body>
 <div class="app-shell" id="app-shell">
@@ -34,13 +35,13 @@
       <a href="network-topology.html" class="nav-item"><i class="fa-solid fa-diagram-project"></i><span>Network Topology</span></a>
       <a href="port-map.html" class="nav-item"><i class="fa-solid fa-ethernet"></i><span>Port Map</span></a>
       <a href="power-map.html" class="nav-item"><i class="fa-solid fa-plug"></i><span>Power Map</span></a>
-            <a href="asset-list.html" class="nav-item active nav-parent open" data-submenu="submenu-asset"><i class="fa-solid fa-list-ul"></i><span>Asset List</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+      <a href="asset-list.html" class="nav-item nav-parent open" data-submenu="submenu-asset"><i class="fa-solid fa-list-ul"></i><span>Asset List</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
       <div class="nav-submenu open" id="submenu-asset">
         <a href="server-list.html" class="nav-subitem" data-type="server"><i class="fa-solid fa-database"></i><span>Server</span></a>
         <a href="storage-list.html" class="nav-subitem" data-type="storage"><i class="fa-solid fa-hard-drive"></i><span>Storage</span></a>
         <a href="isp-list.html" class="nav-subitem active" data-type="isp"><i class="fa-solid fa-cloud"></i><span>ISP</span></a>
-        <a href="asset-list.html" class="nav-subitem nav-parent2" data-submenu2="submenu-asset-net"><i class="fa-solid fa-network-wired"></i><span>Network Device</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
-        <div class="nav-submenu2" id="submenu-asset-net">
+        <a href="asset-list.html" class="nav-subitem nav-parent2 open" data-submenu2="submenu-asset-net"><i class="fa-solid fa-network-wired"></i><span>Network Device</span><span class="nav-caret"><i class="fa-solid fa-chevron-down"></i></span></a>
+        <div class="nav-submenu2 open" id="submenu-asset-net">
           <a href="router-list.html" class="nav-subitem2" data-type="router"><i class="fa-solid fa-tower-broadcast"></i><span>Router</span></a>
           <a href="firewall-list.html" class="nav-subitem2" data-type="firewall"><i class="fa-solid fa-shield-halved"></i><span>Firewall</span></a>
           <a href="ids-ips-list.html" class="nav-subitem2" data-type="ids"><i class="fa-solid fa-shield-virus"></i><span>IDS/IPS</span></a>
@@ -77,13 +78,14 @@
     <span class="sidebar-foot-text" id="sidebar-user">Semua sistem <b>online</b></span>
   </div>
 </aside>
+
 <div class="main">
   <div class="topbar">
     <div>
-      <h1>Asset List</h1>
-      <div class="topbar-sub">ISP — Internet Service Provider</div>
+      <h1>Daftar ISP</h1>
+      <div class="topbar-sub">Internet Service Provider — kelola data provider internet, BGP, SLA & kontrak</div>
     </div>
-    <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input type="text" placeholder="Cari ISP, ASN, atau IP…"></div>
+    <div class="search"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="isp-search" placeholder="Cari ISP, ASN, IP, kontrak…"></div>
     <div class="topbar-actions">
       <button class="theme-toggle" id="theme-toggle-btn" aria-label="Toggle theme">
         <i class="fa-solid fa-sun icon-sun-only"></i><i class="fa-solid fa-moon icon-moon-only"></i>
@@ -97,311 +99,162 @@
   </div>
   <div class="content">
 
-      <div class="card-head">
-        <div><div class="card-title" style="font-size:15px;">ISP — Internet Service Provider</div></div>
-        <button class="btn primary" id="open-add-asset"><i class="fa-solid fa-plus"></i>Add ISP</button>
+    <!-- Stats cards -->
+    <div class="grid grid-4" style="margin-bottom:16px;">
+      <div class="card stat-card">
+        <div class="stat-top"><span class="stat-label">Total ISP</span><div class="stat-icon" style="background:rgba(225,29,72,.12);color:#f87171;"><i class="fa-solid fa-cloud"></i></div></div>
+        <div class="stat-value" id="st-total">0</div>
+        <div class="stat-sub" id="st-total-sub">—</div>
       </div>
-
-      <div class="filter-toolbar">
-        <select class="form-input" style="width:auto;" id="filter-site"><option value="all">Semua Site</option><option value="DC1">DC1 — Cilandak</option><option value="DC2">DC2 — Cikupa</option><option value="DC3">DC3 — Surabaya</option><option value="DC4">DC4 — Bandung</option></select>
-        <select class="form-input" style="width:auto;" id="filter-type">
-          <option value="all">Semua Tipe</option>
-          <option value="isp" selected>ISP</option>
-        </select>
-        <select class="form-input" style="width:auto;" id="filter-status"><option value="all">Semua Status</option><option value="online">Online</option><option value="offline">Offline</option></select>
-        <span class="filter-count" id="filter-count">Menampilkan 0 dari 0 ISP</span>
+      <div class="card stat-card">
+        <div class="stat-top"><span class="stat-label">Active</span><div class="stat-icon" style="background:var(--accent-dim);color:var(--accent-text);"><i class="fa-solid fa-play"></i></div></div>
+        <div class="stat-value" id="st-active">0</div>
+        <div class="stat-sub">Beroperasi normal</div>
       </div>
+      <div class="card stat-card">
+        <div class="stat-top"><span class="stat-label">Backup</span><div class="stat-icon" style="background:var(--warning-dim);color:var(--warning);"><i class="fa-solid fa-rotate"></i></div></div>
+        <div class="stat-value" id="st-backup">0</div>
+        <div class="stat-sub">Redundansi / failover</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-top"><span class="stat-label">ASN Unique</span><div class="stat-icon" style="background:rgba(59,130,246,.12);color:#60a5fa;"><i class="fa-solid fa-fingerprint"></i></div></div>
+        <div class="stat-value" id="st-asn">0</div>
+        <div class="stat-sub">Autonomous System Numbers</div>
+      </div>
+    </div>
 
-      <div class="card">
-        <table>
-          <thead><tr><th>ISP</th><th>ASN</th><th>Bandwidth</th><th>IP Ranges</th><th>Contract</th><th>SLA</th><th>Status</th></tr></thead>
-          <tbody>
-          </tbody>
-        </table>
-        <div class="table-footer">
-          <span>Halaman 1 dari 1</span>
-          <div class="page-btns"><button>‹</button><button class="current">1</button><button>›</button></div>
+    <!-- Filters -->
+    <div class="filter-toolbar" style="margin-bottom:16px;">
+      <select class="form-input" style="width:auto;" id="f-site">
+        <option value="all">Semua Site</option>
+        <option value="DC1">DC1 — Cilandak</option>
+        <option value="DC2">DC2 — Cikupa</option>
+        <option value="DC3">DC3 — Surabaya</option>
+        <option value="DC4">DC4 — Bandung</option>
+      </select>
+      <select class="form-input" style="width:auto;" id="f-status">
+        <option value="all">Semua Status</option>
+        <option value="active">Active</option>
+        <option value="backup">Backup</option>
+        <option value="provisioning">Provisioning</option>
+        <option value="suspended">Suspended</option>
+        <option value="decommissioned">Decommissioned</option>
+      </select>
+      <button type="button" class="btn primary" id="btn-add-isp" style="margin-left:auto;"><i class="fa-solid fa-plus"></i> Tambah ISP</button>
+    </div>
+
+    <!-- Ctx bar -->
+    <div class="ctx-bar" id="isp-ctx-bar" hidden></div>
+
+    <!-- Layout: table + detail -->
+    <div class="isp-layout">
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border-soft);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div class="card-title"><i class="fa-solid fa-cloud" style="color:var(--accent);margin-right:8px;"></i> List ISP</div>
+            <div class="card-title-sub" id="isp-count-text">Menampilkan 0 ISP</div>
+          </div>
         </div>
+        <div style="overflow-x:auto;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ISP Name</th>
+                <th>ASN</th>
+                <th>Bandwidth</th>
+                <th>IP Ranges</th>
+                <th>Contract</th>
+                <th>SLA</th>
+                <th>POP</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="isp-tbody"></tbody>
+          </table>
+        </div>
+        <div class="isp-pagination" id="isp-pagination"></div>
       </div>
+
+      <!-- Detail panel -->
+      <div class="card detail-sticky" id="server-detail">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;">
+          <div>
+            <div class="card-title"><i class="fa-solid fa-clipboard-list" style="color:var(--accent);margin-right:8px;"></i> Detail ISP</div>
+            <div class="card-title-sub">Ringkasan data provider terpilih</div>
+          </div>
+        </div>
+        <div id="detail-body"><div class="form-hint">Pilih ISP pada tabel untuk melihat detail.</div></div>
+      </div>
+    </div>
+
   </div>
 </div>
 </div>
 
-  <div class="modal-overlay" id="modal-overlay">
-    <div class="modal" style="max-width:720px;max-height:calc(100vh - 80px);overflow-y:auto;">
-      <div class="modal-head">
-        <div><div class="modal-title">Add ISP</div><div class="modal-sub">Tambahkan ISP baru ke inventory</div></div>
-        <div class="modal-close" id="close-add-asset"><i class="fa-solid fa-xmark"></i></div>
+<!-- View modal -->
+<div class="modal-overlay" id="isp-view-overlay">
+  <div class="modal" style="max-width:720px;max-height:calc(100vh - 80px);overflow-y:auto;">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="isp-view-title"><i class="fa-solid fa-cloud" style="color:var(--accent);margin-right:8px;"></i> ISP</div>
+        <div class="modal-sub" id="isp-view-sub"></div>
       </div>
-
-      <div class="m-field"><label class="form-label">Asset Name</label><input class="form-input" type="text" id="asset-name" data-sf="hostname" placeholder="mis. ISP-TELKOM-01"></div>
-      <div class="m-field"><label class="form-label">Tipe Asset</label>
-        <select class="form-input" id="asset-type-select">
-          <option value="ISP" selected>ISP</option>
-        </select>
-      </div>
-
-      <div id="isp-section" style="border-top:1px solid var(--border-soft);padding-top:16px;margin-top:6px;">
-        <div style="font-size:11.5px;font-weight:600;color:var(--accent-text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;"><i class="fa-solid fa-cloud"></i> ISP — Informasi Provider</div>
-
-        <div class="form-row">
-          <div class="m-field"><label class="form-label">ISP Name</label><input class="form-input" type="text" id="isp-name" placeholder="mis. Telkom Indonesia"></div>
-          <div class="m-field"><label class="form-label">ASN</label><input class="form-input mono" type="text" id="isp-asn" placeholder="mis. AS17974"></div>
-        </div>
-
-        <div class="form-row">
-          <div class="m-field"><label class="form-label">Bandwidth</label><input class="form-input" type="text" id="isp-bandwidth" placeholder="mis. 10 Gbps"></div>
-          <div class="m-field"><label class="form-label">IP Ranges (Public)</label><input class="form-input mono" type="text" id="isp-ip-ranges" placeholder="mis. 203.0.113.0/24, 103.28.77.0/24"></div>
-        </div>
-
-        <div class="form-row">
-          <div class="m-field"><label class="form-label">Public IP (Router-facing)</label><input class="form-input mono" type="text" id="isp-public-ip" placeholder="mis. 203.0.113.1"></div>
-          <div class="m-field"><label class="form-label">Peering Location</label><input class="form-input" type="text" id="isp-peering-location" placeholder="mis. Jakarta, GI-2"></div>
-        </div>
-
-        <div class="form-row">
-          <div class="m-field"><label class="form-label">Contract No</label><input class="form-input" type="text" id="isp-contract" placeholder="mis. TLK-2026-001"></div>
-          <div class="m-field"><label class="form-label">SLA</label><input class="form-input" type="text" id="isp-sla" placeholder="mis. 99.9% uptime"></div>
-        </div>
-
-        <div class="form-row">
-          <div class="m-field"><label class="form-label">NOC Phone</label><input class="form-input" type="text" id="isp-noc-phone" placeholder="mis. +62-21-5555-1234"></div>
-          <div class="m-field"><label class="form-label">NOC Email</label><input class="form-input" type="text" id="isp-noc-email" placeholder="mis. noc@telkom.co.id"></div>
-        </div>
-
-        <div class="form-row">
-          <div class="m-field"><label class="form-label">BGP Local ASN (Datacenter)</label><input class="form-input mono" type="text" id="isp-bgp-local" placeholder="mis. 65001"></div>
-          <div class="m-field"><label class="form-label">Routing Protocol</label><input class="form-input" type="text" id="isp-routing" placeholder="mis. BGP, Static"></div>
-        </div>
-
-        <div class="m-field"><label class="form-label">Notes</label><input class="form-input" type="text" id="isp-notes" placeholder="Catatan tambahan tentang ISP ini"></div>
-      </div>
-
-      <div class="m-field">
-        <label class="form-label">Tags</label>
-        <div class="tag-picker" id="tag-picker" data-sf-pick="tags">
-          <div class="chip" data-tag="production">production</div>
-          <div class="chip" data-tag="backup">backup</div>
-          <div class="chip" data-tag="primary">primary</div>
-          <div class="chip" data-tag="redundancy">redundancy</div>
-          <button class="chip chip-add" type="button" data-add-chip title="Tambah tag lainnya"><i class="fa-solid fa-plus"></i></button>
-        </div>
-        <div class="chip-add-row" data-add-row style="display:none;">
-          <input class="form-input" type="text" data-add-input placeholder="Tag lain, mis. critical">
-          <button class="btn primary btn-sm" type="button" data-add-confirm title="Tambah"><i class="fa-solid fa-check"></i></button>
-          <button class="btn ghost btn-sm" type="button" data-add-cancel title="Batal"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-      </div>
-
-      <div class="modal-foot">
-        <button class="btn ghost" id="cancel-add-asset">Batal</button>
-        <button class="btn primary">Simpan ISP</button>
-      </div>
+      <div class="modal-close" id="isp-view-close"><i class="fa-solid fa-xmark"></i></div>
+    </div>
+    <div id="isp-view-body"></div>
+    <div class="modal-foot">
+      <button class="btn ghost" id="isp-view-close-btn"><i class="fa-solid fa-xmark"></i> Tutup</button>
+      <button class="btn primary" id="isp-view-edit-btn"><i class="fa-solid fa-pen"></i> Edit ISP</button>
     </div>
   </div>
+</div>
 
-  <div class="modal-overlay" id="view-overlay">
-    <div class="modal" style="max-width:560px;">
-      <div class="modal-head">
-        <div><div class="modal-title" id="view-title">ISP</div><div class="modal-sub" id="view-sub"></div></div>
-        <div class="modal-close" id="view-close"><i class="fa-solid fa-xmark"></i></div>
+<!-- Add / Edit modal -->
+<div class="modal-overlay" id="isp-form-overlay">
+  <div class="modal" style="max-width:820px;max-height:calc(100vh - 80px);overflow-y:auto;">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="isp-form-title"><i class="fa-solid fa-plus" style="color:var(--accent);margin-right:8px;"></i> Add ISP</div>
+        <div class="modal-sub">Tambahkan ISP baru ke inventory</div>
       </div>
-      <div id="view-body"></div>
-      <div class="modal-foot" style="justify-content:flex-end;">
-        <button class="btn primary" id="view-pm-btn" style="display:none;"><i class="fa-solid fa-ethernet"></i> Port Map</button>
-      </div>
+      <div class="modal-close" id="isp-form-close"><i class="fa-solid fa-xmark"></i></div>
+    </div>
+
+    <!-- Hostname / Name field -->
+    <div class="m-field" style="margin-bottom:16px;">
+      <label class="form-label">Nama Aset / Hostname</label>
+      <input class="form-input mono" type="text" id="isp-name-input" placeholder="mis. ISP-TELKOM-01" style="font-size:14px;">
+      <div class="form-hint">Nama unik untuk ISP ini. Akan di-sync ke SQLite sebagai deviceKey.</div>
+    </div>
+
+    <div id="isp-form-body"></div>
+
+    <div class="modal-foot">
+      <button class="btn ghost" id="isp-form-cancel">Batal</button>
+      <button class="btn primary" id="isp-form-save"><i class="fa-solid fa-check"></i> Simpan ISP</button>
     </div>
   </div>
+</div>
 
-    <script src="js/brand.js"></script>
+<!-- Port Map quick modal -->
+<div class="modal-overlay" id="portmap-overlay">
+  <div class="modal" style="max-width:760px;">
+    <div class="modal-head">
+      <div><div class="modal-title" id="portmap-title">Port Map</div><div class="modal-sub" id="portmap-sub"></div></div>
+      <div class="modal-close" id="portmap-close"><i class="fa-solid fa-xmark"></i></div>
+    </div>
+    <div id="portmap-body"></div>
+  </div>
+</div>
+
+<script src="js/brand.js"></script>
 <script src="js/app.js"></script>
 <script src="js/auth.js"></script>
 <script>if(typeof authGuard==="function") authGuard();</script>
-    
-
 <script src="js/keys.js"></script>
-<script>window.ASSET_TYPES_SCOPE = ["isp"];</script>
-    <script src="js/asset-list.js"></script>
-    <script src="js/api.js"></script>
-
-    <div class="modal-overlay" id="portmap-overlay">
-      <div class="modal" style="max-width:760px;">
-        <div class="modal-head">
-          <div><div class="modal-title" id="portmap-title">Port Map</div><div class="modal-sub" id="portmap-sub"></div></div>
-          <div class="modal-close" id="portmap-close"><i class="fa-solid fa-xmark"></i></div>
-        </div>
-        <div id="portmap-body"></div>
-      </div>
-    </div>
-
-    <script src="js/port-data.js"></script>
-    <script src="js/port-map.js"></script>
-
-<script>
-/* ---- ISP-specific logic ---- */
-const ISP_FIELDS = ["ispName","asn","bandwidth","ipRanges","publicIp","peeringLocation","contract","sla","nocPhone","nocEmail","bgpLocal","routing","notes"];
-const ISP_LABELS = { ispName:"ISP Name", asn:"ASN", bandwidth:"Bandwidth", ipRanges:"IP Ranges", publicIp:"Public IP", peeringLocation:"Peering Location", contract:"Contract No", sla:"SLA", nocPhone:"NOC Phone", nocEmail:"NOC Email", bgpLocal:"BGP Local ASN", routing:"Routing Protocol", notes:"Notes" };
-
-function collectISPFields() {
-  const map = { ispName:"isp-name", asn:"isp-asn", bandwidth:"isp-bandwidth", ipRanges:"isp-ip-ranges", publicIp:"isp-public-ip", peeringLocation:"isp-peering-location", contract:"isp-contract", sla:"isp-sla", nocPhone:"isp-noc-phone", nocEmail:"isp-noc-email", bgpLocal:"isp-bgp-local", routing:"isp-routing", notes:"isp-notes" };
-  const out = {};
-  Object.entries(map).forEach(([key, id]) => {
-    const el = document.getElementById(id);
-    if (el) { const v = el.value.trim(); if (v) out[key] = v; }
-  });
-  return out;
-}
-
-function hydrateISPSection(rec) {
-  const map = { ispName:"isp-name", asn:"isp-asn", bandwidth:"isp-bandwidth", ipRanges:"isp-ip-ranges", publicIp:"isp-public-ip", peeringLocation:"isp-peering-location", contract:"isp-contract", sla:"isp-sla", nocPhone:"isp-noc-phone", nocEmail:"isp-noc-email", bgpLocal:"isp-bgp-local", routing:"isp-routing", notes:"isp-notes" };
-  Object.entries(map).forEach(([key, id]) => {
-    const el = document.getElementById(id);
-    if (el) el.value = rec[key] || "";
-  });
-}
-
-function ispRowHTML(a) {
-  const parts = [];
-  if (a.asn) parts.push(a.asn);
-  if (a.bandwidth) parts.push(a.bandwidth);
-  if (a.ipRanges) parts.push(a.ipRanges);
-  if (a.sla) parts.push(a.sla);
-  return `
-    <td><div class="strong">${escA(a.name)}</div><div class="mono" style="font-size:11px;">${escA(a.serial || a.ispName || "-")}</div><div style="margin-top:4px;">${switchTagChips(a.tags)}</div></td>
-    <td class="mono">${escA(a.asn || "-")}</td>
-    <td>${escA(a.bandwidth || "-")}</td>
-    <td class="mono" style="font-size:11px;">${escA(a.ipRanges || "-")}</td>
-    <td>${escA(a.contract || "-")}</td>
-    <td>${escA(a.sla || "-")}</td>
-    <td><span class="badge online"><span class="bdot"></span>Online</span></td>`;
-}
-
-function addISPRow(a) {
-  const tbody = assetTableBody();
-  if (!tbody) return;
-  const tr = document.createElement("tr");
-  tr.setAttribute("data-site", a.site || "all");
-  tr.setAttribute("data-type", "isp");
-  tr.setAttribute("data-status", "online");
-  tr.setAttribute("data-tags", (a.tags || []).join(","));
-  tr.innerHTML = ispRowHTML(a);
-  tbody.insertBefore(tr, tbody.firstChild);
-  if (typeof allRows !== "undefined" && allRows) allRows.push(tr);
-  assetCurrentPage = 1;
-  applyFilters();
-}
-
-/* Override save for ISP type */
-const _origSaveAccessoryAsset = window.saveAccessoryAsset;
-window.saveAccessoryAsset = function() {
-  const typeKey = OPTION_TO_TYPE[assetTypeSelect.value] || "";
-  if (typeKey === "isp") {
-    const a = collectAccessoryAsset();
-    const nameField = document.getElementById("asset-name");
-    if (!a.name) {
-      nameField.focus();
-      nameField.closest(".m-field").style.outline = "1px solid var(--danger)";
-      setTimeout(() => { nameField.closest(".m-field").style.outline = ""; }, 1600);
-      return;
-    }
-    a.name = canonKey(a.name);
-    Object.assign(a, collectISPFields());
-    if (a.ispName) a.serial = a.ispName;
-    saveLocalAccessory(a);
-    if (typeof apiSaveDevice === "function") {
-      apiSaveDevice({ deviceKey: a.name, type: "isp", name: a.name, data: a });
-    }
-    addISPRow(a);
-    overlay.classList.remove("open");
-    resetAddModal();
-    return;
-  }
-  _origSaveAccessoryAsset();
-};
-
-/* Override openViewAsset for ISP */
-const _origOpenViewAsset = window.openViewAsset;
-window.openViewAsset = function(tr) {
-  const a = readAssetRow(tr);
-  if (a.type !== "isp") { _origOpenViewAsset(tr); return; }
-  let rec = null;
-  try { rec = readLocalAccessories().find(x => x.name === a.name && x.type === "isp") || null; } catch(e) {}
-  viewPmName = a.name;
-  viewPmType = a.type;
-  document.getElementById("view-title").textContent = a.name;
-  document.getElementById("view-sub").textContent = `ISP · ${a.brandModel || "—"}`;
-  const body = document.getElementById("view-body");
-  const fields = [
-    ["ISP Name", rec?.ispName], ["ASN", rec?.asn], ["Bandwidth", rec?.bandwidth],
-    ["IP Ranges", rec?.ipRanges], ["Public IP", rec?.publicIp], ["Peering Location", rec?.peeringLocation],
-    ["Contract No", rec?.contract], ["SLA", rec?.sla],
-    ["NOC Phone", rec?.nocPhone], ["NOC Email", rec?.nocEmail],
-    ["BGP Local ASN", rec?.bgpLocal], ["Routing", rec?.routing],
-    ["Notes", rec?.notes],
-  ];
-  body.innerHTML = '<div style="padding:4px 0;">' + fields.map(([k, v]) =>
-    `<div style="display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--border-soft);"><div style="min-width:140px;font-size:12px;color:var(--text-secondary);">${k}</div><div style="font-size:13px;">${escA(v || "—")}</div></div>`
-  ).join("") + "</div>";
-  document.getElementById("view-pm-btn").style.display = "";
-  document.getElementById("view-overlay").classList.add("open");
-};
-
-/* Override hydrate for ISP in DB */
-const _origHydrate = window.hydrateDevicesFromDb;
-window.hydrateDevicesFromDb = async function() {
-  if (typeof fetch !== "function") return;
-  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
-  let list;
-  try {
-    const res = await fetch(base + "/devices");
-    if (!res.ok) return;
-    list = await res.json();
-  } catch(e) { return; }
-  if (!Array.isArray(list)) return;
-  const scope = pageTypeScope();
-  const isps = list.filter(d => String(d.type || "").toLowerCase() === "isp");
-  if (!isps.length) return;
-  const accs = readLocalAccessories();
-  for (const d of isps) {
-    const key = canonKey(d.deviceKey || d.name || "");
-    let data = {};
-    try { data = typeof d.data === "string" ? (JSON.parse(d.data) || {}) : (d.data || {}); } catch(e) { data = {}; }
-    const rec = { ...data, name: key, type: "isp" };
-    const i = accs.findIndex(a => canonKey(a.name) === key && a.type === "isp");
-    if (i >= 0 && Object.keys(data).length > 0) accs[i] = rec;
-    else if (i < 0) accs.unshift(rec);
-  }
-  try { localStorage.setItem(ACC_STORAGE_KEY, JSON.stringify(accs)); } catch(e) {}
-  /* Re-render ISP rows */
-  for (let i = allRows.length - 1; i >= 0; i--) {
-    const tr = allRows[i];
-    if (tr.dataset.type !== "isp") continue;
-    tr.remove();
-    allRows.splice(i, 1);
-  }
-  accs.filter(a => a.type === "isp").forEach(a => {
-    if (!scope || scope.includes("isp")) addISPRow(a);
-  });
-};
-
-/* Seed demo ISP if table empty */
-function seedDemoISP() {
-  const tbody = assetTableBody();
-  if (!tbody || tbody.children.length > 0) return;
-  const demo = [
-    { name: "ISP-TELKOM-01", type: "isp", ispName: "Telkom Indonesia", asn: "AS17974", bandwidth: "10 Gbps", ipRanges: "203.0.113.0/24", publicIp: "203.0.113.1", contract: "TLK-2026-001", sla: "99.9% uptime", nocPhone: "+62-21-5555-1234", nocEmail: "noc@telkom.co.id", bgpLocal: "65001", routing: "BGP", tags: ["production", "primary"] },
-    { name: "ISP-INDOSAT-01", type: "isp", ispName: "Indosat Ooredoo", asn: "AS17967", bandwidth: "10 Gbps", ipRanges: "103.28.77.0/24", publicIp: "103.28.77.1", contract: "ISAT-2026-001", sla: "99.5% uptime", nocPhone: "+62-21-5555-5678", nocEmail: "noc@indosat.com", bgpLocal: "65001", routing: "BGP", tags: ["production", "redundancy"] },
-  ];
-  demo.forEach(d => { saveLocalAccessory(d); addISPRow(d); });
-  if (typeof apiSaveDevice === "function") {
-    demo.forEach(d => apiSaveDevice({ deviceKey: d.name, type: "isp", name: d.name, data: d }));
-  }
-}
-
-window.addEventListener("load", () => {
-  seedDemoISP();
-  applyFilters();
-});
-</script>
+<script src="js/api.js"></script>
+<script src="js/port-data.js"></script>
+<script src="js/port-map.js"></script>
+<script src="js/isp-list.js"></script>
 </body>
 </html>

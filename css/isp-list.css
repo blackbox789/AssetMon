@@ -1,0 +1,83 @@
+/* ============================================
+   RackView — ISP List
+   Layout, table, detail panel, ctx-bar, modals
+   Matches server-list.css pattern.
+   ============================================ */
+
+.isp-layout { display: grid; grid-template-columns: 1fr 360px; gap: 14px; align-items: start; }
+@media (max-width: 1100px) { .isp-layout { grid-template-columns: 1fr; } }
+
+.isp-layout .detail-sticky { position: sticky; top: 14px; }
+
+/* Table */
+.isp-layout .table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.isp-layout .table th {
+  text-align: left; padding: 10px 14px; font-weight: 600; font-size: 11.5px;
+  text-transform: uppercase; letter-spacing: .4px; color: var(--text-secondary);
+  background: var(--bg-surface-2); border-bottom: 1px solid var(--border-soft);
+  position: sticky; top: 0; z-index: 1;
+}
+.isp-layout .table td { padding: 10px 14px; border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+.isp-layout .table tbody tr { cursor: pointer; transition: background .12s; }
+.isp-layout .table tbody tr:hover { background: var(--bg-surface-2); }
+.isp-layout .table tbody tr.row-selected { background: var(--accent-dim); }
+
+/* Ctx bar */
+#isp-ctx-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 14px; margin-bottom: 12px; border-radius: 10px;
+  background: var(--bg-surface-2); border: 1px solid var(--accent-dim);
+  font-size: 12.5px; min-height: 38px;
+}
+#isp-ctx-bar[hidden] { display: none; }
+.ctx-bar-info { font-weight: 600; color: var(--accent-text); margin-right: auto; }
+.ctx-bar-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.ctx-btn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px;
+  border: none; border-radius: 6px; background: var(--bg-surface); color: var(--text-primary);
+  font-size: 12px; cursor: pointer; transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+.ctx-btn:hover { background: var(--accent-dim); color: var(--accent-text); }
+.ctx-btn.danger { color: var(--danger); }
+.ctx-btn.danger:hover { background: var(--danger-dim); }
+.ctx-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Pagination */
+.isp-pagination {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border-soft); font-size: 12.5px;
+  color: var(--text-secondary);
+}
+.isp-pagination button {
+  border: 1px solid var(--border-soft); background: var(--bg-surface); color: var(--text-primary);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; min-width: 30px;
+}
+.isp-pagination button:hover { background: var(--accent-dim); color: var(--accent-text); border-color: var(--accent); }
+.isp-pagination button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.isp-pagination button:disabled { opacity: .35; cursor: not-allowed; }
+.pg-info { font-size: 12px; color: var(--text-muted); }
+.pg-size-select { border: 1px solid var(--border-soft); background: var(--bg-surface); color: var(--text-primary); border-radius: 6px; padding: 3px 6px; font-size: 11.5px; cursor: pointer; }
+
+/* Type chip */
+.type-chip.isp { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 3px 10px; border-radius: 12px; background: rgba(225,29,72,.12); color: #f87171; }
+.type-chip.isp .dot { width: 6px; height: 6px; border-radius: 50%; background: #f87171; }
+
+/* ISP status badges */
+.badge.isp-active { background: rgba(34,197,94,.12); color: #22c55e; }
+.badge.isp-backup { background: rgba(251,191,36,.12); color: #fbbf24; }
+.badge.isp-inactive { background: rgba(107,114,128,.12); color: #6b7280; }
+
+/* ISP form cards */
+.isp-form-card { margin-bottom: 14px; }
+.isp-form-card .card-head { margin-bottom: 12px; }
+.isp-form-card .card-title { font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.isp-form-card .card-title-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.isp-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; }
+.isp-form-grid .m-field.full { grid-column: 1 / -1; }
+@media (max-width: 700px) { .isp-form-grid { grid-template-columns: 1fr; } }
+
+/* ISP summary in detail panel */
+.isp-detail-field { display: flex; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--border-soft); }
+.isp-detail-label { min-width: 130px; font-size: 12px; color: var(--text-secondary); flex-shrink: 0; }
+.isp-detail-value { font-size: 13px; word-break: break-word; }
