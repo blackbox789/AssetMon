@@ -23,6 +23,7 @@ const POWER_STORAGE_KEY   = "rv_power_maps";
 const PAGE_SIZE_KEY       = "rv_page_size";
 const DELETED_SERVERS_KEY = "rv_deleted_servers";
 const TOPO_LAYERS_KEY     = "rv_topo_layers";
+const WAN_LINKS_KEY       = "rv_wan_links";
 
 // ---- Normalisasi master key perangkat ----
 // Semua key perangkat (hostname server, nama switch/PDU/aksesori, deviceKey

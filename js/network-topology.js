@@ -1114,6 +1114,7 @@ function render() {
   // info bar
   updateInfo();
   updateLegend();
+  updateISPSummary();
 }
 
 const TYPE_LABELS_TOPO = { server: "Server", switch: "Switch", pdu: "PDU", firewall: "Firewall", router: "Router", storage: "Storage", ups: "UPS", patch: "Patch Panel", isp: "ISP" };
@@ -1386,6 +1387,52 @@ function updateInfo() {
   if (ispEdges) parts.push(ispEdges + " ISP peering");
   if (wanEdges) parts.push(wanEdges + " WAN link");
   info.textContent = parts.join(" · ");
+}
+// ISP summary panel (kiri bawah topology, muncul bila ada ISP)
+function updateISPSummary() {
+  const old = document.getElementById("isp-summary-panel");
+  if (old) old.remove();
+  const isps = Object.values(nodeMap).filter(n => n.type === "isp");
+  if (!isps.length) return;
+  const viewport = document.querySelector(".topo-viewport");
+  if (!viewport) return;
+  const ispPeering = edges.filter(e => e.kind === "isp").length;
+  const wanCount = edges.filter(e => e.kind === "wan").length;
+  const ispNames = isps.map(n => n.name).join(", ");
+  // ISP → site connectivity
+  const siteMap = {};
+  isps.forEach(isp => {
+    const conns = edges.filter(e => (e.a === isp.id || e.b === isp.id) && e.kind === "isp");
+    const sites = new Set();
+    conns.forEach(e => {
+      const other = nodeMap[e.a === isp.id ? e.b : e.a];
+      if (other && other.site) sites.add(other.siteName || other.site);
+      // also check connected router's site
+      if (other && !other.site) {
+        const routerConns = edges.filter(e2 => (e2.a === other.id || e2.b === other.id) && e2.kind === "data");
+        routerConns.forEach(e2 => {
+          const rn = nodeMap[e2.a === other.id ? e2.b : e2.a];
+          if (rn && rn.site) sites.add(rn.siteName || rn.site);
+        });
+      }
+    });
+    siteMap[isp.name] = [...sites];
+  });
+  const siteLines = Object.entries(siteMap).filter(([,s]) => s.length).map(([name, sites]) =>
+    `<span style="font-size:11px;color:var(--text-secondary);">☁ ${escA(name)} → ${sites.join(", ")}</span>`
+  ).join("");
+  const div = document.createElement("div");
+  div.id = "isp-summary-panel";
+  div.className = "isp-summary-panel";
+  div.innerHTML = `<div style="font-size:11px;font-weight:600;color:#E11D48;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;"><i class="fa-solid fa-cloud"></i> ISP Summary</div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;">
+      <div><span style="font-size:20px;font-weight:700;color:var(--text-primary);">${isps.length}</span><span style="font-size:11px;color:var(--text-muted);display:block;">ISP</span></div>
+      <div><span style="font-size:20px;font-weight:700;color:var(--text-primary);">${ispPeering}</span><span style="font-size:11px;color:var(--text-muted);display:block;">Peering</span></div>
+      <div><span style="font-size:20px;font-weight:700;color:var(--text-primary);">${wanCount}</span><span style="font-size:11px;color:var(--text-muted);display:block;">WAN Link</span></div>
+    </div>
+    ${siteLines ? '<div style="margin-top:6px;display:flex;flex-direction:column;gap:2px;">' + siteLines + '</div>' : ""}
+    <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">${escA(ispNames)}</div>`;
+  viewport.parentElement.appendChild(div);
 }
 
 // ---------- detail node ----------
@@ -1798,6 +1845,27 @@ if (editResetBtn) editResetBtn.addEventListener("click", () => {
 });
 
 // ---------- WAN Link Manager ----------
+function loadWANLinks() {
+  try {
+    const data = JSON.parse(localStorage.getItem(WAN_LINKS_KEY) || "[]");
+    if (!Array.isArray(data)) return;
+    data.forEach(w => {
+      if (w.from && w.to) {
+        ensureNode(w.from, { type: "router" });
+        ensureNode(w.to, { type: "router" });
+        addEdge(w.from, w.to, "wan", { label: w.label || "", bandwidth: w.bandwidth || "", port: w.port || "" });
+      }
+    });
+  } catch (e) {}
+}
+function saveWANLinks() {
+  const data = edges.filter(e => e.kind === "wan").map(e => ({
+    from: nodeMap[e.a] ? nodeMap[e.a].name : e.a,
+    to: nodeMap[e.b] ? nodeMap[e.b].name : e.b,
+    label: e.label || "", bandwidth: e.bandwidth || "", port: e.port || ""
+  }));
+  try { localStorage.setItem(WAN_LINKS_KEY, JSON.stringify(data)); } catch (e) {}
+}
 function populateWANModalSites() {
   const sites = topoSiteList();
   ["wan-from-site", "wan-to-site"].forEach(id => {
@@ -1843,6 +1911,7 @@ function renderWANLinkList() {
     const key = [a, b].sort().join("|") + "::wan";
     const idx = edges.findIndex(e => [e.a, e.b].sort().join("|") + "::" + e.kind === key);
     if (idx >= 0) edges.splice(idx, 1);
+    saveWANLinks();
     renderWANLinkList();
     render();
   }));
@@ -1868,7 +1937,8 @@ function saveWANLink() {
   const rA = nodeMap[slugKey(fromRouter)], rB = nodeMap[slugKey(toRouter)];
   if (rA && fromSite && !rA.site) { const rk = Array.isArray(RACKS) ? RACKS.find(r => r.site === fromSite) : null; rA.site = fromSite; rA.siteName = rk ? rk.siteName : fromSite; }
   if (rB && toSite && !rB.site) { const rk = Array.isArray(RACKS) ? RACKS.find(r => r.site === toSite) : null; rB.site = toSite; rB.siteName = rk ? rk.siteName : toSite; }
-  addEdge(fromRouter, toRouter, "wan", { label: label || (fromRouter + " → " + toRouter) });
+  addEdge(fromRouter, toRouter, "wan", { label: label || (fromRouter + " → " + toRouter), bandwidth: document.getElementById("wan-bandwidth").value.trim(), port: document.getElementById("wan-port").value.trim() });
+  saveWANLinks();
   // clear form
   ["wan-from-site", "wan-to-site", "wan-from-router", "wan-to-router", "wan-label", "wan-bandwidth", "wan-port"].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = "";
@@ -1883,6 +1953,10 @@ if (wanModalClose) wanModalClose.addEventListener("click", () => {
   const ov = document.getElementById("wan-modal-overlay");
   if (ov) ov.classList.remove("open");
 });
+const wanModalOverlay = document.getElementById("wan-modal-overlay");
+if (wanModalOverlay) wanModalOverlay.addEventListener("click", (ev) => {
+  if (ev.target === wanModalOverlay) wanModalOverlay.classList.remove("open");
+});
 const wanSaveBtn = document.getElementById("wan-save-btn");
 if (wanSaveBtn) wanSaveBtn.addEventListener("click", saveWANLink);
 
@@ -1891,6 +1965,7 @@ if (wanSaveBtn) wanSaveBtn.addEventListener("click", saveWANLink);
 // sudah termuat — render pertama langsung punya edge & PDU lane.
 window.addEventListener("load", () => {
   loadTopoLayers();
+  loadWANLinks();
   populateScopeSelects();
   wireFilters();
   updateModeVisibility();
