@@ -24,10 +24,10 @@ const DEVICES = [
       tahunPembelian: "2021", warranty: "s/d 2026", monitoring: "SNMP v3" },
   },
   {
-    deviceKey: "SW-ACC-03", type: "switch", site: "DC2",
+    deviceKey: "SW-ACC-03", type: "switch", site: "DC1",
     data: { type: "switch", subType: "ethernet", brand: "Cisco", model: "Catalyst 2960-X",
-      rack: "R2-B14", posisiU: "U21", ip: "10.10.0.23", serial: "SW-CAT-2960-077",
-      tags: ["production", "network-access"], site: "DC2",
+      rack: "R1-A12", posisiU: "U21", ip: "10.10.0.23", serial: "SW-CAT-2960-077",
+      tags: ["production", "network-access"], site: "DC1",
       lanRj45: "24", lanSfp: "2", speed: "1G", os: "IOS 15.2", role: "Access",
       vlan: "10-40", stacking: "Tidak",
       psuCount: "1", psuWatt: "300", powerRedundancy: "Single",

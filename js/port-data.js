@@ -5,6 +5,15 @@ const DEFAULT_PORT_DATA = {
     { port: 2, vlan: "TRUNK", dest: "SW-ACC-03", destPort: "Uplink", ip: "10.10.0.23", label: "CBL-1002", media: "SFP+ DAC" },
     { port: 3, vlan: "TRUNK", dest: "SW-ACC-04", destPort: "Uplink", ip: "10.10.0.24", label: "CBL-1003", media: "LC MM" },
     { port: "MGMT", vlan: "v99", dest: "SW-MGMT-02", destPort: "1", ip: "10.10.99.1", label: "CBL-1004", media: "Cat6" },
+    // Inter-rack SAN fabric: ke rak R1-A01 & R1-A08
+    { port: 21, vlan: "v20", dest: "STG-SAN-03", destPort: "eth0", ip: "10.10.20.13", label: "CBL-1101", media: "Cat6A" },
+    { port: 23, vlan: "v20", dest: "STG-QSAN-008", destPort: "eth0", ip: "10.10.20.8", label: "CBL-1102", media: "LC MM" },
+    { port: 24, vlan: "v20", dest: "STG-QSAN-008", destPort: "eth1", ip: "10.10.20.9", label: "CBL-1103", media: "LC MM" },
+  ]},
+  "SW-CORE-02": { type: "switch", ports: 28, sfp: 4, rows: [
+    // Inter-rack SAN fabric DC2: ke rak R2-B05
+    { port: 25, vlan: "v20", dest: "STG-SAN-02", destPort: "eth0", ip: "10.10.20.12", label: "CBL-6001", media: "LC MM" },
+    { port: 26, vlan: "v20", dest: "STG-SAN-02", destPort: "eth1", ip: "10.10.20.11", label: "CBL-6002", media: "LC MM" },
   ]},
   "SW-ACC-03": { type: "switch", ports: 24, sfp: 2, rows: [
     { port: 1, vlan: "TRUNK", dest: "SW-CORE-01", destPort: "2", ip: "10.10.0.1", label: "CBL-1010", media: "SFP+ DAC" },

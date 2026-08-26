@@ -26,7 +26,9 @@ function ensureNode(name, extra) {
   const id = slugKey(key);
   if (!id) return null;
   if (!nodeMap[id]) {
-    nodeMap[id] = { id, name: key, type: "external", model: "", ip: "", rack: null, site: null, siteName: "", tags: [], posisiU: "", x: 0, y: 0 };
+    // perangkat nyata yang belum terinventori tetap dapat tipe benar (bukan "external")
+    const unplacedType = TOPO_UNPLACED_TYPES[key.toUpperCase()];
+    nodeMap[id] = { id, name: key, type: unplacedType || "external", unplaced: !unplacedType ? undefined : true, model: "", ip: "", rack: null, site: null, siteName: "", tags: [], posisiU: "", x: 0, y: 0 };
   }
   if (extra) {
     Object.keys(extra).forEach(k => {
@@ -44,6 +46,58 @@ function addEdge(aName, bName, kind, extra) {
   seenEdges.add(key);
   edges.push(Object.assign({ a: a.id, b: b.id, kind }, extra || {}));
 }
+
+// ---- Peta role per perangkat (untuk auto-layer) ----
+// Prioritas: record devices dari SQLite (async) → localStorage (rv_switches/rv_accessories).
+const TOPO_ROLE_MAP = {};
+function topoRoleKey(name) {
+  return String(name || "").trim().toUpperCase().replace(/\s+/g, " ");
+}
+// Node konseptual WAN (boleh tampil di semua site)
+const TOPO_CONCEPTUAL = new Set(["INTERNET", "ISP UPSTREAM", "DMZ SEGMENT", "WAN"]);
+// Perangkat nyata yang dirujuk kabel tapi belum diinventori — beri tipe benar agar tidak jadi "external"
+const TOPO_UNPLACED_TYPES = { "SW-ACC-04": "switch", "JBOD-ENCL-01": "storage" };
+function topoIsConceptual(n) {
+  return Boolean(n.ref) || TOPO_CONCEPTUAL.has(String(n.name || "").toUpperCase());
+}
+(function loadTopoRolesFromLocal() {
+  [SWITCH_STORAGE_KEY, ACC_STORAGE_KEY].forEach(sk => {
+    try {
+      const arr = JSON.parse(localStorage.getItem(sk) || "[]");
+      (Array.isArray(arr) ? arr : []).forEach(r => {
+        const k = topoRoleKey(r && (r.hostname || r.name));
+        if (k && r.role) TOPO_ROLE_MAP[k] = r.role;
+      });
+    } catch (e) { /* abaikan */ }
+  });
+})();
+(async function refreshTopoRolesFromDb() {
+  try {
+    const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+    const res = await fetch(base + "/devices");
+    if (!res.ok || !res.json) return;
+    const list = await res.json();
+    let changed = false;
+    (Array.isArray(list) ? list : []).forEach(d => {
+      let data = {};
+      try { data = typeof d.data === "string" ? (JSON.parse(d.data) || {}) : (d.data || {}); } catch (e) {}
+      const k = topoRoleKey(d.deviceKey || d.name);
+      if (k && data.role && TOPO_ROLE_MAP[k] !== data.role) {
+        TOPO_ROLE_MAP[k] = data.role;
+        changed = true;
+      }
+      // penempatan resmi dari tabel devices → node yang belum punya rak langsung terhubung
+      const n = nodeMap[slugKey(k)];
+      if (n) {
+        const rk = d.rackId ? String(d.rackId).toUpperCase() : "";
+        const st = d.site ? String(d.site).toUpperCase() : "";
+        if (rk && !n.rack) { n.rack = rk; changed = true; }
+        if (st && !n.site) { n.site = st; changed = true; }
+      }
+    });
+    if (changed && typeof render === "function") render();
+  } catch (_) { /* offline / no-op */ }
+})();
 
 // ---- isi node dari RACK_LAYOUTS (device yang benar-benar terpasang) ----
 if (typeof RACK_LAYOUTS !== "undefined") {
@@ -133,6 +187,11 @@ function detectAutoLayer(n) {
   if (/IDS|IPS/.test(name) || t === "ids") return 3;
   if (/^LB-|LOAD\s*BAL/.test(name) || t === "lb") return 4;
   if (/^SW[- ]/.test(name) || t === "switch") {
+    // PRIORITAS 1: field role dari form/DB (Core/Distribution/Access/Management)
+    const ROLE_LAYER = { core: 5, distribution: 6, access: 7, management: 8 };
+    const role = TOPO_ROLE_MAP[topoRoleKey(n.name)];
+    if (role && ROLE_LAYER[String(role).trim().toLowerCase()]) return ROLE_LAYER[String(role).trim().toLowerCase()];
+    // PRIORITAS 2: heuristik nama hostname
     if (/CORE/.test(name)) return 5;
     if (/DIST/.test(name)) return 6;
     if (/ACC|ACCESS/.test(name)) return 7;
@@ -212,6 +271,10 @@ function buildTreeLayout() {
   const vlanMap = buildVlanMap();
   const byType = { wan: [], router: [], fw: [], ids: [], lb: [], core: [], dist: [], access: [], mgmt: [], leaf: [], pdu: [] };
   Object.values(nodeMap).forEach(n => {
+    // Cakupan site: node rak hanya dari site terpilih; eksternal (WAN/Internet) tetap tampil
+    if (n.rack && currentSite && n.site && n.site !== currentSite) return;
+    // perangkat nyata tanpa penempatan tidak dimasukkan ke tree logis (lihat kotak "Belum terpasang" di fisik)
+    if (!n.rack && !topoIsConceptual(n)) return;
     const L = deviceLayer(n);
     if (n.type === "pdu") byType.pdu.push(n);
     else if (L === 0) byType.wan.push(n);
@@ -473,41 +536,86 @@ function renderLogicalTree() {
     drawTreeCaption(18, treeVlanGroups[0].y - 12, "VLAN SEGMENTATION · LAYER 3");
   }
 
-  // lane power
+  // lane power — hanya daftar PDU (koneksi power digambar di Power Map, bukan topologi)
   if (treePduLane.nodes.length) {
     drawTreeCaption(18, treePduLane.y - TREE_CARD_H / 2 - 12, "POWER DISTRIBUTION");
     treePduLane.nodes.forEach(drawTreeCard);
-    // edge power nyata
-    if (currentLayer === "power" || currentLayer === "all") {
-      const pos = {};
-      treeRows.forEach(r => r.nodes.forEach(p => { pos[p.n.id] = p; }));
-      treeVlanGroups.forEach(g => { pos[g.l3.n.id] = g.l3; g.leaves.forEach(p => { pos[p.n.id] = p; }); });
-      treePduLane.nodes.forEach(p => { pos[p.n.id] = p; });
-      edges.forEach(e => {
-        if (e.kind !== "power") return;
-        const a = pos[e.a], b = pos[e.b];
-        if (!a || !b) return;
-        const line = shape(svg, "line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "edge edge-power" });
-        line.setAttribute("stroke-dasharray", "5 4");
-        line.setAttribute("stroke-width", "1.6");
-        svgEdges.push({ el: line, a: e.a, b: e.b, kind: "power" });
-      });
-    }
   }
 
   updateInfo();
 }
 
-// ---------- layout: kotak rack + grid device + band eksternal ----------
-const CELL_W = 150, CELL_H = 48, PAD = 16, HEAD = 30, RACK_COLS = 3, GAP = 26;
+// ---------- layout: kartu rack (semua rack site) + mini silhouette ----------
+const PAD = 14, HEAD = 30, GAP = 22;
+const STRIP_W = 46, CARD_MIN_H = 130;
+const PHYS_CONTENT_W = 218, PHYS_ROW_H = 24;
+const PHYS_TINTS = { server: "#8fbfea", switch: "#85d8cf", pdu: "#b7a3e3", firewall: "#f5c78c", patch: "#a5aebd", tower: "#a8d5a5", storage: "#f97316", ups: "#eab308" };
 const rackBoxes = [];
+const unplacedNodes = [];
+let activeTracePath = null;
+
+// titik sambung trunk di tepi kartu yang menghadap target
+function cardAnchor(box, tx, ty) {
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  const dx = tx - cx, dy = ty - cy;
+  if (Math.abs(dx) > Math.abs(dy)) return { x: dx > 0 ? box.x + box.w : box.x, y: cy };
+  return { x: cx, y: dy > 0 ? box.y + box.h : box.y };
+}
+
+// Kelompok layer utk urutan blok di kartu fisik (selaras spine logis)
+function physGroupOf(n) {
+  const t = n.type;
+  if (t === "router") return { o: 0, label: "ROUTER / WAN" };
+  if (t === "firewall") return { o: 1, label: "FIREWALL" };
+  if (t === "ids") return { o: 2, label: "IDS / IPS" };
+  if (t === "lb") return { o: 3, label: "LOAD BALANCER" };
+  if (t === "switch") {
+    const L = deviceLayer(n);
+    if (L === 5) return { o: 4, label: "CORE SWITCH" };
+    if (L === 6) return { o: 5, label: "DISTRIBUTION SWITCH" };
+    if (L === 8) return { o: 7, label: "MANAGEMENT SWITCH" };
+    return { o: 6, label: "ACCESS SWITCH" };
+  }
+  if (t === "server" || t === "tower" || t === "storage") return { o: 8, label: "SERVER / STORAGE" };
+  if (t === "patch") return { o: 9, label: "PATCH PANEL" };
+  if (t === "pdu" || t === "ups") return { o: 10, label: "POWER" };
+  if (/JBOD|NAS/.test(String(n.name || "").toUpperCase())) return { o: 8, label: "SERVER / STORAGE" };
+  return { o: 11, label: "LAINNYA" };
+}
+function physCardRows(list) {
+  const arr = list.map(n => ({ n, g: physGroupOf(n) }))
+    .sort((a, b) => a.g.o - b.g.o || a.n.name.localeCompare(b.n.name));
+  const rows = [];
+  let last = null;
+  arr.forEach(({ n, g }) => {
+    if (g.label !== last) { rows.push({ cap: g.label }); last = g.label; }
+    rows.push({ dev: n });
+  });
+  return rows;
+}
+
+// Semua rack dari SQLite (fallback: konstanta RACKS) — supaya rak kosong ikut tampil
+let ALL_RACKS = Array.isArray(RACKS) ? RACKS.slice() : [];
+(async function refreshAllRacksFromDb() {
+  try {
+    const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+    const res = await fetch(base + "/racks");
+    if (!res.ok || !res.json) return;
+    const j = await res.json();
+    if (Array.isArray(j) && j.length) { ALL_RACKS = j; render(); }
+  } catch (e) { /* offline */ }
+})();
 
 function layoutNodes() {
   const rackGroups = {};
   const externalNodes = [];
+  unplacedNodes.length = 0;
   Object.values(nodeMap).forEach(n => {
-    if (n.rack) (rackGroups[n.rack] = rackGroups[n.rack] || []).push(n);
-    else externalNodes.push(n);
+    if (n.rack) {
+      if (currentSite && n.site && n.site !== currentSite) return; // cakupan site
+      (rackGroups[n.rack] = rackGroups[n.rack] || []).push(n);
+    } else if (topoIsConceptual(n)) externalNodes.push(n);
+    else unplacedNodes.push(n); // perangkat nyata tanpa penempatan
   });
   Object.values(rackGroups).forEach(list => {
     list.sort((a, b) => (typeOrder[a.type] !== undefined ? typeOrder[a.type] : 8) - (typeOrder[b.type] !== undefined ? typeOrder[b.type] : 8) || a.name.localeCompare(b.name));
@@ -520,30 +628,51 @@ function layoutNodes() {
   const extH = externalNodes.length ? 70 : 0;
 
   const rackIds = Object.keys(rackGroups).sort();
-  const boxW = PAD * 2 + RACK_COLS * CELL_W;
-  const boxH = (list) => PAD * 2 + HEAD + Math.ceil(list.length / RACK_COLS) * CELL_H;
+  const boxW = PAD * 2 + STRIP_W + 6 + PHYS_CONTENT_W;
+
+  // Sumber rak = tabel racks (semua rack site, termasuk yang kosong)
+  const srcRacks = ALL_RACKS.length ? ALL_RACKS : [];
+  let cards = srcRacks
+    .filter(r => !currentSite || currentSite === "__all__" || String(r.site || "").toUpperCase() === String(currentSite).toUpperCase())
+    .map(r => ({ id: String(r.rackId).toUpperCase(), zone: r.zone || "", size: Number(r.size) || 42, totalDevices: Number(r.totalDevices) || 0, devices: rackGroups[String(r.rackId).toUpperCase()] || [] }));
+  // rak yang ada device-nya tapi belum terdaftar di tabel racks tetap digambar
+  rackIds.forEach(rid => { if (!cards.find(c => c.id === rid)) cards.push({ id: rid, zone: "", size: 42, totalDevices: 0, devices: rackGroups[rid] }); });
+  cards.sort((a, b) => a.id.localeCompare(b.id));
 
   let cursorX = 0, cursorY = extH + 26, rowHeight = 0;
   rackBoxes.length = 0;
-  rackIds.forEach((rackId, i) => {
-    const col = i % RACK_COLS;
-    if (col === 0 && i > 0) { cursorY += rowHeight + 24; cursorX = 0; rowHeight = 0; }
-    const list = rackGroups[rackId];
-    const h = boxH(list);
-    const box = { rackId, x: cursorX, y: cursorY, w: boxW, h, nodes: list };
+  const PHYS_COLS = 3;
+  cards.forEach((card, i) => {
+    const col = i % PHYS_COLS;
+    if (col === 0 && i > 0) { cursorY += rowHeight + GAP; cursorX = 0; rowHeight = 0; }
+    const list = card.devices;
+    const rows = list.length ? physCardRows(list) : [];
+    const h = Math.max(CARD_MIN_H, HEAD + PAD * 2 + rows.length * PHYS_ROW_H + (rows.length ? 6 : 0));
+    const box = { rackId: card.id, x: cursorX, y: cursorY, w: boxW, h, nodes: list };
+    box.zone = card.zone;
+    box.size = card.size;
+    box.usedTotal = Math.max(list.length, card.totalDevices || 0);
+    box.empty = box.usedTotal === 0;
+    box.rows = rows;
+    // posisi node (kolom tunggal berurutan per kelompok) — dipakai edge/trace
+    let ry = cursorY + HEAD + PAD;
+    rows.forEach(r => {
+      r.y = ry;
+      if (r.dev) {
+        r.dev.x = cursorX + PAD + STRIP_W + 6 + PHYS_CONTENT_W / 2;
+        r.dev.y = ry + PHYS_ROW_H / 2 + 2;
+      }
+      ry += PHYS_ROW_H;
+    });
     rackBoxes.push(box);
-    const rack = Array.isArray(RACKS) && RACKS.find(r => r.rackId === rackId);
+    const rack = Array.isArray(RACKS) && RACKS.find(r => r.rackId === card.id);
     box.siteName = rack && rack.siteName;
     box.site = rack && rack.site;
-    list.forEach((n, j) => {
-      n.x = cursorX + PAD + (j % RACK_COLS) * CELL_W + CELL_W / 2;
-      n.y = cursorY + HEAD + Math.floor(j / RACK_COLS) * CELL_H + CELL_H / 2;
-    });
     rowHeight = Math.max(rowHeight, h);
     cursorX += boxW + GAP;
   });
 
-  let totalW = Math.max(400, rackBoxes.length ? Math.min(RACK_COLS, rackBoxes.length) * boxW + (Math.min(RACK_COLS, rackBoxes.length) - 1) * GAP : externalNodes.length * 150);
+  let totalW = Math.max(400, rackBoxes.length ? Math.min(3, rackBoxes.length) * boxW + (Math.min(3, rackBoxes.length) - 1) * GAP : externalNodes.length * 150);
   let totalH = Math.max(200, rackBoxes.length ? cursorY + rowHeight : extH + 60);
 
   // saat filter rack spesifik: pindahkan box terpilih ke pojok kiri atas
@@ -564,58 +693,274 @@ function layoutNodes() {
 // ---------- render ----------
 const svgNodes = {};   // id -> <g>
 const svgEdges = [];   // { el, a, b, kind }
-let currentLayer = "data";   // data | power | all
 let currentRack = "all";
+let currentSite = "";        // site.id — cakupan utama kedua mode
 let currentLayout = "logical"; // logical | physical
 
+function topoSiteList() {
+  const out = [];
+  if (Array.isArray(RACKS)) {
+    RACKS.forEach(r => {
+      if (r.site && !out.find(s => s.id === r.site)) out.push({ id: r.site, name: r.siteName || r.site });
+    });
+  }
+  return out;
+}
+function populateScopeSelects() {
+  const siteSel = document.getElementById("filter-site");
+  if (!siteSel) return;
+  const sites = topoSiteList();
+  // opsi khusus: gambaran global antar-site (hanya bermakna di mode Logis)
+  siteSel.innerHTML = '<option value="__all__">🌐 Semua Site (WAN)</option>'
+    + sites.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+  if (!currentSite) currentSite = sites.length ? sites[0].id : "";
+  if (currentSite !== "__all__" && !sites.find(s => s.id === currentSite)) currentSite = sites.length ? sites[0].id : "";
+  siteSel.value = currentSite;
+  fillRackOptions();
+  // sinkron ke picker Atur Layer
+  topoScope.site = currentSite === "__all__" ? "" : currentSite;
+}
+function fillRackOptions() {
+  const rackSel = document.getElementById("filter-rack");
+  if (!rackSel) return;
+  if (currentSite === "__all__") {
+    rackSel.innerHTML = '<option value="all">Semua Rack</option>';
+    rackSel.disabled = true;
+    topoScope.rack = "";
+    return;
+  }
+  const racks = (Array.isArray(RACKS) ? RACKS : []).filter(r => r.site === currentSite).map(r => r.rackId).sort();
+  rackSel.innerHTML = `<option value="all">Semua Rack (${racks.length})</option>` + racks.map(r => `<option value="${r}">${r}</option>`).join("");
+  if (currentRack !== "all" && !racks.includes(currentRack)) currentRack = "all";
+  rackSel.value = currentRack;
+  rackSel.disabled = currentLayout === "logical";
+  // picker Atur Layer mengikuti scope ini; "Semua Rack" = seluruh site
+  topoScope.rack = currentRack === "all" ? "" : currentRack;
+}
+function updateModeVisibility() {
+  const isLogical = currentLayout === "logical";
+  const layersBtn = document.getElementById("topo-layers-btn");
+  if (layersBtn) layersBtn.style.display = isLogical ? "" : "none";
+  const rackSel = document.getElementById("filter-rack");
+  if (rackSel) {
+    rackSel.disabled = isLogical;
+    rackSel.title = isLogical ? "Topologi logis berlaku per site (lintas rak)" : "Fokus ke satu rak atau semua";
+  }
+  const scopeLabel = document.getElementById("editbar-scope-label");
+  if (scopeLabel) scopeLabel.textContent = (topoScope.rack ? "rack " + topoScope.rack : "site " + (topoScope.site || "-"));
+}
+
 function render() {
-  if (currentLayout === "logical") { renderLogicalTree(); return; }
+  if (currentLayout === "logical") {
+    if (currentSite === "__all__") { renderGlobalView(); return; }
+    renderLogicalTree();
+    updateLegend();
+    return;
+  }
   const dim = layoutNodes();
   svg.setAttribute("viewBox", "0 0 " + dim.totalW + " " + dim.totalH);
   svg.innerHTML = "";
 
-  const visible = n => currentRack === "all" || n.rack === currentRack || !n.rack;
+  // Fisik: gambar hanya node yang relevan dengan cakupan — mencegah node
+  // lintas site digambar dengan koordinat basi di pojok kiri atas.
+  const visible = n => {
+    if (!n.rack) return topoIsConceptual(n);            // referensi WAN saja; unplaced pakai kotak khusus
+    if (currentRack !== "all" && n.rack !== currentRack) return false;
+    if (!currentSite || currentSite === "__all__") return true;
+    return String(n.site || "").toUpperCase() === String(currentSite).toUpperCase();
+  };
 
-  // edges (di bawah node)
+  // edges fisik: bundle trunk antar rak + garis langsung ke eksternal
   svgEdges.length = 0;
+  const bundles = new Map();
   edges.forEach(e => {
+    if (e.kind !== "data") return;
     const na = nodeMap[e.a], nb = nodeMap[e.b];
     if (!na || !nb || !visible(na) || !visible(nb)) return;
-    if (currentLayer === "data" && e.kind !== "data") return;
-    if (currentLayer === "power" && e.kind !== "power") return;
-    const line = document.createElementNS(svgNS, "line");
-    line.setAttribute("x1", na.x); line.setAttribute("y1", na.y);
-    line.setAttribute("x2", nb.x); line.setAttribute("y2", nb.y);
-    line.setAttribute("class", "edge edge-" + e.kind);
-    line.dataset.a = e.a; line.dataset.b = e.b; line.dataset.kind = e.kind;
-    if (e.kind === "power") {
-      line.setAttribute("stroke-dasharray", "5 4");
-      line.setAttribute("stroke-width", "1.6");
+    if (na.rack && nb.rack && na.rack !== nb.rack) {
+      // antar rak → dikumpulkan jadi satu trunk per pasangan rak
+      const key = [na.rack, nb.rack].sort().join("⇔");
+      let b = bundles.get(key);
+      if (!b) { const [ra, rb] = key.split("⇔"); b = { ra, rb, items: [] }; bundles.set(key, b); }
+      b.items.push({ label: e.label || "", from: na.name, to: nb.name });
+      return;
     }
-    svg.appendChild(line);
-    svgEdges.push({ el: line, a: e.a, b: e.b, kind: e.kind });
+    // koneksi dalam rak tidak digambar di overview (lihat Rack Elevation);
+    // edge ke node eksternal (tanpa rak) tetap digambar langsung
+    if (!na.rack || !nb.rack) {
+      const line = document.createElementNS(svgNS, "line");
+      line.setAttribute("x1", na.x); line.setAttribute("y1", na.y);
+      line.setAttribute("x2", nb.x); line.setAttribute("y2", nb.y);
+      line.setAttribute("class", "edge edge-data");
+      svg.appendChild(line);
+      svgEdges.push({ el: line, a: e.a, b: e.b, kind: e.kind });
+    }
   });
-
-  // kotak rack (hanya mode fisik)
+  // kartu rack (hanya mode fisik) — SEMUA rack site, termasuk kosong
   if (currentLayout === "physical") {
     rackBoxes.forEach(box => {
       if (currentRack !== "all" && box.rackId !== currentRack) return;
+      const g = document.createElementNS(svgNS, "g");
       const rect = document.createElementNS(svgNS, "rect");
       rect.setAttribute("x", box.x); rect.setAttribute("y", box.y);
       rect.setAttribute("width", box.w); rect.setAttribute("height", box.h);
       rect.setAttribute("rx", "12");
-      rect.setAttribute("class", "rack-box");
+      rect.setAttribute("class", box.empty ? "rack-box rack-box-empty" : "rack-box");
       rect.dataset.rack = box.rackId;
-      svg.appendChild(rect);
+      g.appendChild(rect);
       const title = document.createElementNS(svgNS, "text");
-      title.setAttribute("x", box.x + 12); title.setAttribute("y", box.y + 20);
+      title.setAttribute("x", box.x + PAD); title.setAttribute("y", box.y + 20);
       title.setAttribute("class", "rack-box-title");
-      title.textContent = box.rackId + " · " + (box.siteName || box.site || "") + " · " + box.nodes.length + " device";
-      svg.appendChild(title);
+      title.textContent = box.rackId + (box.zone ? " · " + box.zone : "");
+      g.appendChild(title);
+      // jumlah device di kanan atas
+      const cnt = document.createElementNS(svgNS, "text");
+      cnt.setAttribute("x", box.x + box.w - PAD); cnt.setAttribute("y", box.y + 20);
+      cnt.setAttribute("text-anchor", "end"); cnt.setAttribute("class", "phys-count");
+      cnt.textContent = (box.usedTotal) + " device";
+      g.appendChild(cnt);
+
+      if (box.empty) {
+        const hint = document.createElementNS(svgNS, "text");
+        hint.setAttribute("x", box.x + box.w / 2); hint.setAttribute("y", box.y + box.h / 2 - 4);
+        hint.setAttribute("text-anchor", "middle"); hint.setAttribute("class", "phys-empty-title");
+        hint.textContent = "Rak kosong";
+        const hint2 = document.createElementNS(svgNS, "text");
+        hint2.setAttribute("x", box.x + box.w / 2); hint2.setAttribute("y", box.y + box.h / 2 + 14);
+        hint2.setAttribute("text-anchor", "middle"); hint2.setAttribute("class", "phys-hint");
+        hint2.textContent = "klik dua kali untuk tempatkan perangkat";
+        g.appendChild(hint); g.appendChild(hint2);
+      } else {
+        // mini rack silhouette (posisi U akurat dari RACK_LAYOUTS bila ada)
+        const fx = box.x + PAD, fy = box.y + HEAD + 6;
+        const fh = box.h - HEAD - 6 - PAD * 2;
+        shape(g, "rect", { x: fx, y: fy, width: STRIP_W - 10, height: fh, rx: 4, class: "phys-frame" });
+        const layout = (typeof RACK_LAYOUTS !== "undefined") ? RACK_LAYOUTS[box.rackId] : null;
+        const hUnit = fh / (box.size || 42);
+        if (layout && layout.length) {
+          layout.forEach(d => {
+            if (!d || d.type === "blank" || !d.start) return;
+            const st = Math.min(d.start, d.end || d.start), en = Math.max(d.start, d.end || d.start);
+            shape(g, "rect", {
+              x: fx + 2, y: fy + (st - 1) * hUnit,
+              width: STRIP_W - 14, height: Math.max(2, (en - st + 1) * hUnit - 1),
+              rx: 1.5, fill: PHYS_TINTS[d.type] || "#8a8f98",
+            });
+          });
+        } else {
+          // fallback generik: device terdaftar (berwarna) + sisa snapshot totalDevices (netral)
+          box.nodes.forEach((n, i) => {
+            shape(g, "rect", {
+              x: fx + 2, y: fy + fh - (i + 1) * hUnit,
+              width: STRIP_W - 14, height: Math.max(2, hUnit - 1),
+              rx: 1.5, fill: PHYS_TINTS[n.type] || "#8a8f98",
+            });
+          });
+          const extra = Math.max(0, Math.min(box.size || 42, box.usedTotal) - box.nodes.length);
+          for (let i = box.nodes.length; i < box.nodes.length + extra; i++) {
+            shape(g, "rect", {
+              x: fx + 2, y: fy + fh - (i + 1) * hUnit,
+              width: STRIP_W - 14, height: Math.max(2, hUnit - 1),
+              rx: 1.5, fill: "#8a8f98",
+            });
+          }
+        }
+        // bar utilisasi sederhana: device / size U
+        const pct = Math.min(100, Math.round(box.usedTotal / (box.size || 42) * 100));
+        shape(g, "rect", { x: fx, y: fy + fh + 5, width: STRIP_W - 10, height: 5, rx: 2.5, class: "phys-util-bg" });
+        shape(g, "rect", { x: fx, y: fy + fh + 5, width: (STRIP_W - 10) * pct / 100, height: 5, rx: 2.5, fill: pct >= 80 ? "var(--danger)" : pct >= 50 ? "var(--warning)" : "var(--accent)" });
+
+        // blok perangkat per kelompok layer (ala Rack Elevation)
+        const bx0 = box.x + PAD + STRIP_W + 6;
+        box.rows.forEach(row => {
+          if (row.cap) {
+            const cap = document.createElementNS(svgNS, "text");
+            cap.setAttribute("x", bx0); cap.setAttribute("y", row.y + 8);
+            cap.setAttribute("class", "phys-cap");
+            cap.textContent = row.cap;
+            g.appendChild(cap);
+            return;
+          }
+          const n = row.dev;
+          const gd = document.createElementNS(svgNS, "g");
+          gd.setAttribute("class", "phys-dev");
+          gd.dataset.id = n.id;
+          gd.style.cursor = "pointer";
+          shape(gd, "rect", { x: bx0, y: row.y + 3, width: PHYS_CONTENT_W, height: PHYS_ROW_H - 6, rx: 4, fill: PHYS_TINTS[n.type] || "#8a8f98" });
+          const nm = document.createElementNS(svgNS, "text");
+          nm.setAttribute("x", bx0 + 8); nm.setAttribute("y", row.y + 16);
+          nm.setAttribute("class", "phys-dev-name");
+          const dispName = n.name.length > 22 ? n.name.slice(0, 21) + "…" : n.name;
+          nm.textContent = dispName;
+          gd.appendChild(nm);
+          const meta = document.createElementNS(svgNS, "text");
+          meta.setAttribute("x", bx0 + PHYS_CONTENT_W - 8); meta.setAttribute("y", row.y + 16);
+          meta.setAttribute("text-anchor", "end"); meta.setAttribute("class", "phys-dev-meta");
+          const posTxt = n.posisiU ? "U" + n.posisiU : "";
+          meta.textContent = [posTxt, n.ip].filter(Boolean).join(" · ");
+          gd.appendChild(meta);
+          const tip = document.createElementNS(svgNS, "title");
+          tip.textContent = (n.model ? n.model + "\n" : "") + (n.ip || "");
+          gd.appendChild(tip);
+          gd.addEventListener("click", () => selectNode(n.id));
+          g.appendChild(gd);
+          svgNodes[n.id] = gd;
+        });
+      }
+
+      g.addEventListener("dblclick", () => {
+        window.location.href = "rack-elevation.html?rack=" + encodeURIComponent(box.rackId);
+      });
+      g.style.cursor = "pointer";
+      svg.appendChild(g);
     });
+
+    // ---- Trunk antar rak: satu jalur per pasangan rak, tebal = jumlah link ----
+    bundles.forEach(b => {
+      const ba = rackBoxes.find(x => x.rackId === b.ra);
+      const bb = rackBoxes.find(x => x.rackId === b.rb);
+      if (!ba || !bb) return;
+      const a1 = cardAnchor(ba, bb.x + bb.w / 2, bb.y + bb.h / 2);
+      const a2 = cardAnchor(bb, ba.x + ba.w / 2, ba.y + ba.h / 2);
+      const midY = (a1.y + a2.y) / 2;
+      const d = "M " + a1.x + " " + a1.y + " C " + a1.x + " " + midY + ", " + a2.x + " " + midY + ", " + a2.x + " " + a2.y;
+      const count = b.items.length;
+      const path = document.createElementNS(svgNS, "path");
+      path.setAttribute("d", d);
+      path.setAttribute("class", "trunk" + (activeTracePath ? " dim" : ""));
+      path.setAttribute("stroke-width", Math.min(7, 2 + count * 0.55).toFixed(1));
+      const tip = document.createElementNS(svgNS, "title");
+      tip.textContent = "Trunk " + b.ra + " ⇄ " + b.rb + " (" + count + " link)\n"
+        + b.items.map(i => (i.label ? i.label + ": " : "") + i.from + " → " + i.to).join("\n");
+      path.appendChild(tip);
+      svg.appendChild(path);
+
+      // label jumlah link di titik tengah kurva
+      const lx = (a1.x + a2.x) / 2, ly = midY;
+      shape(svg, "rect", { x: lx - 16, y: ly - 9, width: 32, height: 16, rx: 8, class: "trunk-label-bg" });
+      const lt = document.createElementNS(svgNS, "text");
+      lt.setAttribute("x", lx); lt.setAttribute("y", ly + 3); lt.setAttribute("text-anchor", "middle");
+      lt.setAttribute("class", "trunk-label"); lt.textContent = count + "×";
+      svg.appendChild(lt);
+    });
+
+    // saat trace aktif: gambarkan hop antar rak sebagai garis terang individual
+    if (activeTracePath && activeTracePath.length > 1) {
+      for (let i = 0; i < activeTracePath.length - 1; i++) {
+        const na = nodeMap[activeTracePath[i]], nb = nodeMap[activeTracePath[i + 1]];
+        if (!na || !nb || !na.rack || !nb.rack || na.rack === nb.rack) continue;
+        const line = document.createElementNS(svgNS, "line");
+        line.setAttribute("x1", na.x); line.setAttribute("y1", na.y);
+        line.setAttribute("x2", nb.x); line.setAttribute("y2", nb.y);
+        line.setAttribute("class", "edge traced");
+        line.setAttribute("stroke-width", "2.4");
+        svg.appendChild(line);
+      }
+    }
   }
 
-  // node
+  // node — hanya mode Logis & Global (Fisik memakai blok per kelompok di kartu)
+  if (currentLayout !== "physical") {
   Object.values(nodeMap).forEach(n => {
     if (!visible(n)) return;
     const g = document.createElementNS(svgNS, "g");
@@ -641,9 +986,211 @@ function render() {
     svg.appendChild(g);
     svgNodes[n.id] = g;
   });
+  }
+
+  // Kotak "Belum terpasang": perangkat nyata tanpa penempatan (bukan band eksternal)
+  if (unplacedNodes.length) {
+    const bw = 230, bh = 46 + unplacedNodes.length * 16;
+    const bx = 12, by = svgViewBoxH() - bh - 12;
+    const gu = document.createElementNS(svgNS, "g");
+    shape(gu, "rect", { x: bx, y: by, width: bw, height: bh, rx: 10, class: "unplaced-box" });
+    const t = document.createElementNS(svgNS, "text");
+    t.setAttribute("x", bx + 12); t.setAttribute("y", by + 20);
+    t.setAttribute("class", "phys-empty-title");
+    t.textContent = "⚠ " + unplacedNodes.length + " perangkat belum terpasang";
+    gu.appendChild(t);
+    unplacedNodes.forEach((n, i) => {
+      const ln = document.createElementNS(svgNS, "text");
+      ln.setAttribute("x", bx + 12); ln.setAttribute("y", by + 38 + i * 16);
+      ln.setAttribute("class", "phys-hint");
+      ln.textContent = "• " + n.name + " (" + (TYPE_LABELS_TOPO[n.type] || n.type) + ")";
+      gu.appendChild(ln);
+    });
+    gu.addEventListener("dblclick", () => {
+      window.location.href = "asset-list.html";
+    });
+    svg.appendChild(gu);
+  }
 
   // info bar
   updateInfo();
+  updateLegend();
+}
+
+const TYPE_LABELS_TOPO = { server: "Server", switch: "Switch", pdu: "PDU", firewall: "Firewall", router: "Router", storage: "Storage", ups: "UPS", patch: "Patch Panel" };
+function svgViewBoxH() {
+  const vb = (svg.getAttribute("viewBox") || "0 0 0 400").split(/\s+/);
+  return parseFloat(vb[3]) || 400;
+}
+
+// ---------- Legend dinamis per mode ----------
+function legendItemsHTML(items) {
+  return items.map(it => {
+    if (it.line) {
+      const dash = it.dashed ? ';border-top:2px dashed ' + it.color : '';
+      return `<div class="legend-item"><span class="legend-swatch" style="background:${it.color};height:2px;width:16px;border-radius:0;${dash}"></span>${it.label}</div>`;
+    }
+    const border = it.outline ? ';border:1px dashed ' + (it.color || 'var(--text-muted)') : '';
+    return `<div class="legend-item"><span class="legend-swatch" style="background:${it.fill}${border}"></span>${it.label}</div>`;
+  }).join("");
+}
+function updateLegend() {
+  const el = document.querySelector(".page-toolbar .legend");
+  if (!el) return;
+  let items;
+  if (currentLayout === "logical" && currentSite === "__all__") {
+    items = [
+      { color: "var(--text-muted)", label: "Cloud WAN / Internet" },
+      { fill: "var(--accent-dim)", color: "var(--accent)", label: "Kartu Site (klik untuk buka)" },
+      { color: "var(--violet)", line: true, label: "Uplink site ke WAN" },
+    ];
+  } else if (currentLayout === "logical") {
+    items = [
+      { color: "var(--accent)", label: "Server / Storage" },
+      { color: "var(--info)", label: "Switch" },
+      { color: "#EC4899", label: "IDS/IPS" },
+      { color: "#14B8A6", label: "Load Balancer" },
+      { color: "var(--violet)", label: "Rack PDU / Power lane" },
+      { color: "var(--warning)", label: "Firewall" },
+      { color: "var(--text-muted)", label: "Router / Eksternal" },
+      { outline: true, label: "Node referensi (belum ada di data)" },
+    ];
+  } else {
+    items = [
+      { color: "var(--accent)", label: "Server / Storage" },
+      { color: "var(--info)", label: "Network Switch" },
+      { color: "var(--violet)", label: "Rack PDU" },
+      { color: "var(--warning)", label: "Firewall" },
+      { color: "var(--text-muted)", label: "Router / Eksternal" },
+      { color: "var(--accent)", line: true, label: "Link Data (antar perangkat)" },
+      { color: "var(--accent)", line: true, label: "Trunk antar rak (tebal = banyak link)" },
+      { outline: true, label: "Rak kosong" },
+    ];
+  }
+  el.innerHTML = legendItemsHTML(items);
+}
+
+// ---------- Global view (semua site → cloud WAN) ----------
+const GLOBAL_CARD_W = 280, GLOBAL_CARD_H = 168, GLOBAL_GAP = 44;
+
+function renderGlobalView() {
+  const sites = topoSiteList();
+  const stats = sites.map(s => {
+    const devs = Object.values(nodeMap).filter(n => n.site === s.id && n.rack);
+    const racks = [...new Set(devs.map(n => n.rack))];
+    let sw = 0, srv = 0, pdu = 0, fw = 0, rt = 0;
+    const layers = { core: 0, dist: 0, access: 0, mgmt: 0 };
+    devs.forEach(n => {
+      const L = deviceLayer(n);
+      if (n.type === "switch") {
+        sw++;
+        if (L === 5) layers.core++; else if (L === 6) layers.dist++;
+        else if (L === 7) layers.access++; else if (L === 8) layers.mgmt++;
+      }
+      else if (n.type === "pdu") pdu++;
+      else if (n.type === "firewall") fw++;
+      else if (n.type === "router") rt++;
+      else srv++;
+    });
+    return { id: s.id, name: s.name, devCount: devs.length, rackCount: racks.length, sw, srv, fw, rt, pdu, layers };
+  });
+
+  const margin = 70;
+  const totalW = Math.max(720, margin * 2 + stats.length * GLOBAL_CARD_W + Math.max(0, stats.length - 1) * GLOBAL_GAP);
+  const totalH = 380;
+  svg.setAttribute("viewBox", `0 0 ${totalW} ${totalH}`);
+  svg.innerHTML = "";
+  svgNodesClear();
+  const cx = totalW / 2, cy = 84, rx = 130, ry = 42;
+
+  // cloud WAN
+  const gCloud = document.createElementNS(svgNS, "g");
+  shape(gCloud, "ellipse", { cx, cy, rx, ry, class: "g-wan-cloud" });
+  const t1 = document.createElementNS(svgNS, "text");
+  t1.setAttribute("x", cx); t1.setAttribute("y", cy - 4); t1.setAttribute("text-anchor", "middle");
+  t1.setAttribute("class", "g-wan-title"); t1.textContent = "INTERNET / WAN";
+  const t2 = document.createElementNS(svgNS, "text");
+  t2.setAttribute("x", cx); t2.setAttribute("y", cy + 14); t2.setAttribute("text-anchor", "middle");
+  t2.setAttribute("class", "g-wan-sub"); t2.textContent = stats.length + " site terhubung";
+  gCloud.appendChild(t1); gCloud.appendChild(t2);
+  svg.appendChild(gCloud);
+
+  // kartu site
+  const startY = 210;
+  stats.forEach((s, i) => {
+    const w = GLOBAL_CARD_W, h = GLOBAL_CARD_H;
+    const x = margin + i * (w + GLOBAL_GAP) + Math.max(0, (totalW - margin * 2 - stats.length * w - (stats.length - 1) * GLOBAL_GAP) / 2);
+    const y = startY;
+    const ccx = x + w / 2;
+    // uplink line dari cloud ke kartu
+    const ln = document.createElementNS(svgNS, "line");
+    ln.setAttribute("x1", cx); ln.setAttribute("y1", cy + ry);
+    ln.setAttribute("x2", ccx); ln.setAttribute("y2", y);
+    ln.setAttribute("class", "edge edge-data g-uplink");
+    svg.appendChild(ln);
+
+    const g = document.createElementNS(svgNS, "g");
+    g.setAttribute("class", "g-site-card");
+    g.style.cursor = "pointer";
+    g.dataset.site = s.id;
+    shape(g, "rect", { x, y, width: w, height: h, rx: 12, class: "g-card-bg" });
+    shape(g, "rect", { x, y, width: w, height: 30, rx: 12, class: "g-card-head" });
+    shape(g, "rect", { x, y: y + 18, width: w, height: 12, class: "g-card-head" });
+    const tt = document.createElementNS(svgNS, "text");
+    tt.setAttribute("x", x + 14); tt.setAttribute("y", y + 20); tt.setAttribute("class", "g-card-title");
+    tt.textContent = s.name;
+    g.appendChild(tt);
+
+    const lines = [
+      ["Rack", s.rackCount], ["Device", s.devCount],
+      ["Core / Dist / Acc / Mgmt", `${s.layers.core} / ${s.layers.dist} / ${s.layers.access} / ${s.layers.mgmt}`],
+      ["Firewall · Router · PDU", `${s.fw} · ${s.rt} · ${s.pdu}`],
+      ["Server / Storage / lainnya", s.srv],
+    ];
+    lines.forEach(([k, v], idx) => {
+      const yy = y + 52 + idx * 22;
+      const kEl = document.createElementNS(svgNS, "text");
+      kEl.setAttribute("x", x + 14); kEl.setAttribute("y", yy); kEl.setAttribute("class", "g-k");
+      kEl.textContent = k;
+      const vEl = document.createElementNS(svgNS, "text");
+      vEl.setAttribute("x", x + w - 14); vEl.setAttribute("y", yy); vEl.setAttribute("text-anchor", "end"); vEl.setAttribute("class", "g-v");
+      vEl.textContent = String(v);
+      g.appendChild(kEl); g.appendChild(vEl);
+    });
+    const hint = document.createElementNS(svgNS, "text");
+    hint.setAttribute("x", x + w / 2); hint.setAttribute("y", y + h - 10); hint.setAttribute("text-anchor", "middle");
+    hint.setAttribute("class", "g-hint"); hint.textContent = "klik untuk buka topologi site";
+    g.appendChild(hint);
+
+    g.addEventListener("click", () => {
+      currentSite = s.id;
+      currentRack = "all";
+      topoScope.site = s.id;
+      topoScope.rack = "";
+      populateScopeSelects();
+      render();
+    });
+    svg.appendChild(g);
+  });
+  updateInfo();
+}
+
+function svgNodesClear() {
+  Object.keys(svgNodes).forEach(k => delete svgNodes[k]);
+  svgEdges.length = 0;
+}
+
+function setLayout(layout) {
+  currentLayout = layout;
+  document.querySelectorAll("#layout-buttons .layout-btn").forEach(b =>
+    b.classList.toggle("active", b.dataset.layout === layout));
+  // view Global hanya ada di Logis
+  if (currentLayout !== "logical" && currentSite === "__all__") {
+    const sites = topoSiteList();
+    currentSite = sites.length ? sites[0].id : "";
+  }
+  updateModeVisibility();
+  render();
 }
 
 function updateInfo() {
@@ -753,7 +1300,9 @@ document.getElementById("trace-btn").addEventListener("click", () => {
   const from = traceFromSel.value, to = traceToSel.value;
   if (!from || !to) return;
   const path = findPath(from, to);
+  activeTracePath = path || null;
   highlightTrace(path);
+  if (currentLayout === "physical") render();
   const panel = document.getElementById("detail-panel");
   if (!path) {
     panel.innerHTML = `<span class="detail-type-badge" style="background:var(--danger-dim);color:var(--danger)">Path Trace</span>
@@ -770,36 +1319,34 @@ document.getElementById("trace-btn").addEventListener("click", () => {
     }).join("")}</div>`;
 });
 document.getElementById("clear-trace-btn").addEventListener("click", () => {
+  activeTracePath = null;
   highlightTrace(null);
+  if (currentLayout === "physical") render();
   document.getElementById("detail-panel").innerHTML = `<div class="detail-empty">Klik salah satu node pada topologi untuk melihat detail koneksi.</div>`;
 });
 
-// ---------- filter: layer & rack ----------
-function renderFilterUI() {
-  const sel = document.getElementById("filter-rack");
-  if (!sel) return;
-  const rackIds = Object.keys(nodeMap).reduce((acc, id) => { const r = nodeMap[id].rack; if (r && !acc.includes(r)) acc.push(r); return acc; }, []).sort();
-  sel.innerHTML = `<option value="all">Semua Rack</option>` + rackIds.map(r => `<option value="${r}">${r}</option>`).join("");
-}
+// ---------- filter: scope site/rack + mode ----------
 function wireFilters() {
   document.querySelectorAll("#layout-buttons .layout-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll("#layout-buttons .layout-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentLayout = btn.dataset.layout;
-      render();
-    });
+    btn.addEventListener("click", () => setLayout(btn.dataset.layout));
   });
-  document.querySelectorAll("#layer-buttons .layer-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll("#layer-buttons .layer-btn").forEach(b => b.classList.remove("active"));
-      btn.classList.add("active");
-      currentLayer = btn.dataset.layer;
-      render();
-    });
+  const siteSel = document.getElementById("filter-site");
+  if (siteSel) siteSel.addEventListener("change", () => {
+    currentSite = siteSel.value;
+    topoScope.site = currentSite === "__all__" ? "" : currentSite;
+    topoScope.rack = "";
+    fillRackOptions();
+    // Global/WAN hanya di mode Logis — auto pindah bila perlu
+    if (currentSite === "__all__") setLayout("logical");
+    else { updateModeVisibility(); render(); }
   });
-  const sel = document.getElementById("filter-rack");
-  if (sel) sel.addEventListener("change", () => { currentRack = sel.value; render(); });
+  const rackSel = document.getElementById("filter-rack");
+  if (rackSel) rackSel.addEventListener("change", () => {
+    currentRack = rackSel.value;
+    topoScope.rack = currentRack === "all" ? "" : currentRack;
+    updateModeVisibility();
+    render();
+  });
 }
 
 // ---------- zoom & pan ----------
@@ -991,47 +1538,6 @@ function openRowPicker(key, ev) {
     picker.remove();
   });
 }
-function initTopoScope() {
-  const siteSel = document.getElementById("topo-site-sel");
-  const rackSel = document.getElementById("topo-rack-sel");
-  if (!siteSel || !rackSel) return;
-  let sites = [];
-  if (typeof RACKS !== "undefined" && Array.isArray(RACKS)) {
-    RACKS.forEach(r => {
-      if (r.site && !sites.find(s => s.id === r.site)) sites.push({ id: r.site, name: r.siteName || r.site });
-    });
-  }
-  sites = sites.length ? sites : Object.values(nodeMap).reduce((acc, n) => {
-    const s = n.site || n.siteName;
-    if (s && !acc.includes(s)) acc.push(s);
-    return acc;
-  }, []).map(id => ({ id, name: id }));
-  siteSel.innerHTML = sites.map(s => `<option value="${s.id}">${s.name}</option>`).join("") || '<option value="">—</option>';
-  if (!topoScope.site || !sites.find(s => s.id === topoScope.site)) topoScope.site = sites.length ? sites[0].id : "";
-  fillTopoRacks();
-}
-function fillTopoRacks() {
-  const rackSel = document.getElementById("topo-rack-sel");
-  if (!rackSel) return;
-  let racks = [];
-  if (typeof RACKS !== "undefined" && Array.isArray(RACKS)) {
-    racks = RACKS.filter(r => r.site === topoScope.site).map(r => r.rackId).sort();
-  }
-  if (!racks.length) {
-    racks = Object.values(nodeMap).reduce((acc, n) => {
-      if (n.rack && (n.site === topoScope.site || n.siteName === topoScope.site) && !acc.includes(n.rack)) acc.push(n.rack);
-      return acc;
-    }, []).sort();
-  }
-  rackSel.innerHTML = racks.map(r => `<option value="${r}">${r}</option>`).join("") || '<option value="">—</option>';
-  if (!racks.includes(topoScope.rack)) topoScope.rack = racks.length ? racks[0] : "";
-  rackSel.value = topoScope.rack;
-  siteSelValue();
-}
-function siteSelValue() {
-  const siteSel = document.getElementById("topo-site-sel");
-  if (siteSel) siteSel.value = topoScope.site;
-}
 function updateEditModeUI() {
   const btn = document.getElementById("topo-layers-btn");
   if (btn) {
@@ -1039,7 +1545,9 @@ function updateEditModeUI() {
     btn.classList.toggle("active", editMode);
   }
   if (editbar) editbar.style.display = editMode ? "flex" : "none";
-  if (editMode) initTopoScope();
+  // picker mengikuti Cakupan di toolbar utama; pastikan sinkron
+  topoScope.site = currentSite;
+  topoScope.rack = currentRack === "all" ? "" : currentRack;
 }
 const topoLayersBtn = document.getElementById("topo-layers-btn");
 if (topoLayersBtn) topoLayersBtn.addEventListener("click", () => {
@@ -1047,16 +1555,6 @@ if (topoLayersBtn) topoLayersBtn.addEventListener("click", () => {
   if (!editMode) { const p = document.getElementById("topo-row-picker"); if (p) p.remove(); }
   updateEditModeUI();
   render();
-});
-const topoSiteSel = document.getElementById("topo-site-sel");
-if (topoSiteSel) topoSiteSel.addEventListener("change", () => {
-  topoScope.site = topoSiteSel.value;
-  topoScope.rack = "";
-  fillTopoRacks();
-});
-const topoRackSel = document.getElementById("topo-rack-sel");
-if (topoRackSel) topoRackSel.addEventListener("change", () => {
-  topoScope.rack = topoRackSel.value;
 });
 const editAutoBtn = document.getElementById("topo-edit-auto");
 if (editAutoBtn) editAutoBtn.addEventListener("click", () => {
@@ -1075,8 +1573,13 @@ if (editResetBtn) editResetBtn.addEventListener("click", () => {
 });
 
 // ---------- init ----------
-loadTopoLayers();
-renderFilterUI();
-wireFilters();
-populateTrace();
-render();
+// Dijalankan pada event load agar semua modul data (port-data/pdu-data)
+// sudah termuat — render pertama langsung punya edge & PDU lane.
+window.addEventListener("load", () => {
+  loadTopoLayers();
+  populateScopeSelects();
+  wireFilters();
+  updateModeVisibility();
+  populateTrace();
+  render();
+});

@@ -108,23 +108,31 @@
           <div class="legend-item"><span class="legend-swatch" style="background:var(--violet);height:2px;width:16px;border-radius:0;border-top:2px dashed var(--violet);"></span>Link Power</div>
           <div class="legend-item"><span class="legend-swatch" style="background:transparent;border:1px dashed var(--text-muted);"></span>Node referensi (belum ada di data)</div>
         </div>
-        <div class="toolbar" style="width:100%;justify-content:space-between;align-items:center;">
-          <div class="toolbar" style="flex-wrap:wrap;">
-            <div class="btn-group" id="layout-buttons" style="display:flex;gap:4px;">
-              <button type="button" class="btn ghost layout-btn active" data-layout="logical"><i class="fa-solid fa-sitemap"></i> Logis</button>
-              <button type="button" class="btn ghost layout-btn" data-layout="physical"><i class="fa-solid fa-server"></i> Fisik (Rack)</button>
+          <div class="toolbar" style="width:100%;justify-content:flex-start;align-items:flex-end;flex-wrap:wrap;gap:18px;">
+            <div class="tb-group">
+              <span class="tb-label">Cakupan</span>
+              <div style="display:flex;gap:6px;">
+                <select class="form-input" style="width:auto;min-width:150px;" id="filter-site" title="Semua mode mengikuti site ini"></select>
+                <select class="form-input" style="width:auto;" id="filter-rack"></select>
+              </div>
             </div>
-            <div class="btn-group" id="layer-buttons" style="display:flex;gap:4px;">
-              <button type="button" class="btn ghost layer-btn active" data-layer="data"><i class="fa-solid fa-network-wired"></i> Data</button>
-              <button type="button" class="btn ghost layer-btn" data-layer="power"><i class="fa-solid fa-plug"></i> Power</button>
-              <button type="button" class="btn ghost layer-btn" data-layer="all"><i class="fa-solid fa-diagram-project"></i> Semua</button>
+            <div class="tb-group">
+              <span class="tb-label">Tampilan</span>
+              <div class="btn-group" id="layout-buttons" style="display:flex;gap:4px;">
+                <button type="button" class="btn ghost layout-btn" data-layout="physical"><i class="fa-solid fa-server"></i> Fisik (Rack)</button>
+                <button type="button" class="btn ghost layout-btn active" data-layout="logical"><i class="fa-solid fa-sitemap"></i> Logis</button>
+              </div>
             </div>
-            <select class="form-input" style="width:auto;" id="filter-rack"><option value="all">Semua Rack</option></select>
-            <button type="button" class="btn ghost" id="topo-layers-btn" title="Pilih layer, lalu assign perangkat"><i class="fa-solid fa-layer-group"></i> Atur Layer</button>
-            <select class="form-input" style="width:auto;" id="trace-from"></select>
-            <select class="form-input" style="width:auto;" id="trace-to"></select>
-            <button class="btn primary" id="trace-btn"><i class="fa-solid fa-route"></i>Trace Path</button>
-            <button class="btn ghost" id="clear-trace-btn">Clear</button>
+            <div class="tb-group">
+              <span class="tb-label">Alat</span>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                <button type="button" class="btn ghost" id="topo-layers-btn" title="Pilih layer, lalu assign perangkat"><i class="fa-solid fa-layer-group"></i> Atur Layer</button>
+                <select class="form-input" style="width:auto;" id="trace-from"></select>
+                <select class="form-input" style="width:auto;" id="trace-to"></select>
+                <button class="btn primary" id="trace-btn"><i class="fa-solid fa-route"></i>Trace Path</button>
+                <button class="btn ghost" id="clear-trace-btn">Clear</button>
+              </div>
+            </div>
           </div>
           <div class="toolbar" style="flex-wrap:wrap;">
             <span class="topo-info" id="topo-info"></span>
@@ -145,13 +153,7 @@
       </div>
 
       <div class="topo-editbar" id="topo-editbar" style="display:none;">
-        <label class="topo-scope"><span>Site</span>
-          <select class="form-input" id="topo-site-sel" style="width:auto;"></select>
-        </label>
-        <label class="topo-scope"><span>Rack</span>
-          <select class="form-input" id="topo-rack-sel" style="width:auto;"></select>
-        </label>
-        <span class="topo-editbar-hint"><i class="fa-solid fa-mouse-pointer"></i> Pilih site &amp; rack dulu — klik baris layer untuk menambah perangkat dari rack itu saja.</span>
+        <span class="topo-editbar-hint"><i class="fa-solid fa-mouse-pointer"></i> Klik band layer untuk menambah perangkat — daftar hanya dari <b><span id="editbar-scope-label">site/rack</span></b> yang dipilih di Cakupan.</span>
         <span class="toolbar" style="margin-left:auto;">
           <button class="btn ghost" id="topo-edit-auto" title="Isi mapping dengan hasil deteksi otomatis"><i class="fa-solid fa-wand-magic-sparkles"></i> Saran Otomatis</button>
           <button class="btn ghost" id="topo-edit-reset" title="Kosongkan semua assign manual"><i class="fa-solid fa-rotate-left"></i> Reset</button>
@@ -168,7 +170,9 @@
     
 
 <script src="js/keys.js"></script>
+<script src="js/api.js"></script>
     <script src="js/rack-data.js"></script>
+    <script src="js/port-data.js"></script>
     <script src="js/pdu-data.js"></script>
     <script src="js/network-topology.js"></script>
 
@@ -182,7 +186,6 @@
       </div>
     </div>
 
-    <script src="js/port-data.js"></script>
 
     <div class="modal-overlay" id="powermap-overlay">
       <div class="modal" style="max-width:760px;">

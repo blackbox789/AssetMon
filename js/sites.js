@@ -106,9 +106,25 @@
     const grid = document.getElementById("site-grid");
     if (!grid) return;
     updateTotalStat();
+    // Statistik live dari devices registry (SQLite) — bukan snapshot statis
+    let live = {};
+    try {
+      const devs = typeof apiGetDevices === "function" ? (apiGetDevices() || []) : [];
+      devs.forEach(d => {
+        const sid = String(d.site || "").toUpperCase();
+        if (!sid) return;
+        live[sid] = live[sid] || { devices: 0, racksUsed: new Set() };
+        live[sid].devices++;
+        if (d.rackId) live[sid].racksUsed.add(d.rackId);
+      });
+    } catch (e) { /* offline */ }
     grid.innerHTML = getSiteList().map(site => {
       const meta = SITE_META[site.id];
       const count = RACKS.filter(r => r.site === site.id || String(r.siteName || "").toLowerCase() === String(site.name).toLowerCase()).length;
+      const lv = live[String(site.id).toUpperCase()] || { devices: 0, racksUsed: new Set() };
+      const racksUsed = lv.racksUsed.size;
+      const util = count ? Math.min(100, Math.round(racksUsed / count * 100)) : 0;
+      const utilLabel = `${racksUsed}/${count} rack`;
       const racksUrl = "site-racks.html?site=" + encodeURIComponent(site.id);
       const assetUrl = site.custom ? "asset-list.html" : "asset-list.html?site=" + encodeURIComponent(site.id);
       const badge = meta ? meta.badge : "completed";
@@ -116,14 +132,13 @@
       const power = meta ? meta.power : "Normal";
       const powerColor = meta ? meta.powerColor : "var(--accent-text)";
       const uptime = meta ? meta.uptime : "—";
-      const util = meta ? meta.util : 0;
-      const fillClass = meta ? meta.fillClass : "";
       const maintAlert = maintenanceAlert(site.id);
       const metaAlert = meta && meta.alert ? meta.alert : "";
       const metaStyle = meta && meta.alert ? (meta.alertStyle || "") : "";
       let alertStyle = "";
       if (!maintAlert && !metaAlert) alertStyle = "display:none;";
       else if (!maintAlert && metaStyle) alertStyle = metaStyle;
+      const fillClass = util >= 80 ? "danger" : util >= 50 ? "warning" : "";
       const alertHtml = `<div class="site-alert" data-site-alert="${site.id}" data-rack-fallback="${escapeAttr(maintAlert || "")}" data-meta-alert="${escapeAttr(metaAlert || "")}" data-meta-style="${escapeAttr(metaStyle || "")}"${alertStyle ? ' style="' + alertStyle + '"' : ""}>${maintAlert || metaAlert}</div>`;
       return `
       <div class="card site-card" data-site="${site.id}">
@@ -138,11 +153,12 @@
           </div>
         </div>
         <div class="site-stats">
-          <div class="site-stat" style="cursor:pointer;" onclick="location.href='${racksUrl}'" title="Lihat rack"><div class="k">Racks</div><div class="v" data-site-count="${site.id}">${count}</div></div>
+          <div class="site-stat" style="cursor:pointer;" onclick="openRackQuickView('${site.id}')" title="Lihat ringkasan rack"><div class="k">Racks</div><div class="v" data-site-count="${site.id}">${count}</div></div>
           <div class="site-stat"><div class="k">Power</div><div class="v" style="font-size:13.5px;color:${powerColor};">${power}</div></div>
+          <div class="site-stat"><div class="k">Device</div><div class="v" style="font-size:13.5px;">${lv.devices}</div></div>
           <div class="site-stat"><div class="k">Uptime</div><div class="v" style="font-size:13.5px;">${uptime}</div></div>
         </div>
-        <div class="util-row"><span style="font-size:11.5px;color:var(--text-muted);width:64px;">Utilisasi</span><div class="util-bar"><div class="util-fill ${fillClass}" style="width:${util}%"></div></div><span class="util-pct">${util}%</span></div>
+        <div class="util-row"><span style="font-size:11.5px;color:var(--text-muted);width:64px;">Rak terpakai</span><div class="util-bar"><div class="util-fill ${fillClass}" style="width:${util}%"></div></div><span class="util-pct" title="${utilLabel}">${util}%</span></div>
         ${alertHtml}
         <div class="site-card-foot"><button class="btn ghost" onclick="location.href='${assetUrl}'"><i class="fa-solid fa-list-ul"></i>Lihat Asset</button><button class="btn ghost" onclick="location.href='${racksUrl}'"><i class="fa-solid fa-server"></i>Lihat Rack</button></div>
       </div>`;
@@ -150,6 +166,77 @@
   }
   renderSiteCards();
   refreshMaintenanceAlerts();
+
+  // ---- Quick view rack: modal mini rack elevation per site ----
+  const RQ_TINTS = { server: "#8fbfea", switch: "#85d8cf", pdu: "#b7a3e3", firewall: "#f5c78c", patch: "#a5aebd", tower: "#a8d5a5", storage: "#f97316", ups: "#eab308" };
+  function rqMiniRack(rack, devs, usedTotal) {
+    const size = rack.size || 42;
+    const px = Math.max(90, Math.min(150, size * 3));
+    const hUnit = px / size;
+    let blocks = "";
+    const layout = (typeof RACK_LAYOUTS !== "undefined") ? RACK_LAYOUTS[rack.rackId] : null;
+    if (layout && layout.length) {
+      layout.forEach(d => {
+        if (!d || d.type === "blank" || !d.start) return;
+        const st = Math.min(d.start, d.end || d.start), en = Math.max(d.start, d.end || d.start);
+        const top = (st - 1) * hUnit;
+        const h = Math.max(2, (en - st + 1) * hUnit - 1);
+        blocks += '<div class="mq-block" style="top:' + top.toFixed(1) + 'px;height:' + h.toFixed(1) + 'px;background:' + (RQ_TINTS[d.type] || "#8a8f98") + '" title="' + String(d.name || "").replace(/"/g, "") + '"></div>';
+      });
+    } else {
+      // fallback generik: device terdaftar (berwarna tipe) + sisa snapshot totalDevices (netral)
+      devs.slice(0, size).forEach((d, i) => {
+        blocks += '<div class="mq-block" style="bottom:' + (i * hUnit).toFixed(1) + 'px;height:' + Math.max(2, hUnit - 1).toFixed(1) + 'px;background:' + (RQ_TINTS[d.type] || "#8a8f98") + '"></div>';
+      });
+      const extra = Math.max(0, Math.min(size, usedTotal|0) - devs.length);
+      for (let i = devs.length; i < devs.length + extra; i++) {
+        blocks += '<div class="mq-block" style="bottom:' + (i * hUnit).toFixed(1) + 'px;height:' + Math.max(2, hUnit - 1).toFixed(1) + 'px;background:#8a8f98"></div>';
+      }
+    }
+    const emptyTag = usedTotal ? "" : '<span class="mq-empty">KOSONG</span>';
+    return '<div class="mq-frame" style="height:' + px + 'px"><div class="mq-blocks">' + blocks + "</div>" + emptyTag + "</div>";
+  }
+  function openRackQuickView(siteId) {
+    const site = getSiteList().find(s => s.id === siteId) || { id: siteId, name: siteId };
+    const racks = RACKS.filter(r => r.site === siteId || String(r.siteName || "").toLowerCase() === String(site.name).toLowerCase())
+      .sort((a, b) => a.rackId.localeCompare(b.rackId));
+    let devByRack = {};
+    try {
+      const devs = typeof apiGetDevices === "function" ? (apiGetDevices() || []) : [];
+      devs.forEach(d => {
+        const rk = String(d.rackId || "").toUpperCase();
+        if (!rk) return;
+        (devByRack[rk] = devByRack[rk] || []).push({ type: String(d.type || "").toLowerCase(), name: d.deviceKey });
+      });
+    } catch (e) { /* offline */ }
+    document.getElementById("rq-site-name").textContent = site.name;
+    const grid = document.getElementById("rq-grid");
+    grid.innerHTML = racks.map(r => {
+      const devs = devByRack[String(r.rackId).toUpperCase()] || [];
+      const used = Math.max(devs.length, (r.totalDevices | 0));
+      const pct = r.size ? Math.min(100, Math.round(used / r.size * 100)) : 0;
+      return '<div class="rq-tile" data-rack="' + r.rackId + '" title="Buka Rack Elevation ' + r.rackId + '">' +
+        rqMiniRack(r, devs, used) +
+        '<div class="rq-info">' +
+          '<div class="rq-id">' + r.rackId + '</div>' +
+          '<div class="rq-zone">' + (r.zone || "-") + '</div>' +
+          '<div class="rq-dev">' + used + ' device</div>' +
+          '<div class="rq-util"><div class="util-bar"><div class="util-fill ' + (pct >= 80 ? "danger" : pct >= 50 ? "warning" : "") + '" style="width:' + pct + '%"></div></div><span>' + pct + '%</span></div>' +
+        '</div></div>';
+    }).join("") || '<div class="form-hint">Belum ada rack di site ini.</div>';
+    grid.querySelectorAll(".rq-tile").forEach(t => t.addEventListener("click", () => {
+      location.href = "rack-elevation.html?rack=" + encodeURIComponent(t.dataset.rack);
+    }));
+    document.getElementById("rack-quick-modal").classList.add("open");
+  }
+  window.openRackQuickView = openRackQuickView;
+  (function wireQuickModal() {
+    const m = document.getElementById("rack-quick-modal");
+    if (!m) return;
+    document.getElementById("rack-quick-close").addEventListener("click", () => m.classList.remove("open"));
+    document.getElementById("rack-quick-cancel").addEventListener("click", () => m.classList.remove("open"));
+    m.addEventListener("click", e => { if (e.target === m) m.classList.remove("open"); });
+  })();
 
   RACK_HEIGHTS.forEach(u => {
     const opt = document.createElement("option");
@@ -212,6 +299,15 @@
     }
     idInput.value = nextRackIdFor(val);
   }
+
+  // Hint konvensi penamaan di bawah input Rack ID
+  function updateRackIdHint() {
+    const hint = document.getElementById("rack-id-hint");
+    if (!hint) return;
+    hint.textContent = "Format: huruf besar / angka / tanda hubung, tanpa spasi. Saran untuk site ini: " + nextRackIdFor(siteSel.value === "__new__" ? "" : siteSel.value);
+  }
+
+  siteSel.addEventListener("change", updateRackIdHint);
 
   function flash(msg, error) {
     saveMsg.innerHTML = msg;
@@ -278,6 +374,9 @@
   function openModal() {
     populateSiteSelect();
     onSiteChange();
+    updateRackIdHint();
+    const pc = document.getElementById("rack-power-cap");
+    if (pc) pc.value = "";
     saveMsg.classList.remove("show", "error");
     modal.classList.add("open");
   }
@@ -335,11 +434,16 @@
       flash('<i class="fa-solid fa-triangle-exclamation"></i> Rack ID wajib diisi.', true);
       return;
     }
+    if (!/^[A-Z0-9-]+$/.test(rackId)) {
+      flash('<i class="fa-solid fa-triangle-exclamation"></i> Format Rack ID tidak valid — gunakan huruf besar, angka, dan tanda hubung tanpa spasi (mis. R1-A07).', true);
+      return;
+    }
     if (RACKS.some(r => r.rackId === rackId)) {
       flash('<i class="fa-solid fa-triangle-exclamation"></i> Rack ID "' + rackId + '" sudah terdaftar. Gunakan ID lain.', true);
       return;
     }
 
+    const powerCapEl = document.getElementById("rack-power-cap");
     const entry = saveRack({
       rackId,
       site: siteId,
@@ -348,6 +452,7 @@
       zone: siteZone,
       size: sizeSel.value,
       status: document.getElementById("rack-status").value,
+      powerCapKw: powerCapEl && powerCapEl.value !== "" ? Number(powerCapEl.value) : 0,
     });
     if (!entry) {
       flash('<i class="fa-solid fa-triangle-exclamation"></i> Gagal menyimpan — penyimpanan browser/server tidak tersedia.', true);

@@ -299,10 +299,10 @@ Setiap transisi disimpan ke `status_history` array dalam record:
 - Persistensi manual layer: **`topoLayers`** (localStorage) prioritas atas deteksi otomatis. `deviceLayer(n)` = manual → `detectAutoLayer(n)` (heuristik nama) → leaf (9).
 - Smoke test: `C:\Users\anggo\AppData\Local\Temp\opencode\topo-smoke.cjs` (DOM stub + `vm.runInContext` concat keys/rack-data/port-data/pdu-data/network-topology.js). Terakhir PASS untuk 9 baris + scoping (`R1-A12` → 4/7 switch).
 
-### PENDING — Auto-layer dari field `role` (JANGAN LUPA saat deploy)
-- Field **Peran / Segmentasi** di form network device sekarang dropdown `Core | Distribution | Access | Management` (`data-nf="role"`, tersimpan di record + tabel `devices.data`) — nilainya SENGAJA disamakan dengan baris layer switch di Network Topology.
-- **Belum dikerjakan**: `detectAutoLayer()` di `js/network-topology.js` masih menebak layer dari pola NAMA hostname (SW-CORE-/SW-DIST-/SW-ACC-/MGMT). Perlu ditambah: bila node punya `data.role`/record devices dengan role tersebut, pakai itu sebagai prioritas deteksi otomatis (lebih andal daripada nama), baru fallback heuristik nama.
-- Manfaatnya: switch baru yang di-add via form dengan role terpilih otomatis masuk baris Core/Distribution/Access/Management yang benar di mode Logis tanpa assign manual.
+### DONE — Auto-layer dari field `role` (sudah dikerjakan)
+- Field **Peran / Segmentasi** di form network device adalah dropdown per tipe (switch: `Core | Distribution | Access | Management`; router/firewall/ids/lb punya set masing-masing) — tersimpan di record + tabel `devices.data`.
+- **`detectAutoLayer()` di `js/network-topology.js` kini memprioritaskan field role**: peta `TOPO_ROLE_MAP` (key=canonKey nama) diisi dari localStorage (`rv_switches`/`rv_accessories`) lalu disegarkan async dari `/api/devices` (devices.data.role) dengan re-render bila berubah. Untuk switch: role menimpa heuristik nama hostname; tanpa role → heuristik nama seperti dulu.
+- Manfaat terverifikasi (uji vm): switch baru dengan role "Management" masuk baris Management meski namanya tidak mengandung MGMT; sebaliknya nama CORE tanpa role tetap terdeteksi Core.
 
 ---
 

@@ -159,6 +159,10 @@ if (!devCols.includes("site")) db.exec("ALTER TABLE devices ADD COLUMN site TEXT
 if (!devCols.includes("rackId")) db.exec("ALTER TABLE devices ADD COLUMN rackId TEXT NOT NULL DEFAULT ''");
 db.exec("CREATE INDEX IF NOT EXISTS idx_devices_site ON devices(site)");
 
+// racks: kapasitas daya (kW) untuk capacity planning
+const rackCols = db.prepare("PRAGMA table_info(racks)").all().map(c => c.name);
+if (!rackCols.includes("powerCapKw")) db.exec("ALTER TABLE racks ADD COLUMN powerCapKw REAL NOT NULL DEFAULT 0");
+
 // ---- Referensi data (lookups) ----
 // Tidak ada hardcode di frontend: pilihan form (tipe storage, form factor,
 // interface, vendor, model) diambil dari SQLite via GET /api/refs.
@@ -681,16 +685,17 @@ app.post("/api/racks", (req, res) => {
     totalDevices: (Number(r.server) || 0) + (Number(r.sw) || 0) + (Number(r.pdu) || 0) + (Number(r.firewall) || 0) + (Number(r.patch) || 0),
     util: Math.min(100, Math.max(0, Number(r.util) || 0)),
     status: r.status || "online",
+    powerCapKw: Math.max(0, Number(r.powerCapKw) || 0),
   };
   db.prepare(`
-    INSERT INTO racks (rackId, site, siteName, loc, zone, size, server, sw, pdu, firewall, patch, totalDevices, util, status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO racks (rackId, site, siteName, loc, zone, size, server, sw, pdu, firewall, patch, totalDevices, util, status, powerCapKw)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(rackId) DO UPDATE SET
       site=excluded.site, siteName=excluded.siteName, loc=excluded.loc, zone=excluded.zone,
       size=excluded.size, server=excluded.server, sw=excluded.sw, pdu=excluded.pdu,
       firewall=excluded.firewall, patch=excluded.patch, totalDevices=excluded.totalDevices,
-      util=excluded.util, status=excluded.status
-  `).run(entry.rackId, entry.site, entry.siteName, entry.loc, entry.zone, entry.size, entry.server, entry.sw, entry.pdu, entry.firewall, entry.patch, entry.totalDevices, entry.util, entry.status);
+      util=excluded.util, status=excluded.status, powerCapKw=excluded.powerCapKw
+  `).run(entry.rackId, entry.site, entry.siteName, entry.loc, entry.zone, entry.size, entry.server, entry.sw, entry.pdu, entry.firewall, entry.patch, entry.totalDevices, entry.util, entry.status, entry.powerCapKw);
   if (entry.site) syncDeviceSiteFromRack(entry.rackId, entry.site);
   auditLog(req, currentUserId(req), rackExists ? "rack.update" : "rack.create", entry.rackId, entry.site ? entry.site + " · " + entry.siteName : entry.siteName);
   res.json(entry);
