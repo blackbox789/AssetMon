@@ -148,7 +148,20 @@ CREATE INDEX IF NOT EXISTS idx_servers_created ON servers(createdAt);
 CREATE INDEX IF NOT EXISTS idx_maintenance_created ON maintenance(createdAt);
 CREATE INDEX IF NOT EXISTS idx_visits_created ON visits(createdAt);
 CREATE INDEX IF NOT EXISTS idx_incidents_created ON incidents(createdAt);
-DROP INDEX IF EXISTS idx_ops_created;`);
+DROP INDEX IF EXISTS idx_ops_created;
+CREATE TABLE IF NOT EXISTS wan_links (
+  id          TEXT PRIMARY KEY,
+  fromRouter  TEXT NOT NULL,
+  toRouter    TEXT NOT NULL,
+  fromSite    TEXT,
+  toSite      TEXT,
+  label       TEXT,
+  bandwidth   TEXT,
+  port        TEXT,
+  createdBy   TEXT,
+  createdAt   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+CREATE INDEX IF NOT EXISTS idx_wan_links_created ON wan_links(createdAt);`);
 
 const mapCols = db.prepare("PRAGMA table_info(maps)").all();
 if (!mapCols.some(c => c.name === "updatedAt")) {
@@ -491,11 +504,13 @@ function pruneOrphanDevices() {
       withServer.add(canonKey(r.id));
     } catch (e) { /* abaikan baris rusak */ }
   });
-  const rows = db.prepare("SELECT deviceKey, site, rackId FROM devices").all();
+  const rows = db.prepare("SELECT deviceKey, site, rackId, type FROM devices").all();
   const del = db.prepare("DELETE FROM devices WHERE deviceKey = ?");
   let removed = 0;
   rows.forEach(r => {
     if (r.site || r.rackId) return;
+    // ISP devices are external (no rack/site) — never prune
+    if (String(r.type || "").toLowerCase() === "isp") return;
     if (!withMap.has(r.deviceKey) && !withServer.has(canonKey(r.deviceKey))) {
       del.run(r.deviceKey);
       removed++;
@@ -1164,6 +1179,29 @@ app.delete("/api/notes/:id", (req, res) => {
   if (row.source !== "manual") return res.status(400).json({ error: "hanya catatan manual yang bisa dihapus" });
   db.prepare("DELETE FROM notes WHERE id = ?").run(row.id);
   auditLog(req, currentUserId(req), "note.delete", row.entityType + "/" + row.entityKey, (row.title || row.detail || "").slice(0, 60));
+  res.json({ ok: true });
+});
+
+// ---- WAN Links CRUD ----
+function genWanId() { return "wan-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8); }
+app.get("/api/wan-links", (req, res) => {
+  const rows = db.prepare("SELECT * FROM wan_links ORDER BY createdAt DESC").all();
+  res.json(rows);
+});
+app.post("/api/wan-links", express.json({ limit: "16kb" }), (req, res) => {
+  const d = req.body || {};
+  if (!d.fromRouter || !d.toRouter) return res.status(400).json({ error: "fromRouter dan toRouter wajib" });
+  const id = genWanId();
+  db.prepare("INSERT INTO wan_links (id, fromRouter, toRouter, fromSite, toSite, label, bandwidth, port, createdBy) VALUES (?,?,?,?,?,?,?,?,?)")
+    .run(id, d.fromRouter, d.toRouter, d.fromSite || "", d.toSite || "", d.label || "", d.bandwidth || "", d.port || "", currentUserId(req) || "anon");
+  auditLog(req, currentUserId(req), "wan_link.create", id, (d.label || d.fromRouter + "→" + d.toRouter).slice(0, 60));
+  res.json({ ok: true, id });
+});
+app.delete("/api/wan-links/:id", (req, res) => {
+  const row = db.prepare("SELECT * FROM wan_links WHERE id = ?").get(req.params.id);
+  if (!row) return res.status(404).json({ error: "WAN link tidak ditemukan" });
+  db.prepare("DELETE FROM wan_links WHERE id = ?").run(row.id);
+  auditLog(req, currentUserId(req), "wan_link.delete", row.id, (row.label || row.fromRouter + "→" + row.toRouter).slice(0, 60));
   res.json({ ok: true });
 });
 

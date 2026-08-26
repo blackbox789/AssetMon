@@ -178,8 +178,10 @@ if (typeof PORT_DATA !== "undefined") {
         if (!existing.ip && data.ip) { existing.ip = data.ip; changed = true; }
         if (!existing.model && data.model) { existing.model = data.model; changed = true; }
         existing.type = "isp";
+        existing.ispData = data;  // store full ISP data for detail panel
       } else {
-        ensureNode(key, { type: "isp", ip: data.ip || "", model: data.model || data.asn || "", rack: null, site: null });
+        const n = ensureNode(key, { type: "isp", ip: data.ip || "", model: data.model || data.asn || "", rack: null, site: null });
+        if (n) n.ispData = data;
         changed = true;
       }
     });
@@ -1477,11 +1479,15 @@ function selectNode(id) {
 
   // ISP-specific detail fields (fetched from DB)
   const ispDetailHtml = n.type === "isp" ? (function() {
-    let data = {};
-    try {
-      const accs = JSON.parse(localStorage.getItem(ACC_STORAGE_KEY) || "[]");
-      data = (Array.isArray(accs) ? accs : []).find(a => canonKey(a.name) === n.id && a.type === "isp") || {};
-    } catch (e) {}
+    let data = n.ispData || {};
+    // fallback: try localStorage if ispData not hydrated yet
+    if (!data.asn) {
+      try {
+        const accs = JSON.parse(localStorage.getItem(ACC_STORAGE_KEY) || "[]");
+        const found = (Array.isArray(accs) ? accs : []).find(a => canonKey(a.name) === n.id && a.type === "isp");
+        if (found) data = { ...found, ...data };
+      } catch (e) {}
+    }
     const fields = [
       ["ASN", data.asn], ["Bandwidth", data.bandwidth], ["IP Ranges", data.ipRanges],
       ["Public IP", data.publicIp], ["Peering", data.peeringLocation],
@@ -1845,7 +1851,28 @@ if (editResetBtn) editResetBtn.addEventListener("click", () => {
 });
 
 // ---------- WAN Link Manager ----------
-function loadWANLinks() {
+// SQLite-backed WAN links (primary) with localStorage fallback
+async function loadWANLinksFromDb() {
+  if (typeof fetch !== "function") return false;
+  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+  try {
+    const res = await fetch(base + "/wan-links");
+    if (!res.ok) return false;
+    const rows = await res.json();
+    if (!Array.isArray(rows)) return false;
+    rows.forEach(w => {
+      ensureNode(w.fromRouter, { type: "router" });
+      ensureNode(w.toRouter, { type: "router" });
+      // try to assign sites
+      const rA = nodeMap[slugKey(w.fromRouter)], rB = nodeMap[slugKey(w.toRouter)];
+      if (rA && w.fromSite && !rA.site) { const rk = Array.isArray(RACKS) ? RACKS.find(r => r.site === w.fromSite) : null; rA.site = w.fromSite; rA.siteName = rk ? rk.siteName : w.fromSite; }
+      if (rB && w.toSite && !rB.site) { const rk = Array.isArray(RACKS) ? RACKS.find(r => r.site === w.toSite) : null; rB.site = w.toSite; rB.siteName = rk ? rk.siteName : w.toSite; }
+      addEdge(w.fromRouter, w.toRouter, "wan", { label: w.label || "", bandwidth: w.bandwidth || "", port: w.port || "", dbId: w.id });
+    });
+    return true;
+  } catch (e) { return false; }
+}
+function loadWANLinksFromLocal() {
   try {
     const data = JSON.parse(localStorage.getItem(WAN_LINKS_KEY) || "[]");
     if (!Array.isArray(data)) return;
@@ -1858,7 +1885,27 @@ function loadWANLinks() {
     });
   } catch (e) {}
 }
-function saveWANLinks() {
+async function loadWANLinks() {
+  const dbOk = await loadWANLinksFromDb();
+  if (!dbOk) loadWANLinksFromLocal(); // fallback
+}
+async function saveWANLinkToDb(fromRouter, toRouter, extras) {
+  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+  try {
+    const res = await fetch(base + "/wan-links", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromRouter, toRouter, ...extras })
+    });
+    if (res.ok) { const j = await res.json(); return j.id || null; }
+  } catch (e) {}
+  return null;
+}
+async function deleteWANLinkFromDb(dbId) {
+  if (!dbId) return;
+  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+  try { await fetch(base + "/wan-links/" + encodeURIComponent(dbId), { method: "DELETE" }); } catch (e) {}
+}
+function saveWANLinksToLocal() {
   const data = edges.filter(e => e.kind === "wan").map(e => ({
     from: nodeMap[e.a] ? nodeMap[e.a].name : e.a,
     to: nodeMap[e.b] ? nodeMap[e.b].name : e.b,
@@ -1910,8 +1957,12 @@ function renderWANLinkList() {
     const a = btn.dataset.a, b = btn.dataset.b;
     const key = [a, b].sort().join("|") + "::wan";
     const idx = edges.findIndex(e => [e.a, e.b].sort().join("|") + "::" + e.kind === key);
-    if (idx >= 0) edges.splice(idx, 1);
-    saveWANLinks();
+    if (idx >= 0) {
+      const e = edges[idx];
+      if (e.dbId) deleteWANLinkFromDb(e.dbId); // delete from SQLite
+      edges.splice(idx, 1);
+    }
+    saveWANLinksToLocal();
     renderWANLinkList();
     render();
   }));
@@ -1930,6 +1981,8 @@ function saveWANLink() {
   const fromRouter = document.getElementById("wan-from-router").value.trim();
   const toRouter = document.getElementById("wan-to-router").value.trim();
   const label = document.getElementById("wan-label").value.trim();
+  const bandwidth = document.getElementById("wan-bandwidth").value.trim();
+  const port = document.getElementById("wan-port").value.trim();
   if (!fromRouter || !toRouter) { alert("Router source dan destination wajib diisi."); return; }
   ensureNode(fromRouter, { type: "router" });
   ensureNode(toRouter, { type: "router" });
@@ -1937,8 +1990,17 @@ function saveWANLink() {
   const rA = nodeMap[slugKey(fromRouter)], rB = nodeMap[slugKey(toRouter)];
   if (rA && fromSite && !rA.site) { const rk = Array.isArray(RACKS) ? RACKS.find(r => r.site === fromSite) : null; rA.site = fromSite; rA.siteName = rk ? rk.siteName : fromSite; }
   if (rB && toSite && !rB.site) { const rk = Array.isArray(RACKS) ? RACKS.find(r => r.site === toSite) : null; rB.site = toSite; rB.siteName = rk ? rk.siteName : toSite; }
-  addEdge(fromRouter, toRouter, "wan", { label: label || (fromRouter + " → " + toRouter), bandwidth: document.getElementById("wan-bandwidth").value.trim(), port: document.getElementById("wan-port").value.trim() });
-  saveWANLinks();
+  const extras = { fromSite, toSite, label: label || (fromRouter + " → " + toRouter), bandwidth, port };
+  addEdge(fromRouter, toRouter, "wan", extras);
+  // save to SQLite (async, fire-and-forget)
+  saveWANLinkToDb(fromRouter, toRouter, extras).then(dbId => {
+    if (dbId) {
+      // attach dbId to the edge for delete
+      const lastEdge = edges[edges.length - 1];
+      if (lastEdge && lastEdge.kind === "wan") lastEdge.dbId = dbId;
+    }
+  });
+  saveWANLinksToLocal();
   // clear form
   ["wan-from-site", "wan-to-site", "wan-from-router", "wan-to-router", "wan-label", "wan-bandwidth", "wan-port"].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = "";
