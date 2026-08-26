@@ -121,6 +121,11 @@
         <div class="stat-value" id="st-asn">0</div>
         <div class="stat-sub">Autonomous System Numbers</div>
       </div>
+      <div class="card stat-card">
+        <div class="stat-top"><span class="stat-label">BGP Sessions</span><div class="stat-icon" style="background:rgba(147,51,234,.12);color:#c084fc;"><i class="fa-solid fa-route"></i></div></div>
+        <div class="stat-value" id="st-bgp">0</div>
+        <div class="stat-sub" id="st-bgp-sub">—</div>
+      </div>
     </div>
 
     <!-- Filters -->
@@ -139,6 +144,13 @@
         <option value="provisioning">Provisioning</option>
         <option value="suspended">Suspended</option>
         <option value="decommissioned">Decommissioned</option>
+      </select>
+      <select class="form-input" style="width:auto;" id="f-bgp">
+        <option value="all">Semua BGP</option>
+        <option value="established">Established</option>
+        <option value="active">Negotiating</option>
+        <option value="idle">Idle</option>
+        <option value="none">No Sessions</option>
       </select>
       <button type="button" class="btn primary" id="btn-add-isp" style="margin-left:auto;"><i class="fa-solid fa-plus"></i> Tambah ISP</button>
     </div>
@@ -161,6 +173,8 @@
               <tr>
                 <th>ISP Name</th>
                 <th>ASN</th>
+                <th>Connected Routers</th>
+                <th>BGP Status</th>
                 <th>Bandwidth</th>
                 <th>IP Ranges</th>
                 <th>Contract</th>
@@ -253,6 +267,7 @@
 <script>if(typeof authGuard==="function") authGuard();</script>
 <script src="js/keys.js"></script>
 <script src="js/api.js"></script>
+<script src="js/rack-data.js"></script>
 <script src="js/port-data.js"></script>
 <script src="js/port-map.js"></script>
 <script src="js/isp-list.js"></script>

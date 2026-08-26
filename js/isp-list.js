@@ -20,6 +20,48 @@
   let currentPage = 1;
   let selectedKey = null;
   let ispRecords = []; // [{deviceKey, ...data}]
+  const BGP_CACHE = {};  // key → [{router, localAsn, remoteAsn, prefixAdv, prefixRecv, port, ip}]
+  const PORT_MAP_KEY = "rv_port_maps";
+
+  function buildBgpCache() {
+    BGP_CACHE.__loaded = true;
+    try {
+      const pm = JSON.parse(localStorage.getItem(PORT_MAP_KEY) || "{}");
+      Object.entries(pm).forEach(([devKey, map]) => {
+        if (!map || !Array.isArray(map.rows)) return;
+        map.rows.forEach(row => {
+          const connTo = row.connectedTo || "";
+          const connType = row.connType || "";
+          const ispKey = connTo.startsWith("ISP-") || connType === "isp" ? connTo : "";
+          if (!ispKey) return;
+          const key = canonKey(ispKey);
+          (BGP_CACHE[key] = BGP_CACHE[key] || []).push({
+            router: devKey,
+            localAsn: row.bgpLocalAsn || "",
+            remoteAsn: row.bgpRemoteAsn || "",
+            prefixAdv: row.bgpPrefixAdvertised || "",
+            prefixRecv: row.bgpPrefixReceived || "",
+            port: row.port || "",
+            ip: row.ip || "",
+          });
+        });
+      });
+    } catch (e) {}
+  }
+
+  function getBgpSessions(isp) {
+    if (!BGP_CACHE.__loaded) buildBgpCache();
+    const key = canonKey(isp.name);
+    return BGP_CACHE[key] || [];
+  }
+
+  function bgpStatus(sessions) {
+    if (!sessions.length) return "none";
+    const hasLocal = sessions.some(s => s.localAsn && s.remoteAsn);
+    if (hasLocal) return "established";
+    const hasPartial = sessions.some(s => s.localAsn || s.remoteAsn);
+    return hasPartial ? "active" : "idle";
+  }
 
   /* ---- helpers ---- */
   function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -84,6 +126,7 @@
   const ISP_SECTIONS = [
     { title: "Identitas Provider", icon: "fa-cloud", fields: [
       ["ispName", "ISP Name"], ["asn", "ASN"], ["company", "Company / Legal Name"], ["website", "Website"],
+      ["site", "Site / DC"], ["popLocation", "POP / Peering Location"], ["status", "Status"],
     ]},
     { title: "Layanan & Bandwidth", icon: "fa-gauge-high", fields: [
       ["serviceType", "Service Type"], ["bandwidthDown", "Bandwidth Down"], ["bandwidthUp", "Bandwidth Up"],
@@ -94,7 +137,7 @@
       ["publicIp", "Public IP (Router-facing)"], ["dnsPrimary", "DNS Primary"], ["dnsSecondary", "DNS Secondary"],
     ]},
     { title: "Connectivity", icon: "fa-plug", fields: [
-      ["handoffType", "Handoff Type"], ["interfaceType", "Interface Type"], ["popLocation", "POP / Peering Location"],
+      ["handoffType", "Handoff Type"], ["interfaceType", "Interface Type"],
       ["physicalPath", "Physical Path (Redundancy)"], ["portSpeed", "Port Speed"],
     ]},
     { title: "Routing & BGP", icon: "fa-route", fields: [
@@ -124,21 +167,40 @@
     const active = ispRecords.filter(r => (r.status || "active").toLowerCase() === "active").length;
     const backup = ispRecords.filter(r => (r.redundancyType || "").toLowerCase().includes("backup")).length;
     const asnCount = new Set(ispRecords.map(r => r.asn).filter(Boolean)).size;
-    const popCount = new Set(ispRecords.map(r => r.popLocation).filter(Boolean)).size;
     document.getElementById("st-total").textContent = total;
     document.getElementById("st-active").textContent = active;
     document.getElementById("st-backup").textContent = backup;
     const elAsn = document.getElementById("st-asn");
     if (elAsn) elAsn.textContent = asnCount;
-    document.getElementById("st-total-sub").textContent = `${asnCount} ASN · ${popCount} POP`;
+    document.getElementById("st-total-sub").textContent = `${asnCount} ASN · ${new Set(ispRecords.map(r => r.popLocation).filter(Boolean)).size} POP`;
+    // BGP sessions stat
+    let bgpEst = 0, bgpPartial = 0;
+    ispRecords.forEach(r => {
+      const s = getBgpSessions(r);
+      const st = bgpStatus(s);
+      if (st === "established") bgpEst++;
+      else if (st === "active") bgpPartial++;
+    });
+    const elBgp = document.getElementById("st-bgp");
+    if (elBgp) elBgp.textContent = bgpEst + bgpPartial;
+    const elBgpSub = document.getElementById("st-bgp-sub");
+    if (elBgpSub) elBgpSub.textContent = `${bgpEst} established · ${bgpPartial} negotiating`;
   }
+
+  const fBgp = document.getElementById("f-bgp");
 
   function matchFilters(r) {
     const q = (searchEl ? searchEl.value : "").trim().toLowerCase();
     const site = fSite ? fSite.value : "all";
     const status = fStatus ? fStatus.value : "all";
+    const bgpFilter = fBgp ? fBgp.value : "all";
     if (site !== "all" && (r.site || "all") !== site) return false;
     if (status !== "all" && (r.status || "active").toLowerCase() !== status) return false;
+    if (bgpFilter !== "all") {
+      const sessions = getBgpSessions(r);
+      const st = bgpStatus(sessions);
+      if (st !== bgpFilter) return false;
+    }
     if (q) {
       const hay = [r.name, r.ispName, r.asn, r.ipRanges, r.contractNo, r.slaUptime, r.popLocation, r.company, ...(r.tags || [])].join(" ").toLowerCase();
       if (!hay.includes(q)) return false;
@@ -186,14 +248,24 @@
     if (countText) countText.textContent = list.length ? `Menampilkan ${from}–${to} dari ${list.length} ISP` : "Menampilkan 0 ISP";
     renderPagination(list.length);
     if (!list.length) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:28px;">Tidak ada ISP yang cocok dengan filter.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:28px;">Tidak ada ISP yang cocok dengan filter.</td></tr>`;
       return;
     }
     tbody.innerHTML = pageList.map(r => {
       const active = canonKey(r.name) === selectedKey;
+      const bgpSessions = getBgpSessions(r);
+      const bgpSt = bgpStatus(bgpSessions);
+      const bgpBadge = bgpSt === "established"
+        ? `<span class="badge bgp-established"><span class="bdot"></span>Established</span>`
+        : bgpSt === "active"
+          ? `<span class="badge bgp-active"><span class="bdot"></span>Negotiating</span>`
+          : `<span class="badge bgp-idle"><span class="bdot"></span>${bgpSessions.length ? "Idle" : "No Sessions"}</span>`;
+      const connRouters = bgpSessions.length ? bgpSessions.slice(0, 3).map(s => s.router).join(", ") + (bgpSessions.length > 3 ? ` +${bgpSessions.length - 3}` : "") : "—";
       return `<tr data-key="${esc(r.name)}" class="${active ? "row-selected" : ""}">
         <td><div class="strong">${esc(r.ispName || r.name)}</div><div class="mono" style="font-size:11px;">${esc(r.company || "—")}</div></td>
         <td class="mono">${esc(r.asn || "—")}</td>
+        <td class="mono" style="font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(bgpSessions.map(s=>s.router).join(", "))}">${esc(connRouters || "—")}</td>
+        <td>${bgpBadge}</td>
         <td>${esc(r.bandwidthDown || r.bandwidth || "—")}</td>
         <td class="mono" style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.ipRanges || "")}">${esc(r.ipRanges || "—")}</td>
         <td>${esc(r.contractNo || "—")}</td>
@@ -233,6 +305,24 @@
     if (r.notes) {
       html += `<div style="margin-top:8px;"><div style="font-size:11.5px;font-weight:600;color:var(--text-secondary);margin-bottom:4px;">Notes</div><div style="font-size:13px;color:var(--text-primary);white-space:pre-wrap;">${esc(r.notes)}</div></div>`;
     }
+    // BGP sessions
+    const sessions = getBgpSessions(r);
+    if (sessions.length) {
+      const st = bgpStatus(sessions);
+      const statusClass = st === "established" ? "bgp-established" : st === "active" ? "bgp-active" : "bgp-idle";
+      html += `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft);">
+        <div style="font-size:11.5px;font-weight:600;color:var(--accent-text);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;"><i class="fa-solid fa-route"></i> BGP Sessions (${sessions.length})</div>
+        <div style="margin-bottom:8px;">
+          <span class="badge ${statusClass}"><span class="bdot"></span>${st === "established" ? "Established" : st === "active" ? "Negotiating" : "Idle"}</span>
+        </div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          <thead><tr style="border-bottom:1px solid var(--border-soft);"><th style="text-align:left;padding:4px 0;">Router</th><th style="text-align:left;padding:4px 0;">Local ASN</th><th style="text-align:left;padding:4px 0;">Remote ASN</th><th style="text-align:left;padding:4px 0;">Prefixes</th><th style="text-align:left;padding:4px 0;">Port</th></tr></thead>
+          <tbody>
+          ${sessions.map(s => `<tr style="border-bottom:1px solid var(--border-soft);"><td class="mono" style="padding:4px 0;">${esc(s.router)}</td><td class="mono" style="padding:4px 0;">${esc(s.localAsn || "—")}</td><td class="mono" style="padding:4px 0;">${esc(s.remoteAsn || "—")}</td><td style="padding:4px 0;font-size:11px;">Adv: ${esc(s.prefixAdv || "—")}<br>Recv: ${esc(s.prefixRecv || "—")}</td><td class="mono" style="padding:4px 0;">${esc(s.port || "—")}</td></tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    }
     detailBody.innerHTML = html;
   }
 
@@ -242,8 +332,11 @@
     const r = ispRecords.find(x => canonKey(x.name) === selectedKey);
     if (!r) { ctxBar.hidden = true; return; }
     ctxBar.hidden = false;
-    const name = esc(r.ispName || r.name);
+    const sessions = getBgpSessions(r);
+    const bgpSt = bgpStatus(sessions);
+    const bgpLabel = sessions.length ? `${sessions.length} BGP · ${bgpSt}` : "No BGP sessions";
     ctxBar.innerHTML = `<div class="ctx-bar-info"><i class="fa-solid fa-caret-right"></i> <b>${name}</b></div>
+      <div class="ctx-bar-bgp" style="margin-right:12px;"><span class="badge ${(bgpSt === "established" ? "bgp-established" : bgpSt === "active" ? "bgp-active" : "bgp-idle")}" style="font-size:11px;"><span class="bdot"></span>${esc(bgpLabel)}</span></div>
       <div class="ctx-bar-actions">
         <button type="button" class="ctx-btn" data-ctx="view"><i class="fa-solid fa-eye"></i> Lihat</button>
         <button type="button" class="ctx-btn" data-ctx="edit"><i class="fa-solid fa-pen"></i> Edit</button>
@@ -286,6 +379,21 @@
       html += `</div>`;
     });
     if (r.notes) html += `<div style="margin-top:8px;font-size:13px;white-space:pre-wrap;">${esc(r.notes)}</div>`;
+
+    // BGP sessions in view modal
+    const sessions = getBgpSessions(r);
+    if (sessions.length) {
+      const st = bgpStatus(sessions);
+      html += `<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-soft);">
+        <div style="font-size:11.5px;font-weight:600;color:var(--accent-text);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px;"><i class="fa-solid fa-route"></i> BGP Sessions (${sessions.length})</div>
+        <table style="width:100%;font-size:12px;border-collapse:collapse;">
+          <tbody>
+          ${sessions.map(s => `<tr><td class="mono" style="padding:4px 0;min-width:120px;">${esc(s.router)}</td><td style="padding:4px 0;font-size:11px;">ASN ${esc(s.localAsn || "—")} ↔ ${esc(s.remoteAsn || "—")} · Port ${esc(s.port || "—")}</td></tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    }
+
     body.innerHTML = html;
     const editBtn = document.getElementById("isp-view-edit-btn");
     if (editBtn) editBtn.onclick = () => { closeView(); openEditISP(r); };
@@ -294,6 +402,22 @@
   function closeView() { const o = document.getElementById("isp-view-overlay"); if (o) o.classList.remove("open"); }
 
   /* ---- Add / Edit modal ---- */
+  function buildSiteOptions(current) {
+    const sites = typeof RACK_SITES !== "undefined" ? RACK_SITES : [
+      { id: "DC1", name: "DC1 — Cilandak" },
+      { id: "DC2", name: "DC2 — Cikupa" },
+      { id: "DC3", name: "DC3 — Surabaya" },
+      { id: "DC4", name: "DC4 — Bandung" },
+    ];
+    const arr = Array.isArray(sites) ? sites : [];
+    return arr.map(s => {
+      const id = s.id || s.siteId || s.code || "";
+      const name = s.name || (s.siteName ? s.siteName : (s.id || ""));
+      const selected = current && (String(current).toLowerCase() === String(id).toLowerCase() || String(current).toLowerCase() === String(name).toLowerCase());
+      return `<option value="${esc(id)}" ${selected ? "selected" : ""}>${esc(name)}</option>`;
+    }).join("") || `<option value="DC1"${current === "DC1" ? " selected" : ""}>DC1 — Cilandak</option><option value="DC2" ${current === "DC2" ? " selected" : ""}>DC2 — Cikupa</option>`;
+  }
+
   function buildFormHTML(prefix, r) {
     const p = prefix || "";
     let html = "";
@@ -305,7 +429,13 @@
         const val = r ? esc(r[k] || "") : "";
         const isTextarea = ["notes", "bgpPrefixAdv", "bgpPrefixRecv", "physicalPath", "penaltyClause"].includes(k);
         const isSelect = ["serviceType", "handoffType", "interfaceType", "routingProtocol", "routeType", "redundancyType", "failoverMethod", "status"].includes(k);
-        if (isSelect) {
+        const isSite = k === "site";
+        if (isSite) {
+          html += `<div class="m-field"><label class="form-label">${esc(label)}</label><select class="form-input" data-isp="${k}">
+            <option value="">Pilih site…</option>
+            ${buildSiteOptions(r ? r[k] : "")}
+          </select></div>`;
+        } else if (isSelect) {
           const opts = getSelectOptions(k, r ? r[k] : "");
           html += `<div class="m-field"><label class="form-label">${esc(label)}</label><select class="form-input" data-isp="${k}">${opts}</select></div>`;
         } else if (isTextarea) {
@@ -350,6 +480,8 @@
     const title = document.getElementById("isp-form-title");
     if (!body || !overlay) return;
     title.textContent = "Add ISP";
+    document.getElementById("isp-name-input").value = "";
+    document.getElementById("isp-name-input").readOnly = false;
     body.innerHTML = buildFormHTML("add-", null) + `
       <div class="m-field" style="margin-top:12px;">
         <label class="form-label">Tags</label>
@@ -358,9 +490,15 @@
           <div class="chip" data-tag="backup">backup</div>
           <div class="chip" data-tag="primary">primary</div>
           <div class="chip" data-tag="redundancy">redundancy</div>
-          <button class="chip chip-add" type="button" data-add-chip><i class="fa-solid fa-plus"></i></button>
+          <button class="chip chip-add" type="button" data-add-chip"><i class="fa-solid fa-plus"></i></button>
+        </div>
+        <div class="chip-add-row" data-add-row style="display:none;">
+          <input class="form-input" type="text" data-add-input placeholder="Tag lain, mis. critical">
+          <button class="btn primary btn-sm" type="button" data-add-confirm"><i class="fa-solid fa-check"></i></button>
+          <button class="btn ghost btn-sm" type="button" data-add-cancel"><i class="fa-solid fa-xmark"></i></button>
         </div>
       </div>`;
+    delete body.dataset.editKey;
     overlay.classList.add("open");
     wireTagPicker(document.getElementById("isp-tag-picker"));
   }
@@ -371,9 +509,23 @@
     const title = document.getElementById("isp-form-title");
     if (!body || !overlay) return;
     title.textContent = "Edit ISP";
-    body.innerHTML = buildFormHTML("edit-", r);
+    document.getElementById("isp-name-input").value = r.name || "";
+    document.getElementById("isp-name-input").readOnly = true;
+    body.innerHTML = buildFormHTML("edit-", r) + `
+      <div class="m-field" style="margin-top:12px;">
+        <label class="form-label">Tags</label>
+        <div class="tag-picker" id="isp-tag-picker">${(r.tags || []).map(t => `<div class="chip active" data-tag="${esc(t)}">${esc(t)}</div>`).join("")}
+          <button class="chip chip-add" type="button" data-add-chip"><i class="fa-solid fa-plus"></i></button>
+        </div>
+        <div class="chip-add-row" data-add-row style="display:none;">
+          <input class="form-input" type="text" data-add-input placeholder="Tag lain, mis. critical">
+          <button class="btn primary btn-sm" type="button" data-add-confirm"><i class="fa-solid fa-check"></i></button>
+          <button class="btn ghost btn-sm" type="button" data-add-cancel"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>`;
     body.dataset.editKey = r.name;
     overlay.classList.add("open");
+    wireTagPicker(document.getElementById("isp-tag-picker"));
   }
 
   function closeForm() { const o = document.getElementById("isp-form-overlay"); if (o) o.classList.remove("open"); }
@@ -487,6 +639,7 @@
         if (!dbKeys.has(canonKey(a.name))) ispRecords.unshift(a);
       });
     } catch (e) {}
+    buildBgpCache();
     render();
   }
 
@@ -494,6 +647,7 @@
   if (searchEl) searchEl.addEventListener("input", () => { currentPage = 1; renderRows(); });
   if (fSite) fSite.addEventListener("change", () => { currentPage = 1; renderRows(); });
   if (fStatus) fStatus.addEventListener("change", () => { currentPage = 1; renderRows(); });
+  if (fBgp) fBgp.addEventListener("change", () => { currentPage = 1; renderRows(); });
 
   // Add button
   const btnAdd = document.getElementById("btn-add-isp");
