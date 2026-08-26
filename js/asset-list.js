@@ -77,6 +77,7 @@ toggleServerSection();
 const TYPE_TO_OPTION = {
   server: "Server", switch: "Switch", pdu: "PDU", firewall: "Firewall",
   router: "Router", ids: "IDS/IPS", lb: "Load Balancer", patch: "Patch Panel", ups: "UPS", storage: "Storage",
+  isp: "ISP",
   "kvm-switch": "KVM Switch", "cable-management": "Cable Management",
   "cooling-fan": "Cooling Fan", "blanking-panel": "Blanking Panel",
   "monitoring-sensor": "Monitoring Sensor", custom: "Custom"
@@ -85,6 +86,7 @@ const OPTION_TO_TYPE = Object.fromEntries(Object.entries(TYPE_TO_OPTION).map(([k
 const TYPE_LABELS = {
   server: "Server", switch: "Network Switch", pdu: "Rack PDU", firewall: "Firewall",
   router: "Router", ids: "IDS/IPS", lb: "Load Balancer", patch: "Patch Panel", ups: "UPS", storage: "Storage",
+  isp: "ISP",
   "kvm-switch": "KVM Switch", "cable-management": "Cable Management",
   "cooling-fan": "Cooling Fan", "blanking-panel": "Blanking Panel",
   "monitoring-sensor": "Monitoring Sensor", custom: "Custom"
@@ -127,7 +129,7 @@ const NF_LABELS = {
   psuCount: "PSU", psuWatt: "Watt", powerRedundancy: "Power Redundancy",
   tahunPembelian: "Tahun Pembelian", warranty: "Warranty", monitoring: "Monitoring",
 };
-const ASSET_PORT_MAP_TYPES = ["switch", "server", "firewall", "router", "ids", "lb", "patch", "ups", "storage"];
+const ASSET_PORT_MAP_TYPES = ["switch", "server", "firewall", "router", "ids", "lb", "patch", "ups", "storage", "isp"];
 // Opsi Peran/Segmentasi per tipe (selaras baris layer Network Topology utk switch)
 const ROLE_OPTIONS = {
   switch: ["Core", "Distribution", "Access", "Management"],
@@ -138,13 +140,15 @@ const ROLE_OPTIONS = {
 };
 const networkSection = document.getElementById("network-section");
 const upsSection = document.getElementById("ups-section");
-function nfContainers() { return [networkSection, upsSection].filter(Boolean); }
+const ispSection = document.getElementById("isp-section");
+function nfContainers() { return [networkSection, upsSection, ispSection].filter(Boolean); }
 
 function toggleNetworkSection() {
   const typeKey = OPTION_TO_TYPE[assetTypeSelect.value] || "";
   const isNet = NETWORK_TYPES.includes(typeKey);
   if (networkSection) networkSection.style.display = isNet ? "" : "none";
   if (upsSection) upsSection.style.display = typeKey === "ups" ? "" : "none";
+  if (ispSection) ispSection.style.display = typeKey === "isp" ? "" : "none";
   document.querySelectorAll("[data-nf-switch-only]").forEach(el => { el.style.display = typeKey === "switch" ? "" : "none"; });
   document.querySelectorAll("[data-nf-fw-only]").forEach(el => { el.style.display = typeKey === "firewall" ? "" : "none"; });
   document.querySelectorAll("[data-nf-router-only]").forEach(el => { el.style.display = typeKey === "router" ? "" : "none"; });
@@ -193,7 +197,7 @@ applyModalTypeScope();
 
 function collectNetworkFields() {
   const typeKey = OPTION_TO_TYPE[assetTypeSelect.value] || "";
-  if (!NETWORK_TYPES.includes(typeKey) && typeKey !== "ups") return {};
+  if (!NETWORK_TYPES.includes(typeKey) && typeKey !== "ups" && typeKey !== "isp") return {};
   const out = {};
   nfContainers().forEach(sec => {
     sec.querySelectorAll("[data-nf]").forEach(el => {
@@ -255,6 +259,14 @@ function assetDevImgProbe(imgEl, name, type, image, view) {
 
 function networkSpecSummary(rec) {
   if (!rec) return "—";
+  if (rec.type === "isp") {
+    const parts = [];
+    if (rec.asn) parts.push(rec.asn);
+    if (rec.bandwidth) parts.push(rec.bandwidth);
+    if (rec.ipRanges) parts.push(rec.ipRanges);
+    if (rec.sla) parts.push(rec.sla);
+    return parts.join(" · ") || "—";
+  }
   const n = x => parseInt(x, 10) || 0;
   const ports = [];
   if (n(rec.lanRj45)) ports.push(n(rec.lanRj45) + " RJ45");
@@ -445,7 +457,7 @@ function renderSavedSwitches() {
 // ---- Asset aksesori (KVM Switch, Patch Panel, Cable Management, Cooling Fan, dll) ----
 // Aksesoris rack murni (semantik menu Accessories) vs jalur simpan teknis.
 const RACK_ACCESSORY_TYPES = ["kvm-switch", "patch", "cable-management", "cooling-fan", "blanking-panel", "monitoring-sensor"];
-const ASSET_SAVE_TYPES = [...RACK_ACCESSORY_TYPES, "firewall", "router", "ids", "lb", "ups", "pdu", "storage", "custom"];
+const ASSET_SAVE_TYPES = [...RACK_ACCESSORY_TYPES, "firewall", "router", "ids", "lb", "ups", "pdu", "storage", "isp", "custom"];
 
 function readLocalAccessories() {
   try {
@@ -547,7 +559,7 @@ function saveAccessoryAsset() {
     if (typeof savePowerMap === "function") savePowerMap(a.name);
   }
   saveLocalAccessory(a);
-  if ((["switch", "firewall", "router", "ids", "lb"].includes(a.type) || a.type === "ups") && typeof apiSaveDevice === "function") {
+  if ((["switch", "firewall", "router", "ids", "lb"].includes(a.type) || a.type === "ups" || a.type === "isp") && typeof apiSaveDevice === "function") {
     apiSaveDevice({ deviceKey: a.name, type: a.type, name: a.name, data: a });
   }
   addAccessoryRow(a);
@@ -610,7 +622,7 @@ function deleteAssetRow(tr) {
   });
   if (typeof PORT_DATA !== "undefined") delete PORT_DATA[a.name];
   if (typeof POWER_DATA !== "undefined") delete POWER_DATA[a.name];
-  if (NETWORK_TYPES.includes(type) || type === "ups") {
+  if (NETWORK_TYPES.includes(type) || type === "ups" || type === "isp") {
     if (typeof apiDeleteDevice === "function") apiDeleteDevice(a.name);
   } else {
     if (typeof apiDeleteMap === "function") apiDeleteMap("port", a.name);
@@ -1481,7 +1493,7 @@ async function hydrateDevicesFromDb() {
   for (const d of list) {
     const key = canonKey(d.deviceKey || d.name || "");
     const type = String(d.type || "").toLowerCase();
-    if (!key || (!NETWORK_TYPES.includes(type) && type !== "ups")) continue;
+    if (!key || (!NETWORK_TYPES.includes(type) && type !== "ups" && type !== "isp")) continue;
     let data = {};
     try { data = typeof d.data === "string" ? (JSON.parse(d.data) || {}) : (d.data || {}); } catch (e) { data = {}; }
     const rec = { ...data, name: key, type };
@@ -1525,13 +1537,13 @@ async function hydrateDevicesFromDb() {
   clearAssetDetail();
   for (let i = allRows.length - 1; i >= 0; i--) {
     const tr = allRows[i];
-    if (!NETWORK_TYPES.includes(tr.dataset.type) && tr.dataset.type !== "ups") continue;
+    if (!NETWORK_TYPES.includes(tr.dataset.type) && tr.dataset.type !== "ups" && tr.dataset.type !== "isp") continue;
     tr.remove();
     allRows.splice(i, 1);
   }
   const dbKeys = new Set(dbRecs.map(x => x.key));
   const inScope = t => (scope ? scope.includes(t) : true);
-  const localOnlyAccs = accs.filter(a => !dbKeys.has(canonKey(a.name)) && NETWORK_TYPES.includes(a.type) && inScope(a.type));
+  const localOnlyAccs = accs.filter(a => !dbKeys.has(canonKey(a.name)) && (NETWORK_TYPES.includes(a.type) || a.type === "isp") && inScope(a.type));
   const localOnlySwitches = switches.filter(s => !dbKeys.has(canonKey(s.name)) && inScope("switch"));
   dbRecs.forEach(x => { if (!scope || scope.includes(x.type)) addAccessoryRow(x.rec); });
   localOnlyAccs.forEach(a => addAccessoryRow({ ...a }));

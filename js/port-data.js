@@ -791,5 +791,76 @@ function setDevicePsuCount(deviceKey, count) {
   openPowerMap(deviceKey, false, v);
 }
 
-    
+// ---- Detect ISP edges from port map data ----
+// Returns array of edge objects for topology rendering:
+// [{ from: "RT-EDGE-01", to: "ISP-TELKOM-01", type: "isp", label: "Eth1/1 ↔ ISP-TELKOM-01",
+//    bgp: { localAsn, remoteAsn, prefixAdvertised, prefixReceived } }]
+function detectISPEdges(portData) {
+  const edges = [];
+  const pd = portData || (typeof PORT_DATA !== "undefined" ? PORT_DATA : {});
+  Object.entries(pd).forEach(([deviceKey, map]) => {
+    if (!map || !Array.isArray(map.rows)) return;
+    map.rows.forEach(row => {
+      const connTo = row.connectedTo || "";
+      const connType = row.connType || "";
+      if (!connTo && connType !== "isp") return;
+      // ISP connection: connectedTo starts with "ISP-" or connType === "isp"
+      if (connTo.startsWith("ISP-") || connType === "isp") {
+        const bgp = {};
+        if (row.bgpLocalAsn) bgp.localAsn = row.bgpLocalAsn;
+        if (row.bgpRemoteAsn) bgp.remoteAsn = row.bgpRemoteAsn;
+        if (row.bgpPrefixAdvertised) bgp.prefixAdvertised = row.bgpPrefixAdvertised;
+        if (row.bgpPrefixReceived) bgp.prefixReceived = row.bgpPrefixReceived;
+        edges.push({
+          from: deviceKey,
+          to: connTo,
+          type: "isp",
+          label: `${row.port || ""} ↔ ${connTo}`,
+          port: row.port,
+          ip: row.ip,
+          bgp,
+        });
+      }
+    });
+  });
+  return edges;
+}
+
+// ---- Detect WAN links from port map data ----
+// Returns array of edge objects for cross-site connectivity:
+// [{ from: "RT-EDGE-01", to: "RT-EDGE-02", type: "wan", label: "WAN DC1→DC2" }]
+function detectWANEdges(portData) {
+  const edges = [];
+  const pd = portData || (typeof PORT_DATA !== "undefined" ? PORT_DATA : {});
+  Object.entries(pd).forEach(([deviceKey, map]) => {
+    if (!map || !Array.isArray(map.rows)) return;
+    map.rows.forEach(row => {
+      if ((row.connType || "") === "wan" && row.connectedTo) {
+        edges.push({
+          from: deviceKey,
+          to: row.connectedTo,
+          type: "wan",
+          label: row.label || `${row.port || ""} ↔ ${row.connectedTo}`,
+          ip: row.ip,
+        });
+      }
+    });
+  });
+  return edges;
+}
+
+// ---- Collect all ISP device keys from devices table ----
+async function collectISPDeviceKeys() {
+  if (typeof fetch !== "function") return [];
+  const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+  try {
+    const res = await fetch(base + "/devices");
+    if (!res.ok) return [];
+    const list = await res.json();
+    if (!Array.isArray(list)) return [];
+    return list.filter(d => String(d.type || "").toLowerCase() === "isp")
+      .map(d => canonKey(d.deviceKey || d.name || ""));
+  } catch (e) { return []; }
+}
+
 

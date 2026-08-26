@@ -8,6 +8,7 @@ const typeMeta = {
   ids:      { label: "IDS/IPS",     badgeBg: "rgba(236,72,153,0.14)", badgeColor: "#EC4899" },
   lb:       { label: "Load Balancer", badgeBg: "rgba(20,184,166,0.14)", badgeColor: "#14B8A6" },
   patch:    { label: "Patch Panel", badgeBg: "var(--bg-surface-3)",badgeColor: "var(--text-secondary)" },
+  isp:      { label: "ISP", badgeBg: "rgba(239,68,68,0.14)", badgeColor: "#EF4444" },
 };
 
 // ---- generate layout deterministik untuk rack selain R1-A12 ----

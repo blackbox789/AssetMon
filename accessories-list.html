@@ -52,6 +52,10 @@
         <a href="pdu-list.html" class="nav-subitem"><i class="fa-solid fa-bolt"></i><span>PDU</span></a>
         <a href="cable-registry.html" class="nav-subitem"><i class="fa-solid fa-tag"></i><span>Cable Registry</span></a>
       </div>
+      <div class="nav-submenu" id="submenu-external">
+        <div class="nav-label" style="padding-left:12px;">External</div>
+        <a href="isp-list.html" class="nav-subitem" data-type="isp"><i class="fa-solid fa-cloud"></i><span>ISP</span></a>
+      </div>
       <a href="#" class="nav-item"><i class="fa-solid fa-magnifying-glass"></i><span>Discovery Center</span></a>
     </div>
     <div class="nav-group">
@@ -212,6 +216,7 @@
           <option value="Router">Router</option>
           <option value="IDS/IPS">IDS/IPS</option>
           <option value="Load Balancer">Load Balancer</option>
+          <option value="ISP">ISP</option>
           <option value="Patch Panel">Patch Panel</option>
           <option value="PDU">Rack PDU</option>
           <option value="UPS">UPS</option>
@@ -252,7 +257,37 @@
       </div>
 
 
-      <div id="ups-section" style="display:none;border-top:1px solid var(--border-soft);padding-top:16px;margin-top:6px;">
+      
+      <div id="isp-section" style="display:none;border-top:1px solid var(--border-soft);padding-top:16px;margin-top:6px;">
+        <div style="font-size:11.5px;font-weight:600;color:var(--accent-text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;"><i class="fa-solid fa-cloud"></i> ISP — Informasi Provider</div>
+        <div class="form-row">
+          <div class="m-field"><label class="form-label">ISP Name</label><input class="form-input" type="text" data-nf="ispName" placeholder="mis. Telkom Indonesia"></div>
+          <div class="m-field"><label class="form-label">ASN</label><input class="form-input mono" type="text" data-nf="asn" placeholder="mis. AS17974"></div>
+        </div>
+        <div class="form-row">
+          <div class="m-field"><label class="form-label">Bandwidth</label><input class="form-input" type="text" data-nf="bandwidth" placeholder="mis. 10 Gbps"></div>
+          <div class="m-field"><label class="form-label">IP Ranges (Public)</label><input class="form-input mono" type="text" data-nf="ipRanges" placeholder="mis. 203.0.113.0/24"></div>
+        </div>
+        <div class="form-row">
+          <div class="m-field"><label class="form-label">Public IP (Router-facing)</label><input class="form-input mono" type="text" data-nf="publicIp" placeholder="mis. 203.0.113.1"></div>
+          <div class="m-field"><label class="form-label">Peering Location</label><input class="form-input" type="text" data-nf="peeringLocation" placeholder="mis. Jakarta, GI-2"></div>
+        </div>
+        <div class="form-row">
+          <div class="m-field"><label class="form-label">Contract No</label><input class="form-input" type="text" data-nf="contract" placeholder="mis. TLK-2026-001"></div>
+          <div class="m-field"><label class="form-label">SLA</label><input class="form-input" type="text" data-nf="sla" placeholder="mis. 99.9% uptime"></div>
+        </div>
+        <div class="form-row">
+          <div class="m-field"><label class="form-label">NOC Phone</label><input class="form-input" type="text" data-nf="nocPhone" placeholder="mis. +62-21-5555-1234"></div>
+          <div class="m-field"><label class="form-label">NOC Email</label><input class="form-input" type="text" data-nf="nocEmail" placeholder="mis. noc@telkom.co.id"></div>
+        </div>
+        <div class="form-row">
+          <div class="m-field"><label class="form-label">BGP Local ASN</label><input class="form-input mono" type="text" data-nf="bgpLocal" placeholder="mis. 65001"></div>
+          <div class="m-field"><label class="form-label">Routing Protocol</label><input class="form-input" type="text" data-nf="routing" placeholder="mis. BGP, Static"></div>
+        </div>
+        <div class="m-field"><label class="form-label">Notes</label><input class="form-input" type="text" data-nf="notes" placeholder="Catatan tambahan"></div>
+      </div>
+
+<div id="ups-section" style="display:none;border-top:1px solid var(--border-soft);padding-top:16px;margin-top:6px;">
         <div style="font-size:11.5px;font-weight:600;color:var(--accent-text);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;"><i class="fa-solid fa-plug-circle-bolt"></i> UPS — Spesifikasi Daya</div>
         <div class="form-row">
           <div class="m-field"><label class="form-label">Kapasitas VA</label><input class="form-input" type="text" placeholder="mis. 3000 VA" data-nf="upsVA"></div>

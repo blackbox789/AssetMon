@@ -365,6 +365,26 @@ function ensurePortEditor() {
         <div style="margin-bottom:14px;"><label class="form-label">Port Tujuan</label><input class="form-input mono" type="text" id="portmap-port-destport" placeholder="mis. 3"></div>
         <div style="margin-bottom:14px;"><label class="form-label">Perangkat Tujuan</label><input class="form-input" type="text" id="portmap-port-dest" placeholder="mis. SW-ACC-03"></div>
         <div style="margin-bottom:14px;"><label class="form-label">IP Address</label><input class="form-input mono" type="text" id="portmap-port-ip" placeholder="mis. 10.10.99.14"></div>
+        <div style="margin-bottom:14px;"><label class="form-label">Tipe Koneksi</label>
+          <select class="form-input" id="portmap-port-conn-type">
+            <option value="">—</option>
+            <option value="access">Access</option>
+            <option value="trunk">Trunk</option>
+            <option value="uplink">Uplink</option>
+            <option value="isp">ISP Peering</option>
+            <option value="wan">WAN Link</option>
+            <option value="mgmt">Management</option>
+            <option value="console">Console</option>
+          </select>
+        </div>
+        <div style="margin-bottom:14px;"><label class="form-label">Connected To (ISP)</label>
+          <input class="form-input" type="text" id="portmap-port-conn-to" list="portmap-isp-datalist" placeholder="mis. ISP-TELKOM-01">
+          <datalist id="portmap-isp-datalist"></datalist>
+        </div>
+        <div style="margin-bottom:14px;"><label class="form-label">BGP Local ASN</label><input class="form-input mono" type="text" id="portmap-port-bgp-local" placeholder="mis. 65001"></div>
+        <div style="margin-bottom:14px;"><label class="form-label">BGP Remote ASN</label><input class="form-input mono" type="text" id="portmap-port-bgp-remote" placeholder="mis. 17974"></div>
+        <div style="margin-bottom:14px;"><label class="form-label">Prefix Advertised</label><input class="form-input mono" type="text" id="portmap-port-bgp-adv" placeholder="mis. 10.0.0.0/8"></div>
+        <div style="margin-bottom:14px;"><label class="form-label">Prefix Received</label><input class="form-input mono" type="text" id="portmap-port-bgp-recv" placeholder="mis. 0.0.0.0/0"></div>
       </div>
       <div class="modal-foot" style="justify-content:space-between;">
         <button class="btn ghost" id="portmap-port-delete" style="color:var(--danger);"><i class="fa-solid fa-trash"></i> Kosongkan Port</button>
@@ -395,6 +415,23 @@ function openPortEditor(portNo) {
   document.getElementById("portmap-port-destport").value = row?.destPort || "";
   document.getElementById("portmap-port-dest").value = row?.dest || "";
   document.getElementById("portmap-port-ip").value = row?.ip || "";
+  document.getElementById("portmap-port-conn-type").value = row?.connType || "";
+  document.getElementById("portmap-port-conn-to").value = row?.connectedTo || "";
+  document.getElementById("portmap-port-bgp-local").value = row?.bgpLocalAsn || "";
+  document.getElementById("portmap-port-bgp-remote").value = row?.bgpRemoteAsn || "";
+  document.getElementById("portmap-port-bgp-adv").value = row?.bgpPrefixAdvertised || "";
+  document.getElementById("portmap-port-bgp-recv").value = row?.bgpPrefixReceived || "";
+  /* populate ISP datalist from devices */
+  if (typeof fetch === "function") {
+    const base = typeof API_BASE !== "undefined" ? API_BASE : "/api";
+    fetch(base + "/devices").then(r => r.ok ? r.json() : []).then(list => {
+      const dl = document.getElementById("portmap-isp-datalist");
+      if (dl && Array.isArray(list)) {
+        dl.innerHTML = list.filter(d => String(d.type||"").toLowerCase() === "isp")
+          .map(d => `<option value="${escA(d.deviceKey || d.name || "")}">`).join("");
+      }
+    }).catch(() => {});
+  }
   const mediaSel = document.getElementById("portmap-port-media");
   const mediaInput = document.getElementById("portmap-port-media-custom");
   const spec = (Array.isArray(data.specials) ? data.specials : []).find(s => String(s.key) === String(portNo));
@@ -440,6 +477,12 @@ document.getElementById("portmap-port-save").addEventListener("click", () => {
     destPort: document.getElementById("portmap-port-destport").value.trim() || "—",
     dest: document.getElementById("portmap-port-dest").value.trim() || "—",
     ip: document.getElementById("portmap-port-ip").value.trim() || "—",
+    connType: document.getElementById("portmap-port-conn-type").value || "",
+    connectedTo: document.getElementById("portmap-port-conn-to").value.trim() || "",
+    bgpLocalAsn: document.getElementById("portmap-port-bgp-local").value.trim() || "",
+    bgpRemoteAsn: document.getElementById("portmap-port-bgp-remote").value.trim() || "",
+    bgpPrefixAdvertised: document.getElementById("portmap-port-bgp-adv").value.trim() || "",
+    bgpPrefixReceived: document.getElementById("portmap-port-bgp-recv").value.trim() || "",
   };
   const idx = data.rows.findIndex(r => String(r.port) === String(portNo));
   if (idx >= 0) data.rows[idx] = row; else data.rows.push(row);
