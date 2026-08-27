@@ -591,10 +591,11 @@
       const arr = JSON.parse(localStorage.getItem("rv_accessories") || "[]");
       localStorage.setItem("rv_accessories", JSON.stringify(arr.filter(a => !(canonKey(a.name) === canonKey(r.name) && a.type === "isp"))));
     } catch (e) {}
-    // Clean port map
+    // Clean port map (using correct key: rv_port_maps)
     try {
-      const pm = JSON.parse(localStorage.getItem("rv_port_map") || "{}");
-      if (pm[canonKey(r.name)]) { delete pm[canonKey(r.name)]; localStorage.setItem("rv_port_map", JSON.stringify(pm)); }
+      const PORT_KEY = typeof PORT_STORAGE_KEY !== "undefined" ? PORT_STORAGE_KEY : "rv_port_maps";
+      const pm = JSON.parse(localStorage.getItem(PORT_KEY) || "{}");
+      if (pm[canonKey(r.name)]) { delete pm[canonKey(r.name)]; localStorage.setItem(PORT_KEY, JSON.stringify(pm)); }
     } catch (e) {}
     if (selectedKey === canonKey(r.name)) { selectedKey = null; renderDetail(null); }
     await loadFromDb();
