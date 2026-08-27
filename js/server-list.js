@@ -264,6 +264,7 @@ function gotoRackLocation(id) {
 function deleteServerRecord(id) {
   const s = servers.find(x => x.id === id);
   const name = (s && (s.hostname || s.id)) || id;
+  const hostname = s ? (s.hostname || "") : "";
   const doubleOk = typeof window.confirmDoubleDelete === "function"
     ? window.confirmDoubleDelete(name)
     : (confirm("Hapus " + name + "?") && confirm("Yakin ingin menghapus permanen? Data yang dihapus tidak dapat dikembalikan."));
@@ -276,12 +277,19 @@ function deleteServerRecord(id) {
   } catch (e) { /* abaikan */ }
   try {
     const del = getDeletedServerIds();
-    if (id && !del.includes(id)) {
-      del.push(id);
+    // Store both id (string) for backward compat, and {id, hostname} for rack-layout matching
+    const exists = del.some(x => typeof x === "string" ? x === id : x && x.id === id);
+    if (!exists) {
+      // For backward compat: keep storing ID as string if no hostname
+      // If we have hostname, store as object
+      if (hostname) del.push({ id, hostname: canonKey(hostname) });
+      else del.push(id);
       localStorage.setItem(DELETED_SERVERS_KEY, JSON.stringify(del));
     }
   } catch (e) { /* abaikan */ }
+  // Clean up from SQLite devices table too
   if (name && typeof apiDeleteDevice === "function") apiDeleteDevice(name);
+  // Clean port/power maps
   [PORT_STORAGE_KEY, POWER_STORAGE_KEY].forEach(k => {
     try {
       const obj = JSON.parse(localStorage.getItem(k) || "{}") || {};
@@ -294,7 +302,29 @@ function deleteServerRecord(id) {
   if (typeof PORT_DATA !== "undefined") delete PORT_DATA[name];
   if (typeof POWER_DATA !== "undefined") delete POWER_DATA[name];
   if (typeof apiDeleteMap === "function") { apiDeleteMap("port", name); apiDeleteMap("power", name); }
-  postAudit("server.delete", name, "Dihapus dari List Server (double confirmation)");
+  // Also clean from rack layout (remove the deleted server from rack layout)
+  try {
+    const rackKey = typeof RACK_LAYOUTS_KEY !== "undefined" ? RACK_LAYOUTS_KEY : "rv_rack_layouts_v2";
+    const layoutsRaw = localStorage.getItem(rackKey);
+    if (layoutsRaw) {
+      const layouts = JSON.parse(layoutsRaw);
+      let changed = false;
+      Object.keys(layouts).forEach(rackId => {
+        const layout = layouts[rackId];
+        if (Array.isArray(layout)) {
+          const len = layout.length;
+          layouts[rackId] = layout.filter(d => {
+            const isDel = (d.type === "server" && (canonKey(d.name) === canonKey(hostname)));
+            if (isDel) changed = true;
+            return !isDel;
+          });
+          if (layouts[rackId].length !== len) changed = true;
+        }
+      });
+      if (changed) localStorage.setItem(rackKey, JSON.stringify(layouts));
+    }
+  } catch (e) { /* abaikan */ }
+  postAudit("server.delete", name, "Dihapus dari List Server + rack layout (double confirmation)");
   if (typeof showToast === "function") showToast("Server " + name + " berhasil dihapus.", "success");
   if (selectedId === id) { selectedId = null; renderDetail(null); }
   window.reloadServerList();
@@ -319,6 +349,12 @@ function openSrvView(s) {
 
 window.reloadServerList = function () {
   servers = getServers();
+  const siteSet = [...new Map(servers.map(s => [s.site, s.siteName || s.site])).entries()];
+  if (fSite) {
+    fSite.innerHTML = `<option value="all">Semua Site</option>` + siteSet
+      .filter(([id]) => id)
+      .map(([id, name]) => `<option value="${esc(id)}">${esc(name)}</option>`).join("");
+  }
   if (selectedId && !servers.some(x => x.id === selectedId)) {
     selectedId = null;
     renderDetail(null);

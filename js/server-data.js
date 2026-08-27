@@ -170,8 +170,21 @@ function getDeletedServerIds() {
 }
 
 function getServers() {
+  // Build tombstone sets from deleted IDs
   const deleted = new Set(getDeletedServerIds());
-  const notDeleted = arr => (Array.isArray(arr) ? arr : []).filter(s => !deleted.has(s.id));
+  const deletedHostnames = new Set();
+  // Check both old format (ID only) and new format ({id, hostname})
+  getDeletedServerIds().forEach(item => {
+    if (typeof item === "string") {
+      deleted.add(item);
+    } else if (item && typeof item === "object" && item.hostname) {
+      deleted.add(item.id);
+      deletedHostnames.add(String(item.hostname).toLowerCase());
+    }
+  });
+  const notDeleted = arr => (Array.isArray(arr) ? arr : []).filter(s =>
+    !deleted.has(s.id) && !deletedHostnames.has(String(s.hostname || "").toLowerCase())
+  );
   let list;
   if (typeof apiGetServers === "function") {
     const db = notDeleted(apiGetServers());
@@ -180,12 +193,12 @@ function getServers() {
       const dbIds = new Set(db.map(s => s.id));
       if (!db.length && ls.length && typeof apiSaveServer === "function") {
         ls.forEach(s => apiSaveServer(s));
-        list = [...ls, ...DEFAULT_SERVERS.filter(d => !deleted.has(d.id) && !ls.some(s => s.id === d.id))];
+    list = [...ls, ...DEFAULT_SERVERS.filter(d => !deleted.has(d.id) && !deletedHostnames.has(String(d.hostname || "").toLowerCase()) && !ls.some(s => s.id === d.id))];
       } else {
         list = [
           ...db,
           ...ls.filter(s => !dbIds.has(s.id)),
-          ...DEFAULT_SERVERS.filter(d => !deleted.has(d.id) && !dbIds.has(d.id) && !ls.some(s => s.id === d.id))
+          ...DEFAULT_SERVERS.filter(d => !deleted.has(d.id) && !deletedHostnames.has(String(d.hostname || "").toLowerCase()) && !dbIds.has(d.id) && !ls.some(s => s.id === d.id))
         ];
       }
     }
@@ -198,7 +211,7 @@ function getServers() {
     const seen = new Set(list.map(s => String(s.hostname || "").toLowerCase()));
     buildRackServers().forEach(r => {
       const k = String(r.hostname || "").toLowerCase();
-      if (k && !seen.has(k)) {
+      if (k && !seen.has(k) && !deleted.has(r.id) && !deletedHostnames.has(k)) {
         seen.add(k);
         list.push(r);
       }
